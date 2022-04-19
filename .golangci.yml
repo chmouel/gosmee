@@ -1,0 +1,60 @@
+run:
+  build-tags:
+    - e2e
+  skip-dirs:
+    - vendor
+linters-settings:
+  gocritic:
+    disabled-checks:
+      - unlambda
+linters:
+  enable:
+    - asciicheck
+    - bodyclose
+    - depguard
+    - dogsled
+    - durationcheck
+    - exhaustive
+    # - exhaustivestruct
+    - exportloopref
+    - forbidigo
+    - forcetypeassert
+    - gochecknoinits
+    - dupl
+    - errcheck
+    - errorlint
+    - gofumpt
+    - goimports
+    - gosec
+    - gocritic
+    - misspell
+    - deadcode
+    - gosec
+    - govet
+    - ifshort
+    - importas
+    - makezero
+    - nakedret
+    - predeclared
+    - revive
+    - stylecheck
+    - unparam
+    - gochecknoinits
+      # - goconst
+      # - gocyclo
+    # - goerr113
+    - gofmt
+    - goheader
+    - gomodguard
+    - goprintffuncname
+    - nilerr
+    - noctx
+    - nolintlint
+    - prealloc
+    - promlinter
+    - rowserrcheck
+    - sqlclosecheck
+    - tparallel
+    #- unconvert
+    - wastedassign
+    - whitespace

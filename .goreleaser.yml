@@ -1,0 +1,68 @@
+builds:
+  - env:
+      - CGO_ENABLED=0
+    main: ./
+    binary: gosmee
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -w
+      - -s
+archives:
+  - name_template: "{{ .Binary }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    replacements:
+      darwin: MacOS
+      linux: Linux
+      windows: Windows
+      386: i386
+      amd64: x86_64
+    format_overrides:
+      - goos: windows
+        format: zip
+checksum:
+  name_template: "checksums.txt"
+
+snapshot:
+  name_template: "{{ .Tag }}-next"
+
+release:
+  prerelease: true
+
+nfpms:
+  - file_name_template: "gosmee-{{.Version}}_{{.Os}}-{{.Arch}}"
+    homepage: https://github.com/chmouel/gosmee
+    description: Gosmee - smee.io forwarder in go
+    maintainer: Chmouel Boudjnah <chmouel@chmouel.com>
+    license: Apache 2.0
+    formats:
+      - deb
+      - rpm
+    bindir: /usr/bin
+    replacements:
+      amd64: 64bit
+      386: 32bit
+      arm: ARM
+      arm64: ARM64
+      darwin: macOS
+      linux: Linux
+      windows: Windows
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - Merge pull request
+      - Merge branch
+      - go mod tidy
+
+universal_binaries:
+  - replace: true
+    name_template: "gosmee"
