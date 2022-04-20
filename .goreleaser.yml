@@ -71,6 +71,7 @@ changelog:
       - Merge pull request
       - Merge branch
       - go mod tidy
+      - "^Update README.md$"
 
 universal_binaries:
   - replace: true
