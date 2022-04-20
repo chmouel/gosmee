@@ -5,11 +5,11 @@
 class Gosmee < Formula
   desc "gosmee  - smee.io go client"
   homepage "https://github.com/chmouel/gosmee"
-  version "0.0.3"
+  version "0.0.4"
 
   on_macos do
-    url "https://github.com/chmouel/gosmee/releases/download/0.0.3/gosmee_0.0.3_MacOS_all.tar.gz"
-    sha256 "12854ea76c17677d7b4d067bf9a43de80e35940dea5ebd4408db52caff493c89"
+    url "https://github.com/chmouel/gosmee/releases/download/0.0.4/gosmee_0.0.4_MacOS_all.tar.gz"
+    sha256 "f7dd1380ed3d20e96e3a5eca287a7c4919614791fdde859fdfcb3d368eb07273"
 
     def install
       bin.install "gosmee"
@@ -18,16 +18,16 @@ class Gosmee < Formula
 
   on_linux do
     if Hardware::CPU.arm? && Hardware::CPU.is_64_bit?
-      url "https://github.com/chmouel/gosmee/releases/download/0.0.3/gosmee_0.0.3_Linux_arm64.tar.gz"
-      sha256 "386cc53154b69fcda7764c03a4625fe9221a16cdfd6edca1a23d08265528109e"
+      url "https://github.com/chmouel/gosmee/releases/download/0.0.4/gosmee_0.0.4_Linux_arm64.tar.gz"
+      sha256 "bc1ec71c0ee1026aba080864e609e9feefd84a11ac69a2b4a49adc7073d81e91"
 
       def install
         bin.install "gosmee"
       end
     end
     if Hardware::CPU.intel?
-      url "https://github.com/chmouel/gosmee/releases/download/0.0.3/gosmee_0.0.3_Linux_x86_64.tar.gz"
-      sha256 "ef83a5b29b40d64d9de5d1962ddfe5ae74306cfac230aca40ad6a99339f32d16"
+      url "https://github.com/chmouel/gosmee/releases/download/0.0.4/gosmee_0.0.4_Linux_x86_64.tar.gz"
+      sha256 "852ddce188caa7e74ab7ec9c20ceb97ee5620aa0658b6b35ba00dc373fcbb080"
 
       def install
         bin.install "gosmee"
