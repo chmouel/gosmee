@@ -9,7 +9,7 @@ class Gosmee < Formula
 
   on_macos do
     url "https://github.com/chmouel/gosmee/releases/download/0.0.3/gosmee_0.0.3_MacOS_all.tar.gz"
-    sha256 "edd8c8a16bd05b54211479978fc6666201e5d2be8501662cda4a5196c2145f5c"
+    sha256 "12854ea76c17677d7b4d067bf9a43de80e35940dea5ebd4408db52caff493c89"
 
     def install
       bin.install "gosmee"
@@ -19,7 +19,7 @@ class Gosmee < Formula
   on_linux do
     if Hardware::CPU.arm? && Hardware::CPU.is_64_bit?
       url "https://github.com/chmouel/gosmee/releases/download/0.0.3/gosmee_0.0.3_Linux_arm64.tar.gz"
-      sha256 "fc400aefd70be3d5ba2760e35e6a9ec9861eb8fb965de35d06011eeec466d354"
+      sha256 "386cc53154b69fcda7764c03a4625fe9221a16cdfd6edca1a23d08265528109e"
 
       def install
         bin.install "gosmee"
@@ -27,7 +27,7 @@ class Gosmee < Formula
     end
     if Hardware::CPU.intel?
       url "https://github.com/chmouel/gosmee/releases/download/0.0.3/gosmee_0.0.3_Linux_x86_64.tar.gz"
-      sha256 "6f7c67db79168fe30759678d10a32ef62a707320ebb4052ec7ce2f585c65b36b"
+      sha256 "ef83a5b29b40d64d9de5d1962ddfe5ae74306cfac230aca40ad6a99339f32d16"
 
       def install
         bin.install "gosmee"
