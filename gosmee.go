@@ -273,7 +273,8 @@ func (c goSmee) setup() error {
 func main() {
 	app := &cli.App{
 		Name:                 "gosmee",
-		Usage:                "forward smee url to local",
+		Usage:                "forward smee url to a local service",
+		UsageText:            "gosmee [command options] SMEE_URL LOCAL_SERVICE_URL",
 		EnableBashCompletion: true,
 		Version:              string(Version),
 		Commands: []*cli.Command{
@@ -361,6 +362,6 @@ func main() {
 		},
 	}
 	if err := app.Run(os.Args); err != nil {
-		os.Stdout.WriteString(fmt.Sprintf("%s Forwarding %s\n", ansi.Color("ERROR", "red+b"), err.Error()))
+		os.Stdout.WriteString(fmt.Sprintf("%s gosmee %s\n", ansi.Color("ERROR", "red+b"), err.Error()))
 	}
 }
