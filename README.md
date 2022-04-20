@@ -40,6 +40,10 @@ Checkout the directory and use :
 -$ ./bin/gosmee --help
 ```
 
+### Services
+
+Services for macOS and Linux is available in [./hack/](./hack) directory.
+
 ## Usage
 
 The basic usage is with a smee url and a target url example :

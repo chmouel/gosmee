@@ -1,0 +1,9 @@
+[Unit]
+Description=Gosmee Forward
+
+[Service]
+ExecStart=gosmee https://smee.io/abcdef http://localhost:8080
+
+
+[Install]
+WantedBy=default.target
