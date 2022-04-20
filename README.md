@@ -1,4 +1,4 @@
-# gosmee  - smee.io go client
+# gosmee - smee.io go client
 
 A command line client for Smee’s webhook payload delivery service in GO.
 
@@ -11,7 +11,7 @@ easily expose some local developement server to the internet for webhook
 
 ### Release
 
-Go to  the [release](https://github.com/chmouel/gosmee/releases) page and choose your tarball, package for your platform.
+Go to the [release](https://github.com/chmouel/gosmee/releases) page and choose your archive or package for your platform.
 
 ## Homebrew
 
@@ -32,9 +32,10 @@ docker run ghcr.io/chmouel/gosmee:latest
 go install -v github.com/chmouel/gosmee@latest
 ```
 
-### GIT
+### Git
 
 Checkout the directory and use :
+
 ```shell
 -$ make build
 -$ ./bin/gosmee --help
@@ -46,13 +47,13 @@ Services for macOS and Linux is available in [./hack/](./hack) directory.
 
 ## Usage
 
-The basic usage is with a smee url and a target url example :
+The basic usage is with a smee URL and a target URL example :
 
 ```shell
 gosmee https://smee.io/aBcDeF https://localhost:8080
 ```
 
-will replay all message from the smee url to a service on `localhost:8080`
+will replay all message from the smee URL to a service on `localhost:8080`
 
 Another option is to be able to save all the replay as shell script :
 
@@ -60,7 +61,7 @@ Another option is to be able to save all the replay as shell script :
 gosmee --saveDir /tmp/savedreplay https://smee.io/aBcDeF https://localhost:8080
 ```
 
-When you have a new message comming to your smee url gosmee will save the json to
+When you have a new message comming to your smee URL gosmee will save the json to
 `/tmp/savedreplay/timestamp.json` and a shell script with curl to
 `/tmp/savedreplay/timestamp.sh`, you can simply replay the webhook at ease by
 launching the shell script.

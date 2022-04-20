@@ -1,6 +1,6 @@
 # System services
 
-## macOS:
+## macOS
 
 ```shell
 cp com.chmouel.gosmee.plist ~/Library/LaunchAgents/
