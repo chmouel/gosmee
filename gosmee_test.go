@@ -27,7 +27,7 @@ func TestGoSmeeGood(t *testing.T) {
 	assert.Assert(t, strings.Contains(string(m.body), "hello"))
 	assert.Equal(t, m.eventType, "push")
 	assert.Equal(t, m.contentType, "application/json")
-	assert.Equal(t, m.timestamp, "20220419T20h03", m.timestamp)
+	assert.Assert(t, strings.HasPrefix(m.timestamp, "2022"))
 	_, ok := m.headers["otherheader"]
 	assert.Assert(t, !ok)
 }
