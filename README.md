@@ -11,7 +11,7 @@ easily expose some local developement server to the internet for webhook
 
 ### Release
 
-Go to release page and choose your tarball, package for your platform
+Go to  the [release](https://github.com/chmouel/gosmee/releases) page and choose your tarball, package for your platform.
 
 ### Docker
 
