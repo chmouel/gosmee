@@ -94,7 +94,6 @@ func (c goSmee) parse(data []byte) (payloadMsg, error) {
 				pm.eventType = pv
 			}
 		}
-
 	}
 	return pm, nil
 }

@@ -29,6 +29,12 @@ lint-md: ${MD_FILES} ## runs markdownlint and vale on all markdown files
 dev:
 	reflex -r 'gosmee.go' -s go run gosmee.go -- --saveDir /tmp/save2 $(SMEE_URL) $(TARGET_URL)
 
+fmt:
+	@go fmt `go list ./... | grep -v /vendor/`
+
+fumpt:
+	@gofumpt -w *.go
+
 .PHONY: vendor
 vendor:
 	@go mod tidy

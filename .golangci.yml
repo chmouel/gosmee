@@ -10,7 +10,7 @@ linters-settings:
 linters:
   enable:
     - asciicheck
-    - bodyclose
+    # - bodyclose
     - depguard
     - dogsled
     - durationcheck
@@ -38,7 +38,7 @@ linters:
     - predeclared
     - revive
     - stylecheck
-    - unparam
+    # - unparam
     - gochecknoinits
       # - goconst
       # - gocyclo
@@ -47,14 +47,14 @@ linters:
     - goheader
     - gomodguard
     - goprintffuncname
-    - nilerr
-    - noctx
+    # - nilerr
+    # - noctx
     - nolintlint
     - prealloc
     - promlinter
-    - rowserrcheck
-    - sqlclosecheck
-    - tparallel
+    # - rowserrcheck
+    # - sqlclosecheck
+    # - tparallel
     #- unconvert
-    - wastedassign
+    # - wastedassign
     - whitespace

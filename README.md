@@ -26,7 +26,6 @@ brew install gosmee
 yay -S gosmee-bin
 ```
 
-
 ### Docker
 
 ```shell
