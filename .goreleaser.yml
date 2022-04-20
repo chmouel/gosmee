@@ -51,7 +51,7 @@ snapshot:
   name_template: "{{ .Tag }}-next"
 
 release:
-  prerelease: false
+  prerelease: "false"
 
 nfpms:
   - file_name_template: "gosmee-{{.Version}}_{{.Os}}-{{.Arch}}"
