@@ -1,6 +1,6 @@
 before:
   hooks:
-    - /bin/sh -c "echo {{.Tag}} > misc/version"
+    - /bin/sh -c "echo -n {{.Tag}} > misc/version"
 
 builds:
   - env:
