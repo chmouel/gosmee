@@ -20,6 +20,13 @@ brew tap chmouel/gosmee https://github.com/chmouel/gosmee
 brew install gosmee
 ```
 
+## Arch
+
+```shell
+yay -S gosmee-bin
+```
+
+
 ### Docker
 
 ```shell
