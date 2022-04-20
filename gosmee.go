@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"text/template"
 	"time"
 
 	_ "embed"
@@ -22,12 +23,8 @@ import (
 	"golang.org/x/text/language"
 )
 
-var shellScriptTmpl = `#!/bin/bash
-set -euxf
-targethostname="%s"
-[[ ${1:-""} == -l ]] && targethostname="http://localhost:8080"
-curl -H 'Content-Type: %s' %s -X POST -d @%s.json ${targethostname}
-`
+//go:embed misc/replay_script.tmpl.bash
+var shellScriptTmpl []byte
 
 //go:embed misc/zsh_completion.zsh
 var zshCompletion []byte
@@ -180,7 +177,22 @@ func (c goSmee) saveData(b []byte) error {
 		headers += fmt.Sprintf("-H '%s: %s' ", k, v)
 	}
 
-	_, _ = s.WriteString(fmt.Sprintf(shellScriptTmpl, c.targetURL, pm.contentType, headers, fprefix))
+	// parse shellScriptTmpl as template with arguments
+	t := template.Must(template.New("shellScriptTmpl").Parse(string(shellScriptTmpl)))
+	if err := t.Execute(s, struct {
+		Headers     string
+		TargetURL   string
+		ContentType string
+		FilePrefix  string
+	}{
+		Headers:     headers,
+		TargetURL:   c.targetURL,
+		ContentType: pm.contentType,
+		FilePrefix:  fprefix,
+	}); err != nil {
+		return err
+	}
+
 	// set permission
 	if err := os.Chmod(shscript, 0o755); err != nil {
 		return err
