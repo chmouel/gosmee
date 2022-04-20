@@ -286,7 +286,7 @@ func main() {
 			},
 			&cli.StringFlag{
 				Name:    "saveDir",
-				Usage:   "Save payloads to this dir",
+				Usage:   "Save payloads to this dir with shell scripts to replay it easily.",
 				Aliases: []string{"s"},
 			},
 			&cli.BoolFlag{
@@ -297,11 +297,10 @@ func main() {
 			},
 			&cli.BoolFlag{
 				Name:  "nocolor",
-				Usage: "Disable color output",
+				Usage: "Disable color output, automatically disabled when non tty",
 			},
 		},
 	}
-
 	if err := app.Run(os.Args); err != nil {
 		os.Stdout.WriteString(fmt.Sprintf("%s Forwarding %s\n", ansi.Color("ERROR", "red+b"), err.Error()))
 	}
