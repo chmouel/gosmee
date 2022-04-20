@@ -5,7 +5,7 @@ A command line client for Smee’s webhook payload delivery service in GO.
 ## Description
 
 Replay message from <https://smee.io/> to a target service. Allowing you to
-easily expose some local developement server to the internet for your webhook
+easily expose a local dev service to the internet to be consumed by webhooks.
 
 ## Screenshot
 
