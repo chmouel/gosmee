@@ -68,6 +68,7 @@ changelog:
     exclude:
       - "^docs:"
       - "^test:"
+      - "^Brew formula update for gosmee version"
       - Merge pull request
       - Merge branch
       - go mod tidy
