@@ -43,7 +43,7 @@ Checkout the directory and use :
 
 ### System Services
 
-System Service example file for macOS and Linux is available in the [./hack/](./hack) directory.
+System Service example file for macOS and Linux is available in the [misc](./misc) directory.
 
 ## Usage
 
@@ -73,7 +73,7 @@ You will have a pretty colored emoji unless you specify `--nocolor` as argument.
 ## Thanks
 
 - Most of the works is done by the [go-sse](github.com/r3labs/sse) library.
-- Used previously [pysmee](https://github.com/akrog/pysmee) but it seems that the underlying sse library is broken with chunked transfer. 
+- Used previously [pysmee](https://github.com/akrog/pysmee) but it seems that the underlying sse library is broken with chunked transfer.
 
 ## Copyright
 
