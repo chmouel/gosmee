@@ -40,12 +40,12 @@ snapshot:
   name_template: "{{ .Tag }}-next"
 
 release:
-  prerelease: false
+  prerelease: true
 
 nfpms:
   - file_name_template: "gosmee-{{.Version}}_{{.Os}}-{{.Arch}}"
     homepage: https://github.com/chmouel/gosmee
-    description: Gosmee - smee.io forwarder in go
+    description: "Gosmee - smee.io forwarder in go"
     maintainer: Chmouel Boudjnah <chmouel@chmouel.com>
     license: Apache 2.0
     formats:
@@ -75,3 +75,13 @@ changelog:
 universal_binaries:
   - replace: true
     name_template: "gosmee"
+
+aurs:
+  - name: gosmee-bin
+    homepage: "https://github.com/chmouel/gosmee"
+    description: "Gosmee - smee.io forwarder in go"
+    maintainers:
+      - "Chmouel Boudjnah <chmouel@chmouel.com>"
+    license: Apache 2.0
+    private_key: "{{ .Env.AUR_PRIVATE_KEY }}"
+    git_url: ssh://aur@aur.archlinux.org/gosmee-bin.git
