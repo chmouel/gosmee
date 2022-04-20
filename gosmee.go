@@ -30,6 +30,7 @@ type payloadMsg struct {
 	body        []byte
 	timestamp   string
 	contentType string
+	eventType   string
 }
 
 type messageBody struct {
@@ -84,8 +85,16 @@ func (c goSmee) parse(data []byte) (payloadMsg, error) {
 				return payloadMsg{}, fmt.Errorf("cannot convert timestamp to int64")
 			}
 			dt := time.Unix(tsInt, 0)
+
 			pm.timestamp = dt.Format("20060102T15h04")
 		}
+
+		if payloadKey == "x-github-event" || payloadKey == "x-gitlab-event" || payloadKey == "x-event-key" {
+			if pv, ok := payloadValue.(string); ok {
+				pm.eventType = pv
+			}
+		}
+
 	}
 	return pm, nil
 }
@@ -110,7 +119,14 @@ func (c goSmee) saveData(b []byte) error {
 		}
 	}
 
-	jsonfile := fmt.Sprintf("%s.json", filepath.Join(c.saveDir, pm.timestamp))
+	var fprefix string
+	if pm.eventType != "" {
+		fprefix = filepath.Join(c.saveDir, fmt.Sprintf("%s-%s", pm.eventType, pm.timestamp))
+	} else {
+		fprefix = filepath.Join(c.saveDir, fmt.Sprintf("%s", pm.timestamp))
+	}
+
+	jsonfile := fmt.Sprintf("%s.json", fprefix)
 	f, err := os.Create(jsonfile)
 	if err != nil {
 		return err
@@ -122,14 +138,14 @@ func (c goSmee) saveData(b []byte) error {
 		return err
 	}
 
-	shscript := fmt.Sprintf("%s.sh", filepath.Join(c.saveDir, pm.timestamp))
+	shscript := fmt.Sprintf("%s.sh", fprefix)
 	os.Stdout.WriteString(fmt.Sprintf("%s %s and %s has been saved\n", c.emoji("⌁", "yellow+b"), shscript, jsonfile))
 	s, err := os.Create(shscript)
 	if err != nil {
 		return err
 	}
 	defer s.Close()
-	_, _ = s.WriteString(fmt.Sprintf("#!/bin/bash\n\nset -euxf\ncurl -H 'Content-Type: %s' -X POST -d @%s.json ", pm.contentType, filepath.Join(c.saveDir, pm.timestamp)))
+	_, _ = s.WriteString(fmt.Sprintf("#!/bin/bash\n\nset -euxf\ncurl -H 'Content-Type: %s' -X POST -d @%s.json ", pm.contentType, fprefix))
 	for k, v := range pm.headers {
 		_, _ = s.WriteString(fmt.Sprintf("-H '%s: %s' ", k, v))
 	}

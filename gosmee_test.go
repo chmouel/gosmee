@@ -12,6 +12,8 @@ var simpleJSON = `{
 	"user-agent": "gosmee",
 	"timestamp": 1650391429188,
 	"otherheader": "yolo",
+	"content-type": "application/json",
+	"x-github-event": "push",
 	"body": {"hello": "world"}
 }
 `
@@ -23,6 +25,9 @@ func TestGoSmeeGood(t *testing.T) {
 	assert.Equal(t, m.headers["X-Foo"], "bar")
 	assert.Equal(t, m.headers["User-Agent"], "gosmee")
 	assert.Assert(t, strings.Contains(string(m.body), "hello"))
+	assert.Equal(t, m.eventType, "push")
+	assert.Equal(t, m.contentType, "application/json")
+	assert.Equal(t, m.timestamp, "20220419T20h03", m.timestamp)
 	_, ok := m.headers["otherheader"]
 	assert.Assert(t, !ok)
 }
