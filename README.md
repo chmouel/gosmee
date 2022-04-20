@@ -20,7 +20,7 @@ brew tap chmouel/gosmee https://github.com/chmouel/gosmee
 brew install gosmee
 ```
 
-## Arch
+## [Arch](https://aur.archlinux.org/packages/gosmee-bin)
 
 ```shell
 yay -S gosmee-bin
