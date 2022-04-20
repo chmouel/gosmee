@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	_ "embed"
+
 	"github.com/mattn/go-isatty"
 	"github.com/mgutz/ansi"
 	"github.com/mitchellh/mapstructure"
@@ -20,11 +22,18 @@ import (
 	"golang.org/x/text/language"
 )
 
-var tmpl = `#!/bin/bash
+var shellScriptTmpl = `#!/bin/bash
 set -euxf
 targethostname="%s"
 [[ ${1:-""} == -l ]] && targethostname="http://localhost:8080"
-curl -H 'Content-Type: %s' %s -X POST -d @%s.json ${targethostname}`
+curl -H 'Content-Type: %s' %s -X POST -d @%s.json ${targethostname}
+`
+
+//go:embed misc/zsh_completion.zsh
+var zshCompletion []byte
+
+//go:embed misc/bash_completion.bash
+var bashCompletion []byte
 
 type goSmee struct {
 	saveDir, smeeURL, targetURL string
@@ -171,7 +180,7 @@ func (c goSmee) saveData(b []byte) error {
 		headers += fmt.Sprintf("-H '%s: %s' ", k, v)
 	}
 
-	_, _ = s.WriteString(fmt.Sprintf(tmpl, c.targetURL, pm.contentType, headers, fprefix))
+	_, _ = s.WriteString(fmt.Sprintf(shellScriptTmpl, c.targetURL, pm.contentType, headers, fprefix))
 	// set permission
 	if err := os.Chmod(shscript, 0o755); err != nil {
 		return err
@@ -248,8 +257,33 @@ func (c goSmee) setup() error {
 
 func main() {
 	app := &cli.App{
-		Name:  "gosmee",
-		Usage: "forward smee url to local",
+		Name:                 "gosmee",
+		Usage:                "forward smee url to local",
+		EnableBashCompletion: true,
+		Commands: []*cli.Command{
+			{
+				Name:  "completion",
+				Usage: "generate shell completion",
+				Subcommands: []*cli.Command{
+					{
+						Name:  "zsh",
+						Usage: "generate zsh completion",
+						Action: func(c *cli.Context) error {
+							os.Stdout.WriteString(string(zshCompletion))
+							return nil
+						},
+					},
+					{
+						Name:  "bash",
+						Usage: "generate bash completion",
+						Action: func(c *cli.Context) error {
+							os.Stdout.WriteString(string(bashCompletion))
+							return nil
+						},
+					},
+				},
+			},
+		},
 		Action: func(c *cli.Context) error {
 			if c.NArg() != 2 {
 				err := cli.ShowCommandHelp(c, c.Command.Name)
@@ -293,8 +327,9 @@ func main() {
 			},
 			&cli.StringFlag{
 				Name:    "saveDir",
-				Usage:   "Save payloads to this dir with shell scripts to replay it easily.",
+				Usage:   "Save payloads to `DIR` populated with shell scripts to replay easily.",
 				Aliases: []string{"s"},
+				EnvVars: []string{"GOSMEE_SAVEDIR"},
 			},
 			&cli.BoolFlag{
 				Name:    "noReplay",
@@ -303,8 +338,9 @@ func main() {
 				Value:   false,
 			},
 			&cli.BoolFlag{
-				Name:  "nocolor",
-				Usage: "Disable color output, automatically disabled when non tty",
+				Name:    "nocolor",
+				Usage:   "Disable color output, automatically disabled when non tty",
+				EnvVars: []string{"NO_COLOR"},
 			},
 		},
 	}

@@ -55,6 +55,18 @@ Checkout the directory and use :
 
 System Service example file for macOS and Linux is available in the [misc](./misc) directory.
 
+### Shell completion
+
+Shell completion is available with:
+
+```shell
+# BASH
+source <(gosmee completion bash)
+
+# ZSH
+source <(gosmee completion zsh)
+```
+
 ## Usage
 
 You first may want to generate your own smee URL by going to <https://smee.io/new>

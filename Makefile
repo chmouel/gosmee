@@ -8,7 +8,10 @@ all: test lint build
 test:
 	@go test ./... -v
 
-build:
+clean:
+	@rm -rf bin/gosmee
+
+build: clean
 	@echo "building."
 	@mkdir -p bin/
 	@go build  -v -ldflags="-s -w"  -o bin/gosmee gosmee.go
