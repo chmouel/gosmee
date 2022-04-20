@@ -2,6 +2,8 @@ TARGET_URL ?= http://localhost:8080
 SMEE_URL ?= https://smee.io/new
 MD_FILES := $(shell find . -type f -regex ".*md"  -not -regex '^./vendor/.*'  -not -regex '^./.vale/.*' -not -regex "^./.git/.*" -print)
 
+LDFLAGS := -s -w
+FLAGS += -ldflags "$(LDFLAGS)"
 
 all: test lint build
 
@@ -14,7 +16,7 @@ clean:
 build: clean
 	@echo "building."
 	@mkdir -p bin/
-	@go build  -v -ldflags="-s -w"  -o bin/gosmee gosmee.go
+	@go build  -v $(FLAGS)  -o bin/gosmee gosmee.go
 
 lint: lint-go lint-md
 
