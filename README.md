@@ -5,7 +5,7 @@ A command line client for Smee’s webhook payload delivery service in GO.
 ## Description
 
 Replay message from <https://smee.io/> to a target service. Allowing you to
-easily expose some local developement server to the internet for webhook
+easily expose some local developement server to the internet for your webhook
 
 ## Screenshot
 
@@ -57,7 +57,9 @@ System Service example file for macOS and Linux is available in the [misc](./mis
 
 ## Usage
 
-The basic usage is with a smee URL and a target URL example :
+You first may want to generate your own smee URL by going to <https://smee.io/new>
+
+When you have it the basic usage is the folllowing :
 
 ```shell
 gosmee https://smee.io/aBcDeF https://localhost:8080
