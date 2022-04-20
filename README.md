@@ -13,6 +13,13 @@ easily expose some local developement server to the internet for webhook
 
 Go to  the [release](https://github.com/chmouel/gosmee/releases) page and choose your tarball, package for your platform.
 
+## Homebrew
+
+```
+brew tap chmouel/gosmee https://github.com/chmouel/gosmee
+brew install gosmee
+```
+
 ### Docker
 
 ```
