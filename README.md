@@ -30,7 +30,7 @@ brew install gosmee
 yay -S gosmee-bin
 ```
 
-### Docker
+### [Docker](https://github.com/users/chmouel/packages/container/package/gosmee)
 
 ```shell
 docker run ghcr.io/chmouel/gosmee:latest
