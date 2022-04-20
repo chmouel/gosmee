@@ -15,15 +15,21 @@ Go to  the [release](https://github.com/chmouel/gosmee/releases) page and choose
 
 ## Homebrew
 
-```
+```shell
 brew tap chmouel/gosmee https://github.com/chmouel/gosmee
 brew install gosmee
 ```
 
 ### Docker
 
-```
+```shell
 docker run ghcr.io/chmouel/gosmee:latest
+```
+
+## GO
+
+```shell
+go install -v github.com/chmouel/gosmee@latest
 ```
 
 ### GIT
