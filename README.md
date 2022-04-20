@@ -65,18 +65,18 @@ When you have it the basic usage is the folllowing :
 gosmee https://smee.io/aBcDeF https://localhost:8080
 ```
 
-will replay all message from the smee URL to a service on `localhost:8080`
+this will replay all payload comingto to the smee URL on a service running on `http://localhost:8080`
 
-Another option is to be able to save all the replay as shell script :
+Another option is to be able to save all the replay as a handy shell script :
 
 ```shell
 gosmee --saveDir /tmp/savedreplay https://smee.io/aBcDeF https://localhost:8080
 ```
 
-When you have a new message comming to your smee URL gosmee will save the json to
-`/tmp/savedreplay/timestamp.json` and a shell script with curl to
-`/tmp/savedreplay/timestamp.sh`, you can simply replay the webhook at ease by
-launching the shell script.
+What this will do is when you have a new payload comming to your smee URL, gosmee will save the json to
+`/tmp/savedreplay/timestamp.json` and generate a shell script with curl options  to
+`/tmp/savedreplay/timestamp.sh`. You then can simply replay the webhook at ease by
+launching the shell script again and again..
 
 You can ignore some events (if we detect it from Gitlab/GitHub/Bitbucket) if you add one or multiple `--ignore-event` flags.
 
