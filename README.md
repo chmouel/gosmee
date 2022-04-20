@@ -41,9 +41,9 @@ Checkout the directory and use :
 -$ ./bin/gosmee --help
 ```
 
-### Services
+### System Services
 
-Services for macOS and Linux is available in [./hack/](./hack) directory.
+System Service example file for macOS and Linux is available in the [./hack/](./hack) directory.
 
 ## Usage
 
