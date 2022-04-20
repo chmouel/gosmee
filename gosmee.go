@@ -20,6 +20,12 @@ import (
 	"golang.org/x/text/language"
 )
 
+var tmpl = `#!/bin/bash
+set -euxf
+targethostname="%s"
+[[ ${1:-""} == -l ]] && targethostname="http://localhost:8080"
+curl -H 'Content-Type: %s' %s -X POST -d @%s.json ${targethostname}`
+
 type goSmee struct {
 	saveDir, smeeURL, targetURL string
 	decorate, noReplay          bool
@@ -160,11 +166,12 @@ func (c goSmee) saveData(b []byte) error {
 		return err
 	}
 	defer s.Close()
-	_, _ = s.WriteString(fmt.Sprintf("#!/bin/bash\n\nset -euxf\ncurl -H 'Content-Type: %s' -X POST -d @%s.json ", pm.contentType, fprefix))
+	headers := ""
 	for k, v := range pm.headers {
-		_, _ = s.WriteString(fmt.Sprintf("-H '%s: %s' ", k, v))
+		headers += fmt.Sprintf("-H '%s: %s' ", k, v)
 	}
-	_, _ = s.WriteString(fmt.Sprintf("%s\n", c.targetURL))
+
+	_, _ = s.WriteString(fmt.Sprintf(tmpl, c.targetURL, pm.contentType, headers, fprefix))
 	// set permission
 	if err := os.Chmod(shscript, 0o755); err != nil {
 		return err
