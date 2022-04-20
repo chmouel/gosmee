@@ -1,3 +1,7 @@
+before:
+  hooks:
+    - /bin/sh -c "echo {{.Tag}} > misc/version"
+
 builds:
   - env:
       - CGO_ENABLED=0
@@ -39,7 +43,6 @@ brews:
       output = Utils.popen_read("SHELL=zsh #{bin}/gosmee completion zsh")
       (zsh_completion/"_gosmee").write output
       prefix.install_metafiles
-
 
 checksum:
   name_template: "checksums.txt"

@@ -29,6 +29,9 @@ var shellScriptTmpl []byte
 //go:embed misc/zsh_completion.zsh
 var zshCompletion []byte
 
+//go:embed misc/version
+var Version []byte
+
 //go:embed misc/bash_completion.bash
 var bashCompletion []byte
 
@@ -272,6 +275,7 @@ func main() {
 		Name:                 "gosmee",
 		Usage:                "forward smee url to local",
 		EnableBashCompletion: true,
+		Version:              string(Version),
 		Commands: []*cli.Command{
 			{
 				Name:  "completion",
