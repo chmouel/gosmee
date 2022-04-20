@@ -57,6 +57,8 @@ launching the shell script.
 
 You can add `--noReplay` if you only want the saving and not replaying.
 
+You will have a pretty colored emoji unless you specify `--nocolor` as argument.
+
 ## Thanks
 
 Most of the works is done by the [go-sse](github.com/r3labs/sse) library
