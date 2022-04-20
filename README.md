@@ -76,6 +76,8 @@ When you have a new message comming to your smee URL gosmee will save the json t
 `/tmp/savedreplay/timestamp.sh`, you can simply replay the webhook at ease by
 launching the shell script.
 
+You can ignore some events (if we detect it from Gitlab/GitHub/Bitbucket) if you add one or multiple `--ignore-event` flags.
+
 You can add `--noReplay` if you only want the saving and not replaying.
 
 You will have a pretty colored emoji unless you specify `--nocolor` as argument.

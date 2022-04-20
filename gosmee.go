@@ -23,6 +23,7 @@ import (
 type goSmee struct {
 	saveDir, smeeURL, targetURL string
 	decorate, noReplay          bool
+	ignoreEvents                []string
 }
 
 type payloadMsg struct {
@@ -95,6 +96,16 @@ func (c goSmee) parse(data []byte) (payloadMsg, error) {
 			}
 		}
 	}
+
+	if len(c.ignoreEvents) > 0 && pm.eventType != "" {
+		for _, v := range c.ignoreEvents {
+			if v == pm.eventType {
+				os.Stdout.WriteString(fmt.Sprintf("%s skipping event %s as requested\n", c.emoji("!", "blue+b"), pm.eventType))
+				return payloadMsg{}, nil
+			}
+		}
+	}
+
 	return pm, nil
 }
 
@@ -109,6 +120,9 @@ func (c goSmee) saveData(b []byte) error {
 	pm, err := c.parse(b)
 	if err != nil {
 		return err
+	}
+	if len(pm.headers) == 0 {
+		return nil
 	}
 
 	// check if saveDir is created
@@ -162,6 +176,10 @@ func (c goSmee) replayData(b []byte) error {
 	if err != nil {
 		return err
 	}
+	if len(pm.headers) == 0 {
+		return nil
+	}
+
 	client := http.Client{Timeout: time.Duration(1) * time.Second}
 	ctx := context.Background()
 	req, err := http.NewRequestWithContext(ctx, "POST", c.targetURL, strings.NewReader(string(pm.body)))
@@ -176,7 +194,15 @@ func (c goSmee) replayData(b []byte) error {
 		return err
 	}
 	defer resp.Body.Close()
-	msg := fmt.Sprintf("request replayed to %s, status: %s", ansi.Color(c.targetURL, "green+ub"), ansi.Color(fmt.Sprintf("%d", resp.StatusCode), "blue+b"))
+
+	var msg string
+	if pm.eventType != "" {
+		msg = fmt.Sprintf("%s event", pm.eventType)
+	} else {
+		msg = "request"
+	}
+
+	msg = fmt.Sprintf("%s replayed to %s, status: %s", msg, ansi.Color(c.targetURL, "green+ub"), ansi.Color(fmt.Sprintf("%d", resp.StatusCode), "blue+b"))
 	if resp.StatusCode > 299 {
 		msg = fmt.Sprintf("%s, error: %s", msg, resp.Status)
 	}
@@ -241,15 +267,21 @@ func main() {
 				decorate = false
 			}
 			cfg := goSmee{
-				smeeURL:   smeeURL,
-				targetURL: targetURL,
-				saveDir:   c.String("saveDir"),
-				noReplay:  c.Bool("noReplay"),
-				decorate:  decorate,
+				smeeURL:      smeeURL,
+				targetURL:    targetURL,
+				saveDir:      c.String("saveDir"),
+				noReplay:     c.Bool("noReplay"),
+				decorate:     decorate,
+				ignoreEvents: c.StringSlice("ignore-event"),
 			}
 			return cfg.setup()
 		},
 		Flags: []cli.Flag{
+			&cli.StringSliceFlag{
+				Name:    "ignore-event",
+				Aliases: []string{"I"},
+				Usage:   "Ignore these events",
+			},
 			&cli.StringFlag{
 				Name:    "saveDir",
 				Usage:   "Save payloads to this dir",
