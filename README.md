@@ -9,6 +9,19 @@ easily expose some local developement server to the internet for webhook
 
 ## Install
 
+### Release
+
+Go to release page and choose your tarball, package for your platform
+
+### Docker
+
+```
+docker run ghcr.io/chmouel/gosmee:latest
+```
+
+### GIT
+
+Checkout the directory and use :
 ```shell
 -$ make build
 -$ ./bin/gosmee --help
