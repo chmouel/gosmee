@@ -86,9 +86,6 @@ universal_binaries:
   - replace: true
     name_template: "gosmee"
 
-sboms:
-  - artifacts: archive
-
 aurs:
   - name: gosmee-bin
     homepage: "https://github.com/chmouel/gosmee"
