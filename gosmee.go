@@ -92,6 +92,8 @@ func (c goSmee) parse(data []byte) (payloadMsg, error) {
 
 		if payloadKey == "x-github-event" || payloadKey == "x-gitlab-event" || payloadKey == "x-event-key" {
 			if pv, ok := payloadValue.(string); ok {
+				// github action don't like it
+				pv = strings.ReplaceAll(pv, ":", "-")
 				pm.eventType = pv
 			}
 		}
