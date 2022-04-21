@@ -82,7 +82,10 @@ func (c goSmee) parse(data []byte) (payloadMsg, error) {
 			if err != nil {
 				return pm, err
 			}
-			pm.body = mb.Body
+			pm.body, err = json.MarshalIndent(mb.Body, "", "  ")
+			if err != nil {
+				return payloadMsg{}, nil
+			}
 		}
 		if payloadKey == "content-type" {
 			if pv, ok := payloadValue.(string); ok {
@@ -108,7 +111,8 @@ func (c goSmee) parse(data []byte) (payloadMsg, error) {
 		if payloadKey == "x-github-event" || payloadKey == "x-gitlab-event" || payloadKey == "x-event-key" {
 			if pv, ok := payloadValue.(string); ok {
 				// github action don't like it
-				pv = strings.ReplaceAll(pv, ":", "-")
+				replace := strings.NewReplacer(":", "-", " ", "_")
+				pv = replace.Replace(strings.ToLower(pv))
 				pm.eventType = pv
 			}
 		}
