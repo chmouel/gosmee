@@ -82,10 +82,7 @@ func (c goSmee) parse(data []byte) (payloadMsg, error) {
 			if err != nil {
 				return pm, err
 			}
-			pm.body, err = json.MarshalIndent(mb.Body, "", "  ")
-			if err != nil {
-				return payloadMsg{}, nil
-			}
+			pm.body = mb.Body
 		}
 		if payloadKey == "content-type" {
 			if pv, ok := payloadValue.(string); ok {
