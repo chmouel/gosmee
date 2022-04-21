@@ -5,11 +5,11 @@
 class Gosmee < Formula
   desc "gosmee  - smee.io go client"
   homepage "https://github.com/chmouel/gosmee"
-  version "0.0.8"
+  version "0.0.9"
 
   on_macos do
-    url "https://github.com/chmouel/gosmee/releases/download/0.0.8/gosmee_0.0.8_MacOS_all.tar.gz"
-    sha256 "ea511ef1e0d1d0969d2c978c3146e5f012ec93e0ea0b832f1e23ce588c2f4e57"
+    url "https://github.com/chmouel/gosmee/releases/download/0.0.9/gosmee_0.0.9_MacOS_all.tar.gz"
+    sha256 "8bf80d0bed20fd77d9ec91a8f700bb41d135d6d2ba1eeb0cb8f3ad676b50ff57"
 
     def install
       bin.install "gosmee" => "gosmee"
@@ -22,9 +22,9 @@ class Gosmee < Formula
   end
 
   on_linux do
-    if Hardware::CPU.arm? && Hardware::CPU.is_64_bit?
-      url "https://github.com/chmouel/gosmee/releases/download/0.0.8/gosmee_0.0.8_Linux_arm64.tar.gz"
-      sha256 "32fef0447e22d7b21ae67b2d85e544e1e091aa8b78108571c4b13608392de1c9"
+    if Hardware::CPU.intel?
+      url "https://github.com/chmouel/gosmee/releases/download/0.0.9/gosmee_0.0.9_Linux_x86_64.tar.gz"
+      sha256 "9562d8dec39579e2656c1333c4343f3428dbb91278140d4856a1f01bdb329dc5"
 
       def install
         bin.install "gosmee" => "gosmee"
@@ -35,9 +35,9 @@ class Gosmee < Formula
         prefix.install_metafiles
       end
     end
-    if Hardware::CPU.intel?
-      url "https://github.com/chmouel/gosmee/releases/download/0.0.8/gosmee_0.0.8_Linux_x86_64.tar.gz"
-      sha256 "d440398d387c0429914e3c692378d3b746dde8e006e140a11587ebc15a3cc7ef"
+    if Hardware::CPU.arm? && Hardware::CPU.is_64_bit?
+      url "https://github.com/chmouel/gosmee/releases/download/0.0.9/gosmee_0.0.9_Linux_arm64.tar.gz"
+      sha256 "f7d2661b9566b60732ca6e1dba2352282211a65261a60b7bf7ecc60c4b726476"
 
       def install
         bin.install "gosmee" => "gosmee"
