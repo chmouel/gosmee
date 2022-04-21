@@ -3,7 +3,7 @@ SMEE_URL ?= https://smee.io/new
 MD_FILES := $(shell find . -type f -regex ".*md"  -not -regex '^./vendor/.*'  -not -regex '^./.vale/.*' -not -regex "^./.git/.*" -print)
 
 LDFLAGS := -s -w
-FLAGS += -ldflags "$(LDFLAGS)"
+FLAGS += -ldflags "$(LDFLAGS)" -buildvcs=true
 
 all: test lint build
 

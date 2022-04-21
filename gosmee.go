@@ -118,7 +118,7 @@ func (c goSmee) parse(data []byte) (payloadMsg, error) {
 	if len(c.ignoreEvents) > 0 && pm.eventType != "" {
 		for _, v := range c.ignoreEvents {
 			if v == pm.eventType {
-				os.Stdout.WriteString(fmt.Sprintf("%s skipping event %s as requested\n", c.emoji("!", "blue+b"), pm.eventType))
+				os.Stdout.WriteString(fmt.Sprintf("%sskipping event %s as requested\n", c.emoji("!", "blue+b"), pm.eventType))
 				return payloadMsg{}, nil
 			}
 		}
@@ -131,7 +131,7 @@ func (c goSmee) emoji(emoji, color string) string {
 	if !c.decorate {
 		return ""
 	}
-	return ansi.Color(emoji, color)
+	return ansi.Color(emoji, color) + " "
 }
 
 func (c goSmee) saveData(b []byte) error {
@@ -170,7 +170,7 @@ func (c goSmee) saveData(b []byte) error {
 	}
 
 	shscript := fmt.Sprintf("%s.sh", fprefix)
-	os.Stdout.WriteString(fmt.Sprintf("%s %s and %s has been saved\n", c.emoji("⌁", "yellow+b"), shscript, jsonfile))
+	os.Stdout.WriteString(fmt.Sprintf("%s%s and %s has been saved\n", c.emoji("⌁", "yellow+b"), shscript, jsonfile))
 	s, err := os.Create(shscript)
 	if err != nil {
 		return err
@@ -240,16 +240,18 @@ func (c goSmee) replayData(b []byte) error {
 	if resp.StatusCode > 299 {
 		msg = fmt.Sprintf("%s, error: %s", msg, resp.Status)
 	}
-	os.Stdout.WriteString(fmt.Sprintf("%s %s\n", c.emoji("•", "magenta+b"), msg))
+	os.Stdout.WriteString(fmt.Sprintf("%s%s\n", c.emoji("•", "magenta+b"), msg))
 	return nil
 }
 
 func (c goSmee) setup() error {
+	version := strings.TrimSpace(string(Version))
+	os.Stdout.WriteString(fmt.Sprintf("%sStarting gosmee version: %s\n", c.emoji("⇉", "green+b"), version))
 	client := sse.NewClient(c.smeeURL)
 	err := client.Subscribe("messages", func(msg *sse.Event) {
 		if string(msg.Event) == "ready" {
 			// print to stdout
-			os.Stdout.WriteString(fmt.Sprintf("%s Forwarding %s to %s\n", c.emoji("✓", "green+b"), ansi.Color(c.smeeURL, "green+u"), ansi.Color(c.targetURL, "green+u")))
+			os.Stdout.WriteString(fmt.Sprintf("%sForwarding %s to %s\n", c.emoji("✓", "yellow+b"), ansi.Color(c.smeeURL, "green+u"), ansi.Color(c.targetURL, "green+u")))
 			return
 		}
 		if string(msg.Data) != "{}" {
@@ -277,7 +279,7 @@ func main() {
 		Usage:                "forward smee url to a local service",
 		UsageText:            "gosmee [command options] SMEE_URL LOCAL_SERVICE_URL",
 		EnableBashCompletion: true,
-		Version:              string(Version),
+		Version:              strings.TrimSpace(string(Version)),
 		Commands: []*cli.Command{
 			{
 				Name:  "completion",
