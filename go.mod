@@ -5,7 +5,7 @@ go 1.18
 require (
 	github.com/mattn/go-isatty v0.0.14
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d
-	github.com/mitchellh/mapstructure v1.4.3
+	github.com/mitchellh/mapstructure v1.5.0
 	github.com/r3labs/sse v0.0.0-20210224172625-26fe804710bc
 	github.com/urfave/cli/v2 v2.10.2
 	golang.org/x/text v0.3.7
