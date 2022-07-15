@@ -96,6 +96,52 @@ You can add `--noReplay` if you only want the saving and not replaying.
 
 You will have a pretty colored emoji unless you specify `--nocolor` as argument.
 
+## Build image for your arch 
+
+```
+update GOARCH to your arch in Dockerfile, such as GOARCH=s390x
+podman build -t yourrepo/gosmee:s390x .
+podman push yourrepo/gosmee:s390x
+```
+
+## Deploy it on openshift
+
+```
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: gosmee-client
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gosmee-client
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: gosmee-client
+    spec:
+      containers:
+        - name: gosmee-client
+          image: 'docker.io/zhengxiaomei123/gosmee:s390x'
+          args:
+            - 'https://smee.io/yHv1dESyg7BJmm4i'
+            - $(SVC)
+          env:
+            - name: SVC
+              value: >-
+                http://pipelines-as-code-controller-openshift-pipelines.apps.pli43-tt4.psi.ospqa.com
+      restartPolicy: Always
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 25%
+      maxSurge: 25%
+  revisionHistoryLimit: 10
+  progressDeadlineSeconds: 600
+```
+
 ## Thanks
 
 - Most of the works is done by the [go-sse](github.com/r3labs/sse) library.
