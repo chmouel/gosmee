@@ -96,6 +96,44 @@ You can add `--noReplay` if you only want the saving and not replaying.
 
 You will have a pretty colored emoji unless you specify `--nocolor` as argument.
 
+## Kubernetes
+
+You can expose an internal kubernetes via gosmee :
+
+```
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gosmee
+  namespace: gitea
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gosmee
+  template:
+    metadata:
+      labels:
+        app: gosmee
+    spec:
+      containers:
+        - image: ghcr.io/chmouel/gosmee:latest
+          imagePullPolicy: IfNotPresent
+          name: gosmee
+          args:
+            [
+              "--saveDir",
+              "/tmp/save",
+              "https://yousmee.url",
+              "http://deployment.name.namespace.name:PORT_OF_SERVICE",
+            ]
+```
+
+the `http://deployment.name.namespace.name:PORT_OF_SERVICE` url is the url of your internal deployment running on your cluster, for example : 
+
+   http://service.namespace:8080
+
 ## Thanks
 
 - Most of the works is done by the [go-sse](github.com/r3labs/sse) library.
