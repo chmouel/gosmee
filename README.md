@@ -100,7 +100,7 @@ You will have a pretty colored emoji unless you specify `--nocolor` as argument.
 
 You can expose an internal kubernetes via gosmee :
 
-```
+```yaml
 ---
 apiVersion: apps/v1
 kind: Deployment
