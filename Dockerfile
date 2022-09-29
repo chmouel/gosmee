@@ -1,7 +1,8 @@
-FROM mirror.gcr.io/library/golang:latest
+FROM --platform=$BUILDPLATFORM mirror.gcr.io/library/golang:latest
 COPY . /go/src/github.com/chmouel/gosmee
 WORKDIR /go/src/github.com/chmouel/gosmee
-RUN CGO_ENABLED=0 GOOS=linux go build -a  -ldflags="-s -w"  -installsuffix cgo -o gosmee .
+ARG TARGETARCH 
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build -a  -ldflags="-s -w"  -installsuffix cgo -o gosmee .
 
 FROM registry.access.redhat.com/ubi8/ubi-minimal:8.5-240.1648458092
 RUN microdnf update \
