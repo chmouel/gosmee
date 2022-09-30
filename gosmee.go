@@ -35,6 +35,8 @@ var Version []byte
 //go:embed misc/bash_completion.bash
 var bashCompletion []byte
 
+const defaultTimeout = 5
+
 type goSmee struct {
 	saveDir, smeeURL, targetURL string
 	decorate, noReplay          bool
@@ -214,7 +216,7 @@ func (c goSmee) replayData(b []byte) error {
 		return nil
 	}
 
-	client := http.Client{Timeout: time.Duration(1) * time.Second}
+	client := http.Client{Timeout: time.Duration(defaultTimeout) * time.Second}
 	ctx := context.Background()
 	req, err := http.NewRequestWithContext(ctx, "POST", c.targetURL, strings.NewReader(string(pm.body)))
 	if err != nil {
@@ -350,6 +352,12 @@ func main() {
 				Usage:   "Save payloads to `DIR` populated with shell scripts to replay easily.",
 				Aliases: []string{"s"},
 				EnvVars: []string{"GOSMEE_SAVEDIR"},
+			},
+			&cli.IntFlag{
+				Name:    "target-connection-timeout",
+				Usage:   "How long to wait for the connection timeout",
+				EnvVars: []string{"GOSMEE_TARGET_TIMEOUT"},
+				Value:   defaultTimeout,
 			},
 			&cli.BoolFlag{
 				Name:    "noReplay",
