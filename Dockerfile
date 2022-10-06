@@ -4,13 +4,15 @@ WORKDIR /go/src/github.com/chmouel/gosmee
 ARG TARGETARCH 
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build -a  -ldflags="-s -w"  -installsuffix cgo -o gosmee .
 
-FROM registry.access.redhat.com/ubi8/ubi-minimal:8.5-240.1648458092
+FROM registry.access.redhat.com/ubi9/ubi-minimal
 RUN microdnf update \
- && microdnf install --nodocs rsync \
+ && microdnf install --nodocs rsync shadow-utils \
  && microdnf clean all \
+ && useradd gosmee \
  && rm -rf /var/cache/yum
 
 COPY --from=0 /go/src/github.com/chmouel/gosmee/gosmee /usr/local/bin/gosmee
 
-WORKDIR /
+WORKDIR /home/gosmee
+USER gosmee
 ENTRYPOINT ["/usr/local/bin/gosmee"]
