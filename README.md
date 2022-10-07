@@ -98,7 +98,7 @@ You will have a pretty colored emoji unless you specify `--nocolor` as argument.
 
 ## Kubernetes
 
-You can expose an internal kubernetes via gosmee :
+You can expose an internal kubernetes deployment or service with gosmee :
 
 ```yaml
 ---
@@ -130,13 +130,14 @@ spec:
             ]
 ```
 
-the `http://deployment.name.namespace.name:PORT_OF_SERVICE` url is the url of your internal deployment running on your cluster, for example : 
+the `http://deployment.name.namespace.name:PORT_OF_SERVICE` URL is the URL of
+your internal deployment running on your cluster, for example :
 
-   http://service.namespace:8080
+   <http://service.namespace:8080>
 
 ## Thanks
 
-- Most of the works is done by the [go-sse](github.com/r3labs/sse) library.
+- Most of the works is done by the [go-sse](https://github.com/r3labs/sse) library.
 - Used previously [pysmee](https://github.com/akrog/pysmee) but it seems that the underlying sse library is broken with chunked transfer.
 
 ## Copyright
