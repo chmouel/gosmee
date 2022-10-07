@@ -9,7 +9,7 @@ require (
 	github.com/r3labs/sse v0.0.0-20210224172625-26fe804710bc
 	github.com/urfave/cli/v2 v2.17.1
 	golang.org/x/text v0.3.7
-	gotest.tools/v3 v3.3.0
+	gotest.tools/v3 v3.4.0
 )
 
 require (
