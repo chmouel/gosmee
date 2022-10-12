@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM mirror.gcr.io/library/golang:latest
+FROM --platform=$BUILDPLATFORM golang:latest
 COPY . /go/src/github.com/chmouel/gosmee
 WORKDIR /go/src/github.com/chmouel/gosmee
 ARG TARGETARCH 
