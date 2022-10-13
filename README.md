@@ -106,7 +106,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: gosmee
-  namespace: gitea
 spec:
   replicas: 1
   selector:
