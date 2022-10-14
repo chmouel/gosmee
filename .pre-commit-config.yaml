@@ -9,6 +9,10 @@ repos:
   - id: check-added-large-files
   - id: check-json
   - id: check-vcs-permalinks
+- repo: https://github.com/adrienverge/yamllint.git
+  rev: v1.28.0
+  hooks:
+    - id: yamllint
 - repo: local
   hooks:
   - id: lint-markdown
