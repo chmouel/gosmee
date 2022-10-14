@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"text/template"
@@ -152,14 +151,14 @@ func (c goSmee) saveData(b []byte) error {
 		}
 	}
 
-	var fprefix string
+	var fbasepath string
 	if pm.eventType != "" {
-		fprefix = filepath.Join(c.saveDir, fmt.Sprintf("%s-%s", pm.eventType, pm.timestamp))
+		fbasepath = fmt.Sprintf("%s-%s", pm.eventType, pm.timestamp)
 	} else {
-		fprefix = filepath.Join(c.saveDir, fmt.Sprintf("%s", pm.timestamp))
+		fbasepath = fmt.Sprintf("%s", pm.timestamp)
 	}
 
-	jsonfile := fmt.Sprintf("%s.json", fprefix)
+	jsonfile := fmt.Sprintf("%s.json", fbasepath)
 	f, err := os.Create(jsonfile)
 	if err != nil {
 		return err
@@ -171,7 +170,7 @@ func (c goSmee) saveData(b []byte) error {
 		return err
 	}
 
-	shscript := fmt.Sprintf("%s.sh", fprefix)
+	shscript := fmt.Sprintf("%s.sh", fbasepath)
 	os.Stdout.WriteString(fmt.Sprintf("%s%s and %s has been saved\n", c.emoji("⌁", "yellow+b"), shscript, jsonfile))
 	s, err := os.Create(shscript)
 	if err != nil {
@@ -189,12 +188,12 @@ func (c goSmee) saveData(b []byte) error {
 		Headers     string
 		TargetURL   string
 		ContentType string
-		FilePrefix  string
+		FileBase    string
 	}{
 		Headers:     headers,
 		TargetURL:   c.targetURL,
 		ContentType: pm.contentType,
-		FilePrefix:  fprefix,
+		FileBase:    fbasepath,
 	}); err != nil {
 		return err
 	}
