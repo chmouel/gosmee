@@ -7,7 +7,7 @@ require (
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/r3labs/sse v0.0.0-20210224172625-26fe804710bc
-	github.com/urfave/cli/v2 v2.19.2
+	github.com/urfave/cli/v2 v2.20.2
 	golang.org/x/text v0.4.0
 	gotest.tools/v3 v3.4.0
 )
