@@ -173,7 +173,7 @@ func (c goSmee) saveData(b []byte) error {
 		fbasepath = pm.timestamp
 	}
 
-	jsonfile := fmt.Sprintf("%s.json", fbasepath)
+	jsonfile := fmt.Sprintf("%s/%s.json", c.saveDir, fbasepath)
 	f, err := os.Create(jsonfile)
 	if err != nil {
 		return err
@@ -185,7 +185,7 @@ func (c goSmee) saveData(b []byte) error {
 		return err
 	}
 
-	shscript := fmt.Sprintf("%s.sh", fbasepath)
+	shscript := fmt.Sprintf("%s/%s.sh", c.saveDir, fbasepath)
 	os.Stdout.WriteString(fmt.Sprintf("%s%s and %s has been saved\n", c.emoji("⌁", "yellow+b"), shscript, jsonfile))
 	s, err := os.Create(shscript)
 	if err != nil {

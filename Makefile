@@ -21,16 +21,19 @@ vendor:
 $(OUTPUT_DIR)/$(NAME): main.go FORCE
 	go build -mod=vendor $(FLAGS)  -v -o $@ ./$<
 
+$(OUTPUT_DIR)/$(NAME)-aarch64-linux: main.go FORCE
+	env GOARCH=arm64 GOOS=linux	go build -mod=vendor $(FLAGS)  -v -o $@ ./$<
+
 test:
 	@go test ./... -v
 
 clean:
-	@rm -rf bin/gosmee
+	@rm -rf $(OUTPUT_DIR)/gosmee
 
 build: clean
 	@echo "building."
-	@mkdir -p bin/
-	@go build  -v $(FLAGS)  -o bin/gosmee gosmee.go
+	@mkdir -p $(OUTPUT_DIR)/
+	@go build  -v $(FLAGS)  -o $(OUTPUT_DIR)/gosmee gosmee.go
 
 lint: lint-go lint-md
 

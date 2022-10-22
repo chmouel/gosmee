@@ -28,13 +28,7 @@ func errorIt(w http.ResponseWriter, r *http.Request, status int, err error) {
 }
 
 func serve(c *cli.Context) error {
-	certFile := c.String("tls-cert")
-	certKey := c.String("tls-key")
-	httpPrefix := "http"
-	sslEnabled := certFile != "" && certKey != ""
-	if sslEnabled {
-		httpPrefix = "https"
-	}
+	publicURL := c.String("public-url")
 	router := chi.NewRouter()
 	router.Use(middleware.Logger)
 	router.Use(middleware.RequestID)
@@ -52,7 +46,7 @@ func serve(c *cli.Context) error {
 	})
 
 	router.Get("/new", func(w http.ResponseWriter, r *http.Request) {
-		url := fmt.Sprintf("%s://%s%s\n", httpPrefix, r.Host,
+		url := fmt.Sprintf("%s%s\n", publicURL,
 			strings.ReplaceAll(r.URL.String(), "/new", fmt.Sprintf("/%s",
 				randomString(8))))
 		w.WriteHeader(http.StatusOK)
@@ -62,10 +56,9 @@ func serve(c *cli.Context) error {
 		channel := chi.URLParam(r, "channel")
 		ua := r.Header.Get("User-Agent")
 		if !strings.HasPrefix(ua, "gosmee") {
-			url := strings.TrimSpace(fmt.Sprintf("%s://%s%s\n", httpPrefix, r.Host, r.URL.String()))
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(
-				fmt.Sprintf("Use the gosmee client to connect, eg: gosmee client %s https://yourlocalservice\n", url)))
+				fmt.Sprintf("Use the gosmee client to connect, eg: gosmee client %s https://yourlocalservice\n", publicURL)))
 			return
 		}
 		newURL, err := r.URL.Parse(fmt.Sprintf("%s?stream=%s", r.URL.Path, channel))
@@ -117,13 +110,26 @@ func serve(c *cli.Context) error {
 		_, _ = w.Write([]byte(fmt.Sprintf(`{"status":%d, "channel": "%s", "message":"ok"}`, http.StatusAccepted, channel)))
 	})
 	config := goSmee{}
+
+	certFile := c.String("tls-cert")
+	certKey := c.String("tls-key")
+	sslEnabled := certFile != "" && certKey != ""
 	portAddr := fmt.Sprintf("%s:%d", c.String("address"), c.Int("port"))
+	if publicURL == "" {
+		publicURL = "http://"
+		if sslEnabled {
+			publicURL = "https://"
+		}
+		publicURL = fmt.Sprintf("%s%s", publicURL, portAddr)
+	}
+
 	os.Stdout.WriteString(
-		fmt.Sprintf("%sServing for webhooks on %s \n",
+		fmt.Sprintf("%sServing for webhooks on %s\n",
 			config.emoji("✓", "yellow+b"),
-			ansi.Color(fmt.Sprintf("%s://%s", httpPrefix, portAddr), "green+u")))
-	//nolint:gosec
+			ansi.Color(publicURL, "green+u")))
+
 	if sslEnabled {
+		//nolint:gosec
 		return http.ListenAndServeTLS(portAddr, certFile, certKey, router)
 	}
 	//nolint:gosec

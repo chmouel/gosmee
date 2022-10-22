@@ -31,6 +31,10 @@ accessible endpoint and forward request to your local service`,
 					return serve(c)
 				},
 				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:  "public-url",
+						Usage: "Public URL to show to user, useful when you are behind a proxy.",
+					},
 					&cli.IntFlag{
 						Name:    "port",
 						Aliases: []string{"p"},
