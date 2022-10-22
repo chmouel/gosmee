@@ -1,11 +1,17 @@
-# gosmee - smee.io go client
+# gosmee - A webhook forwader/relayer
 
-A command line client for Smee’s webhook payload delivery service in GO.
+gosmee is a webhook forwarder that you can easily run anywhere.
 
 ## Description
 
-Replay message from <https://smee.io/> to a target host. Allowing you to
-easily expose a local dev service to the internet to be consumed by webhooks.
+Gosmee let you relays webhooks from itself (acting as a server) or from <https://smee.io> to your local notebook.
+
+With `gosmee` you can easily expose the service on your local network or behind a VPN, letting a
+public service (ie: GitHub) to push webhooks to it.
+
+For example, if you setup your GitHub Webhook to point to a <https://smee.io/> URL or where `gosmee server` listen to.
+
+You then use the `gosmee client` on your local notebook to get the events from the server and relay it to the local service. So effectively connecting github webhook to your local service on your local workstation.
 
 ## Screenshot
 
@@ -69,20 +75,22 @@ source <(gosmee completion zsh)
 
 ## Usage
 
-You first may want to generate your own smee URL by going to <https://smee.io/new>
+### Client
 
-When you have it the basic usage is the folllowing :
+If you want to use <https://smee.io> you  may want to generate your own smee URL by going to <https://smee.io/new>.
+
+When you have it, the basic usage is the following :
 
 ```shell
-gosmee https://smee.io/aBcDeF https://localhost:8080
+gosmee client https://smee.io/aBcDeF https://localhost:8080
 ```
 
-this will replay all payload comingto to the smee URL on a service running on `http://localhost:8080`
+It will replay all payload coming to to the smee URL on a service running on `http://localhost:8080`
 
 Another option is to be able to save all the replay as a handy shell script :
 
 ```shell
-gosmee --saveDir /tmp/savedreplay https://smee.io/aBcDeF https://localhost:8080
+gosmee client --saveDir /tmp/savedreplay https://smee.io/aBcDeF https://localhost:8080
 ```
 
 What this will do is when you have a new payload comming to your smee URL, gosmee will save the json to
@@ -96,41 +104,37 @@ You can add `--noReplay` if you only want the saving and not replaying.
 
 You will have a pretty colored emoji unless you specify `--nocolor` as argument.
 
-## Kubernetes
+### Server
 
-You can expose an internal kubernetes deployment or service with gosmee :
+With `gosmee server` you can use your own server rather than <https://smee.io>
+as relay. By default `gosmee server` will bind to `localhost` on port `3333`
+which is not very useful. You probably want to expose it to your public IP or
+behind a proxy with the flags `--address` and `--port`.
 
-```yaml
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: gosmee
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: gosmee
-  template:
-    metadata:
-      labels:
-        app: gosmee
-    spec:
-      containers:
-        - image: ghcr.io/chmouel/gosmee:latest
-          imagePullPolicy: IfNotPresent
-          name: gosmee
-          args:
-            [
-              "--saveDir",
-              "/tmp/save",
-              "https://yousmee.url",
-              "http://deployment.name.namespace.name:PORT_OF_SERVICE",
-            ]
+You really want to secure that endpoint, you can generate some letsencrypt
+certificate and use the `--tls-cert` and `--tls-key` flags to specify them.
+
+To use it you go to your url and a suffix with your random ID. For example :
+
+<https://myserverurl/RANDOM_ID>
+
+The random ID accepted to the server needs to be at least 8 characters (and you
+really want to be it random).
+
+With `/new` you can easily generate a random ID, ie:
+
+```shell
+% curl http://localhost:3333/new
+http://localhost:3333/NqybHcEi
 ```
 
-the `http://deployment.name.namespace.name:PORT_OF_SERVICE` URL is the URL of
-your internal deployment running on your cluster, for example :
+### Kubernetes
+
+You can expose an internal kubernetes deployment or service with gosmee  by using [this file](./misc/kubernetes-deployment.yaml)
+
+Adjust the SMEE_URL in there to your endpoint
+
+and the `http://deployment.name.namespace.name:PORT_OF_SERVICE` URL is the Kubernetes internal URL of your deployment running on your cluster, for example :
 
    <http://service.namespace:8080>
 

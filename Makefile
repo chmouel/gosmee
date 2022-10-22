@@ -1,13 +1,25 @@
+NAME  := gosmee
 TARGET_URL ?= http://localhost:8080
 SMEE_URL ?= https://smee.io/new
-IMAGE_REGISTRY ?= quay.io/bgirriam/gosmee
 IMAGE_VERSION ?= latest
 MD_FILES := $(shell find . -type f -regex ".*md"  -not -regex '^./vendor/.*'  -not -regex '^./.vale/.*' -not -regex "^./.git/.*" -print)
 
 LDFLAGS := -s -w
 FLAGS += -ldflags "$(LDFLAGS)" -buildvcs=true
+OUTPUT_DIR = bin
 
 all: test lint build docker-build
+
+
+FORCE:
+
+.PHONY: vendor
+vendor:
+	@echo Generating vendor directory
+	@go mod tidy && go mod vendor
+
+$(OUTPUT_DIR)/$(NAME): main.go FORCE
+	go build -mod=vendor $(FLAGS)  -v -o $@ ./$<
 
 test:
 	@go test ./... -v
@@ -19,10 +31,6 @@ build: clean
 	@echo "building."
 	@mkdir -p bin/
 	@go build  -v $(FLAGS)  -o bin/gosmee gosmee.go
-
-docker-build:
-	@echo "docker image building."
-	docker buildx build --platform linux/amd64,linux/s390x,linux/ppc64le -f Dockerfile -t ${IMAGE_REGISTRY}:${IMAGE_VERSION} --push .
 
 lint: lint-go lint-md
 
@@ -46,7 +54,3 @@ fmt:
 fumpt:
 	@gofumpt -w *.go
 
-.PHONY: vendor
-vendor:
-	@go mod tidy
-	@go mod vendor

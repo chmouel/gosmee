@@ -1,6 +1,6 @@
 before:
   hooks:
-    - /bin/sh -c "printf {{.Version }} > misc/version"
+    - /bin/sh -c "printf {{.Version }} > gosmee/templates/version"
 
 builds:
   - env:
@@ -37,7 +37,7 @@ brews:
       name: gosmee
     folder: Formula
     homepage: "https://github.com/chmouel/gosmee"
-    description: gosmee  - smee.io go client
+    description: "gosmee - A webhook and https://smee.io forwarder"
     install: |
       bin.install "gosmee" => "gosmee"
       output = Utils.popen_read("SHELL=bash #{bin}/gosmee completion bash")
@@ -58,7 +58,7 @@ release:
 nfpms:
   - file_name_template: "gosmee-{{.Version}}_{{.Os}}-{{.Arch}}"
     homepage: https://github.com/chmouel/gosmee
-    description: "Gosmee - smee.io forwarder in go"
+    description: "gosmee - A webhook and https://smee.io forwarder"
     maintainer: Chmouel Boudjnah <chmouel@chmouel.com>
     license: Apache 2.0
     formats:
@@ -94,7 +94,7 @@ universal_binaries:
 aurs:
   - name: gosmee-bin
     homepage: "https://github.com/chmouel/gosmee"
-    description: "Gosmee - smee.io forwarder in go"
+    description: "gosmee - A webhook and https://smee.io forwarder"
     maintainers:
       - "Chmouel Boudjnah <chmouel@chmouel.com>"
     license: Apache 2.0
