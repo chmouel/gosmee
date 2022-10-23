@@ -114,7 +114,7 @@ behind a proxy with the flags `--address` and `--port`.
 You really want to secure that endpoint, you can generate some letsencrypt
 certificate and use the `--tls-cert` and `--tls-key` flags to specify them.
 
-To use it you go to your url and a suffix with your random ID. For example :
+To use it you go to your URL and a suffix with your random ID. For example :
 
 <https://myserverurl/RANDOM_ID>
 
@@ -126,6 +126,23 @@ With `/new` you can easily generate a random ID, ie:
 ```shell
 % curl http://localhost:3333/new
 http://localhost:3333/NqybHcEi
+```
+
+### Nginx
+
+Running gosmee server behind nginx may require some configuration to work properly.
+Here is a `proxy_pass location` to a locally running gosmee server on port localhost:3333:
+
+```nginx
+    location / {
+        proxy_pass         http://127.0.0.1:3333;
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_set_header Host $host;
+        proxy_set_header Connection '';
+        proxy_http_version 1.1;
+        chunked_transfer_encoding off;
+    }
 ```
 
 ### Kubernetes
