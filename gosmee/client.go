@@ -23,17 +23,11 @@ import (
 	"golang.org/x/text/language"
 )
 
-//go:embed templates/replay_script.tmpl.bash
-var shellScriptTmpl []byte
-
-//go:embed templates/zsh_completion.zsh
-var zshCompletion []byte
-
 //go:embed templates/version
 var Version []byte
 
-//go:embed templates/bash_completion.bash
-var bashCompletion []byte
+//go:embed templates/replay_script.tmpl.bash
+var shellScriptTmpl []byte
 
 var pmEventRe = regexp.MustCompile(`(\w+|\d+|_|-|:)`)
 

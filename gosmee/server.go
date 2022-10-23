@@ -1,6 +1,7 @@
 package gosmee
 
 import (
+	_ "embed"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -21,6 +23,9 @@ var (
 	defaultServerPort    = 3333
 	defaultServerAddress = "localhost"
 )
+
+//go:embed templates/index.tmpl
+var indexTmpl []byte
 
 func errorIt(w http.ResponseWriter, r *http.Request, status int, err error) {
 	w.WriteHeader(status)
@@ -43,6 +48,25 @@ func serve(c *cli.Context) error {
 		events.Publish(sid, &sse.Event{
 			Data: []byte("ready"),
 		})
+	})
+
+	router.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		url := fmt.Sprintf("%s/%s", publicURL, randomString(8))
+		w.WriteHeader(http.StatusOK)
+		// parse template  file in indexTmpl
+		t, err := template.New("index").Parse(string(indexTmpl))
+		if err != nil {
+			errorIt(w, r, http.StatusInternalServerError, err)
+			return
+		}
+		varmap := map[string]string{
+			"URL": url,
+		}
+		w.Header().Set("Content-Type", "text/html")
+		if err := t.ExecuteTemplate(w, "index", varmap); err != nil {
+			errorIt(w, r, http.StatusInternalServerError, err)
+			return
+		}
 	})
 
 	router.Get("/new", func(w http.ResponseWriter, r *http.Request) {

@@ -5,10 +5,18 @@ import (
 	"os"
 	"strings"
 
+	_ "embed"
+
 	"github.com/mattn/go-isatty"
 	"github.com/mgutz/ansi"
 	"github.com/urfave/cli/v2"
 )
+
+//go:embed templates/zsh_completion.zsh
+var zshCompletion []byte
+
+//go:embed templates/bash_completion.bash
+var bashCompletion []byte
 
 func makeapp() *cli.App {
 	return &cli.App{
