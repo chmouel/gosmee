@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"text/template"
@@ -33,6 +34,8 @@ var Version []byte
 
 //go:embed templates/bash_completion.bash
 var bashCompletion []byte
+
+var pmEventRe = regexp.MustCompile(`(\w+|\d+|_|-|:)`)
 
 const defaultTimeout = 5
 
@@ -124,8 +127,10 @@ func (c goSmee) parse(data []byte) (payloadMsg, error) {
 		if payloadKey == "x-github-event" || payloadKey == "x-gitlab-event" || payloadKey == "x-event-key" {
 			if pv, ok := payloadValue.(string); ok {
 				// github action don't like it
-				replace := strings.NewReplacer(":", "-", " ", "_")
+				replace := strings.NewReplacer(":", "-", " ", "_", "/", "_")
 				pv = replace.Replace(strings.ToLower(pv))
+				// remove all non-alphanumeric characters and don't let directory straversal
+				pv = pmEventRe.FindString(pv)
 				pm.eventType = pv
 			}
 		}
@@ -272,8 +277,8 @@ func (c goSmee) clientSetup() error {
 	}
 	err := client.Subscribe(channel, func(msg *sse.Event) {
 		if string(msg.Event) == "ready" || string(msg.Data) == "ready" {
-			// print to stdout
-			os.Stdout.WriteString(fmt.Sprintf("%sForwarding %s to %s\n", c.emoji("✓", "yellow+b"), ansi.Color(c.smeeURL, "green+u"), ansi.Color(c.targetURL, "green+u")))
+			os.Stdout.WriteString(
+				fmt.Sprintf("%sForwarding %s to %s\n", c.emoji("✓", "yellow+b"), ansi.Color(c.smeeURL, "green+u"), ansi.Color(c.targetURL, "green+u")))
 			return
 		}
 		if string(msg.Data) != "{}" {
