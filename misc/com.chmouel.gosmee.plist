@@ -8,6 +8,7 @@
     <key>ProgramArguments</key>
     <array>
       <string>gosmee</string>
+      <string>client</string>
       <string>https://smee.io/aBcDeF</string>
       <string>https://localhost:8080</string>
     </array>
