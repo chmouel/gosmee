@@ -1,0 +1,27 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gosmee
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gosmee
+  template:
+    metadata:
+      labels:
+        app: gosmee
+    spec:
+      containers:
+        - image: ghcr.io/chmouel/gosmee:latest
+          imagePullPolicy: IfNotPresent
+          name: gosmee
+          args:
+            [
+              "client",
+              "--saveDir",
+              "/tmp/save",
+              "https://yousmee.url",
+              "http://deployment.name.namespace.name:PORT_OF_SERVICE",
+            ]
