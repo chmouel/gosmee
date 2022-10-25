@@ -51,7 +51,7 @@ func serve(c *cli.Context) error {
 	})
 
 	router.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		url := fmt.Sprintf("%s/%s", publicURL, randomString(8))
+		url := fmt.Sprintf("%s/%s", publicURL, randomString(12))
 		w.WriteHeader(http.StatusOK)
 		// parse template  file in indexTmpl
 		t, err := template.New("index").Parse(string(indexTmpl))
@@ -72,11 +72,11 @@ func serve(c *cli.Context) error {
 	router.Get("/new", func(w http.ResponseWriter, r *http.Request) {
 		url := fmt.Sprintf("%s%s\n", publicURL,
 			strings.ReplaceAll(r.URL.String(), "/new", fmt.Sprintf("/%s",
-				randomString(8))))
+				randomString(12))))
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(url))
 	})
-	router.Get("/{channel:[a-zA-Z0-9]{8,}}", func(w http.ResponseWriter, r *http.Request) {
+	router.Get("/{channel:[a-zA-Z0-9]{12,}}", func(w http.ResponseWriter, r *http.Request) {
 		channel := chi.URLParam(r, "channel")
 		ua := r.Header.Get("User-Agent")
 		if !strings.HasPrefix(ua, "gosmee") {
@@ -93,7 +93,7 @@ func serve(c *cli.Context) error {
 		r.URL = newURL
 		events.ServeHTTP(w, r)
 	})
-	router.Post("/{channel:[a-zA-Z0-9]{8,}}", func(w http.ResponseWriter, r *http.Request) {
+	router.Post("/{channel:[a-zA-Z0-9]{12,}}", func(w http.ResponseWriter, r *http.Request) {
 		channel := chi.URLParam(r, "channel")
 		// try to json decode body
 		var d interface{}
