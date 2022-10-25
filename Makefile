@@ -8,8 +8,7 @@ LDFLAGS := -s -w
 FLAGS += -ldflags "$(LDFLAGS)" -buildvcs=true
 OUTPUT_DIR = bin
 
-all: test lint build docker-build
-
+all: test lint build
 
 FORCE:
 
@@ -33,7 +32,7 @@ clean:
 build: clean
 	@echo "building."
 	@mkdir -p $(OUTPUT_DIR)/
-	@go build  -v $(FLAGS)  -o $(OUTPUT_DIR)/gosmee gosmee.go
+	@go build  -v $(FLAGS)  -o $(OUTPUT_DIR)/gosmee main.go
 
 lint: lint-go lint-md
 
