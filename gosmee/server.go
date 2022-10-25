@@ -79,11 +79,10 @@ func serve(c *cli.Context) error {
 	router.Get("/{channel:[a-zA-Z0-9]{12,}}", func(w http.ResponseWriter, r *http.Request) {
 		channel := chi.URLParam(r, "channel")
 		accept := r.Header.Get("Accept")
-		fmt.Printf("accept: %v\n", accept)
 		if strings.Contains(accept, "text/html") {
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(
-				fmt.Sprintf("Use the gosmee client to connect, eg: gosmee client %s https://yourlocalservice\n", publicURL)))
+			fmt.Fprintf(w, "Use the gosmee client to connect, eg: gosmee client %s/%s http://yourlocalservice:port\n",
+				publicURL, channel)
 			return
 		}
 		newURL, err := r.URL.Parse(fmt.Sprintf("%s?stream=%s", r.URL.Path, channel))
