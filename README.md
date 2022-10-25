@@ -118,7 +118,7 @@ To use it you go to your URL and a suffix with your random ID. For example :
 
 <https://myserverurl/RANDOM_ID>
 
-The random ID accepted to the server needs to be at least 8 characters (and you
+The random ID accepted to the server needs to be at least 12 characters (and you
 really want to be it random).
 
 With `/new` you can easily generate a random ID, ie:
