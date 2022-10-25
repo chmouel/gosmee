@@ -5,13 +5,13 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     steps:
-      - name: Set up Go
-        uses: actions/setup-go@v1
-        with:
-          go-version: 1.18
-
       - name: Check out code
         uses: actions/checkout@v1
+
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version-file: go.mod
 
       - uses: alexellis/setup-arkade@v1
       - uses: alexellis/arkade-get@master
@@ -26,13 +26,13 @@ jobs:
     runs-on: ubuntu-latest
     needs: [lint, test]
     steps:
-      - name: Set up Go
-        uses: actions/setup-go@v1
-        with:
-          go-version: 1.18
-
       - name: Check out code
         uses: actions/checkout@v1
+
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version-file: go.mod
 
       - name: Build
         run: |
@@ -42,13 +42,13 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     steps:
-      - name: Set up Go
-        uses: actions/setup-go@v1
-        with:
-          go-version: 1.18
-
       - name: Check out code
         uses: actions/checkout@v1
+
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version-file: go.mod
 
       - name: Run Unit tests.
         run: |
