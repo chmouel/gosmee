@@ -60,7 +60,8 @@ func serve(c *cli.Context) error {
 			return
 		}
 		varmap := map[string]string{
-			"URL": url,
+			"URL":     url,
+			"Version": string(Version),
 		}
 		w.Header().Set("Content-Type", "text/html")
 		if err := t.ExecuteTemplate(w, "index", varmap); err != nil {
