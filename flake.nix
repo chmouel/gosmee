@@ -37,6 +37,7 @@
               pkgs.gnumake
               pkgs.pre-commit # needed for pre-commit install
               pkgs.git # needed for pre-commit install
+              pkgs.yamllint # needed for pre-commit install
             ];
             shellHook = ''
               pre-commit install
