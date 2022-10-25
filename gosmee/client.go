@@ -133,7 +133,7 @@ func (c goSmee) parse(data []byte) (payloadMsg, error) {
 	if len(c.ignoreEvents) > 0 && pm.eventType != "" {
 		for _, v := range c.ignoreEvents {
 			if v == pm.eventType {
-				os.Stdout.WriteString(fmt.Sprintf("%sskipping event %s as requested\n", c.emoji("!", "blue+b"), pm.eventType))
+				fmt.Fprintf(os.Stdout, "%sskipping event %s as requested\n", c.emoji("!", "blue+b"), pm.eventType)
 				return payloadMsg{}, nil
 			}
 		}
@@ -185,7 +185,8 @@ func (c goSmee) saveData(b []byte) error {
 	}
 
 	shscript := fmt.Sprintf("%s/%s.sh", c.saveDir, fbasepath)
-	os.Stdout.WriteString(fmt.Sprintf("%s%s and %s has been saved\n", c.emoji("⌁", "yellow+b"), shscript, jsonfile))
+
+	fmt.Fprintf(os.Stdout, "%s%s and %s has been saved\n", c.emoji("⌁", "yellow+b"), shscript, jsonfile)
 	s, err := os.Create(shscript)
 	if err != nil {
 		return err
@@ -256,36 +257,39 @@ func (c goSmee) replayData(b []byte) error {
 	if resp.StatusCode > 299 {
 		msg = fmt.Sprintf("%s, error: %s", msg, resp.Status)
 	}
-	os.Stdout.WriteString(fmt.Sprintf("%s%s\n", c.emoji("•", "magenta+b"), msg))
+	fmt.Fprintf(os.Stdout, "%s%s\n", c.emoji("•", "magenta+b"), msg)
 	return nil
 }
 
 func (c goSmee) clientSetup() error {
 	version := strings.TrimSpace(string(Version))
-	os.Stdout.WriteString(fmt.Sprintf("%sStarting gosmee version: %s\n", c.emoji("⇉", "green+b"), version))
+	fmt.Fprintf(os.Stdout, "%sStarting gosmee version: %s\n", c.emoji("⇉", "green+b"), version)
 	client := sse.NewClient(c.smeeURL)
 	client.Headers["User-Agent"] = fmt.Sprintf("gosmee/%s", version)
+	// this is to get nginx to work
+	client.Headers["X-Accel-Buffering"] = "no"
 	channel := filepath.Base(c.smeeURL)
 	if strings.HasPrefix(c.smeeURL, "https://smee.io") {
 		channel = smeeChannel
 	}
 	err := client.Subscribe(channel, func(msg *sse.Event) {
 		if string(msg.Event) == "ready" || string(msg.Data) == "ready" {
-			os.Stdout.WriteString(
-				fmt.Sprintf("%sForwarding %s to %s\n", c.emoji("✓", "yellow+b"), ansi.Color(c.smeeURL, "green+u"), ansi.Color(c.targetURL, "green+u")))
+			fmt.Fprintf(os.Stdout,
+				"%sForwarding %s to %s\n", c.emoji("✓", "yellow+b"), ansi.Color(c.smeeURL, "green+u"),
+				ansi.Color(c.targetURL, "green+u"))
 			return
 		}
 		if string(msg.Data) != "{}" {
 			if c.saveDir != "" {
 				err := c.saveData(msg.Data)
 				if err != nil {
-					os.Stdout.WriteString(fmt.Sprintf("%s Forwarding %s\n", ansi.Color("ERROR", "red+b"), err.Error()))
+					fmt.Fprintf(os.Stdout, "%s Forwarding %s\n", ansi.Color("ERROR", "red+b"), err.Error())
 					return
 				}
 			}
 			if !c.noReplay {
 				if err := c.replayData(msg.Data); err != nil {
-					os.Stdout.WriteString(fmt.Sprintf("%s Forwarding %s\n", ansi.Color("ERROR", "red+b"), err.Error()))
+					fmt.Fprintf(os.Stdout, "%s Forwarding %s\n", ansi.Color("ERROR", "red+b"), err.Error())
 					return
 				}
 			}

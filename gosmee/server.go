@@ -75,7 +75,7 @@ func serve(c *cli.Context) error {
 			strings.ReplaceAll(r.URL.String(), "/new", fmt.Sprintf("/%s",
 				randomString(12))))
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(url))
+		fmt.Fprintf(w, url)
 	})
 	router.Get("/{channel:[a-zA-Z0-9]{12,}}", func(w http.ResponseWriter, r *http.Request) {
 		channel := chi.URLParam(r, "channel")
@@ -132,7 +132,8 @@ func serve(c *cli.Context) error {
 			Data: reencoded,
 		})
 		w.WriteHeader(http.StatusAccepted)
-		_, _ = w.Write([]byte(fmt.Sprintf(`{"status":%d, "channel": "%s", "message":"ok"}`, http.StatusAccepted, channel)))
+
+		fmt.Fprintf(w, `{"status":%d, "channel": "%s", "message":"ok"}`, http.StatusAccepted, channel)
 	})
 	config := goSmee{}
 
@@ -148,10 +149,8 @@ func serve(c *cli.Context) error {
 		publicURL = fmt.Sprintf("%s%s", publicURL, portAddr)
 	}
 
-	os.Stdout.WriteString(
-		fmt.Sprintf("%sServing for webhooks on %s\n",
-			config.emoji("✓", "yellow+b"),
-			ansi.Color(publicURL, "green+u")))
+	fmt.Fprintf(os.Stdout, "%sServing for webhooks on %s\n", config.emoji("✓", "yellow+b"),
+		ansi.Color(publicURL, "green+u"))
 
 	if sslEnabled {
 		//nolint:gosec
