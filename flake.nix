@@ -27,9 +27,10 @@
           gosmee = utils.lib.mkApp { drv = self.packages.${system}.gosmee; name = "gosmee"; };
           default = self.apps.${system}.gosmee;
         };
-        overlay = final: prev: {
-          gosmee = gosmee;
-        };
+        # FIXME: fix the overlay and nix flake check
+        # overlays = {
+        #   default = final: prev: { gosmee = gosmee; };
+        # };
         devShell = pkgs.mkShell
           {
             nativeBuildInputs = [
