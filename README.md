@@ -57,6 +57,24 @@ Checkout the directory and use :
 -$ ./bin/gosmee --help
 ```
 
+### [Nix/NixOS](https://nixos.org/)
+
+This repository includes a `flake` (see [NixOS Wiki on
+Flakes](https://nixos.wiki/wiki/Flakes)).
+
+If you have the `nix flake` command enabled (currenty on
+nixos-unstable, `nixos-version` >= 22.05)
+
+```shell
+nix run github:chmouel/gosmee -- --help # your args are here
+```
+
+You can also use it to test and develop the source code:
+
+```shell
+nix develop # drops you in a shell with all the thing needed
+nix flake check # runs tests
+```
 ### System Services
 
 System Service example file for macOS and Linux is available in the [misc](./misc) directory.
