@@ -75,6 +75,7 @@ You can also use it to test and develop the source code:
 nix develop # drops you in a shell with all the thing needed
 nix flake check # runs tests
 ```
+
 ### System Services
 
 System Service example file for macOS and Linux is available in the [misc](./misc) directory.

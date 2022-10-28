@@ -90,13 +90,14 @@ accessible endpoint and forward request to your local service`,
 						decorate = false
 					}
 					cfg := goSmee{
-						smeeURL:      smeeURL,
-						targetURL:    targetURL,
-						saveDir:      c.String("saveDir"),
-						noReplay:     c.Bool("noReplay"),
-						decorate:     decorate,
-						ignoreEvents: c.StringSlice("ignore-event"),
-						channel:      c.String("channel"),
+						smeeURL:          smeeURL,
+						targetURL:        targetURL,
+						saveDir:          c.String("saveDir"),
+						noReplay:         c.Bool("noReplay"),
+						decorate:         decorate,
+						ignoreEvents:     c.StringSlice("ignore-event"),
+						channel:          c.String("channel"),
+						targetCnxTimeout: c.Int("target-connection-timeout"),
 					}
 					err := cfg.clientSetup()
 					return err
@@ -121,7 +122,7 @@ accessible endpoint and forward request to your local service`,
 					},
 					&cli.IntFlag{
 						Name:    "target-connection-timeout",
-						Usage:   "How long to wait for the connection timeout",
+						Usage:   "How long to wait when forwarding the request to the service",
 						EnvVars: []string{"GOSMEE_TARGET_TIMEOUT"},
 						Value:   defaultTimeout,
 					},

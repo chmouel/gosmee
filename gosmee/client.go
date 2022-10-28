@@ -40,6 +40,7 @@ type goSmee struct {
 	decorate, noReplay          bool
 	ignoreEvents                []string
 	channel                     string
+	targetCnxTimeout            int
 }
 
 type payloadMsg struct {
@@ -230,9 +231,10 @@ func (c goSmee) replayData(b []byte) error {
 		return nil
 	}
 
-	client := http.Client{Timeout: time.Duration(defaultTimeout) * time.Second}
-	ctx := context.Background()
-	req, err := http.NewRequestWithContext(ctx, "POST", c.targetURL, strings.NewReader(string(pm.body)))
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(c.targetCnxTimeout)*time.Second)
+	defer cancel()
+	client := http.Client{}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.targetURL, strings.NewReader(string(pm.body)))
 	if err != nil {
 		return err
 	}
