@@ -155,12 +155,10 @@ Here is a `proxy_pass location` to a locally running gosmee server on port local
 ```nginx
     location / {
         proxy_pass         http://127.0.0.1:3333;
-        proxy_buffering off;
-        proxy_cache off;
-        proxy_set_header Host $host;
-        proxy_set_header Connection '';
-        proxy_http_version 1.1;
-        chunked_transfer_encoding off;
+        proxy_set_header Connection '';   
+        proxy_http_version 1.1;           
+        chunked_transfer_encoding off;    
+        proxy_read_timeout 372h; 
     }
 ```
 
