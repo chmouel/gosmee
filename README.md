@@ -162,6 +162,18 @@ Here is a `proxy_pass location` to a locally running gosmee server on port local
     }
 ```
 
+### Caddy
+
+Running with Caddy is trivial :
+
+```caddyfile
+https://webhook.mydomain {
+    reverse_proxy http://127.0.0.1:3333
+}
+```
+
+default seems good enough!
+
 ### Kubernetes
 
 You can expose an internal kubernetes deployment or service with gosmee  by using [this file](./misc/kubernetes-deployment.yaml)
