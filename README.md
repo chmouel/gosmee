@@ -195,4 +195,8 @@ and the `http://deployment.name.namespace.name:PORT_OF_SERVICE` URL is the Kuber
 
 ## Authors
 
-Chmouel Boudjnah <[@chmouel](https://twitter.com/chmouel)>
+### Chmouel Boudjnah
+
+- Fediverse - <[@chmouel@chmouel.com](https://fosstodon.org/@chmouel)>
+- Twitter - <[@chmouel](https://twitter.com/chmouel)>
+- Blog  - <[https://blog.chmouel.com](https://blog.chmouel.com)>
