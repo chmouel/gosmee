@@ -9,7 +9,7 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/r3labs/sse/v2 v2.9.0
 	github.com/urfave/cli/v2 v2.23.5
-	golang.org/x/text v0.4.0
+	golang.org/x/text v0.5.0
 	gotest.tools/v3 v3.4.0
 )
 
