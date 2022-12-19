@@ -11,7 +11,16 @@ public service (ie: GitHub) to push webhooks to it.
 
 For example, if you setup your GitHub Webhook to point to a <https://smee.io/> URL or where `gosmee server` listen to.
 
-You then use the `gosmee client` on your local notebook to get the events from the server and relay it to the local service. So effectively connecting github webhook to your local service on your local workstation.
+You then use the `gosmee client` on your local notebook to get the events from
+the server and relay it to the local service. So effectively connecting github
+webhook to your local service on your local workstation.
+
+### Diagram
+
+For the people who rather prefer to understand on how it works with a small
+diagram:
+
+![diagram](./.github/gosmee-diag.png)
 
 ## Screenshot
 
