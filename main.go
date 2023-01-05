@@ -10,6 +10,6 @@ import (
 
 func main() {
 	if err := gosmee.Run(os.Args); err != nil {
-		os.Stdout.WriteString(fmt.Sprintf("%s gosmee %s\n", ansi.Color("ERROR", "red+b"), err.Error()))
+		fmt.Fprintf(os.Stdout, "%s gosmee %s\n", ansi.Color("ERROR", "red+b"), err.Error())
 	}
 }
