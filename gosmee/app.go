@@ -19,7 +19,7 @@ var zshCompletion []byte
 var bashCompletion []byte
 
 func makeapp() *cli.App {
-	return &cli.App{
+	app := &cli.App{
 		Name:  "gosmee",
 		Usage: "Forward SMEE url from an external endpoint to a local service",
 		UsageText: `gosmee can forward webhook from https://smee.io or from
@@ -146,7 +146,7 @@ accessible endpoint and forward request to your local service`,
 					{
 						Name:  "zsh",
 						Usage: "generate zsh completion",
-						Action: func(c *cli.Context) error {
+						Action: func(_ *cli.Context) error {
 							os.Stdout.WriteString(string(zshCompletion))
 							return nil
 						},
@@ -154,8 +154,20 @@ accessible endpoint and forward request to your local service`,
 					{
 						Name:  "bash",
 						Usage: "generate bash completion",
-						Action: func(c *cli.Context) error {
+						Action: func(_ *cli.Context) error {
 							os.Stdout.WriteString(string(bashCompletion))
+							return nil
+						},
+					},
+					{
+						Name:  "fish",
+						Usage: "generate fish completion",
+						Action: func(c *cli.Context) error {
+							ret, err := c.App.ToFishCompletion()
+							if err != nil {
+								return err
+							}
+							fmt.Fprintln(os.Stdout, ret)
 							return nil
 						},
 					},
@@ -163,6 +175,7 @@ accessible endpoint and forward request to your local service`,
 			},
 		},
 	}
+	return app
 }
 
 func Run(args []string) error {

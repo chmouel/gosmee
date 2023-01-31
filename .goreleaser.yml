@@ -39,13 +39,13 @@ brews:
     homepage: "https://github.com/chmouel/gosmee"
     description: "gosmee - A webhook and https://smee.io forwarder"
     install: |
-      bin.install "gosmee" => "gosmee"
       output = Utils.popen_read("SHELL=bash #{bin}/gosmee completion bash")
       (bash_completion/"gosmee").write output
       output = Utils.popen_read("SHELL=zsh #{bin}/gosmee completion zsh")
       (zsh_completion/"_gosmee").write output
+      output = Utils.popen_read("SHELL=zsh #{bin}/gosmee completion fish")
+      (fish_completion/"gosmee.fish").write output
       prefix.install_metafiles
-
 checksum:
   name_template: "checksums.txt"
 
@@ -111,8 +111,10 @@ aurs:
       mkdir -p "${pkgdir}/usr/share/bash-completion/completions/"
       mkdir -p "${pkgdir}/usr/share/zsh/site-functions/"
 
-      ./gosmee completion zsh > gosmee.zsh
-      ./gosmee completion bash > gosmee.bash
+      for i in zsh bash fish;do
+        ./gosmee completion ${i} > gosmee.${i}
+      done
 
-      install -Dm644 "gosmee.bash" "${pkgdir}/usr/share/bash-completion/completions/gosmee"
+      install -dm644 "gosmee.fish" "${pkgdir}/usr/share/fish/vendor_completions.d/"
+      install -dm644 "gosmee.bash" "${pkgdir}/usr/share/bash-completion/completions/gosmee"
       install -Dm644 "gosmee.zsh" "${pkgdir}/usr/share/zsh/site-functions/_gosmee"
