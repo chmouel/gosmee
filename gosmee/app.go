@@ -90,14 +90,15 @@ accessible endpoint and forward request to your local service`,
 						decorate = false
 					}
 					cfg := goSmee{
-						smeeURL:          smeeURL,
-						targetURL:        targetURL,
-						saveDir:          c.String("saveDir"),
-						noReplay:         c.Bool("noReplay"),
-						decorate:         decorate,
-						ignoreEvents:     c.StringSlice("ignore-event"),
-						channel:          c.String("channel"),
-						targetCnxTimeout: c.Int("target-connection-timeout"),
+						smeeURL:           smeeURL,
+						targetURL:         targetURL,
+						saveDir:           c.String("saveDir"),
+						noReplay:          c.Bool("noReplay"),
+						decorate:          decorate,
+						ignoreEvents:      c.StringSlice("ignore-event"),
+						channel:           c.String("channel"),
+						targetCnxTimeout:  c.Int("target-connection-timeout"),
+						insecureTLSVerify: c.Bool("insecure-skip-tls-verify"),
 					}
 					err := cfg.clientSetup()
 					return err
@@ -136,6 +137,11 @@ accessible endpoint and forward request to your local service`,
 						Name:    "nocolor",
 						Usage:   "Disable color output, automatically disabled when non tty",
 						EnvVars: []string{"NO_COLOR"},
+					},
+					&cli.BoolFlag{
+						Name:  "insecure-skip-tls-verify",
+						Value: false,
+						Usage: "If true, the target server's certificate will not be checked for validity. This will make your HTTPS connections insecure",
 					},
 				},
 			},

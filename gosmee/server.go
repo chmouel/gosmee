@@ -27,7 +27,7 @@ var (
 //go:embed templates/index.tmpl
 var indexTmpl []byte
 
-func errorIt(w http.ResponseWriter, r *http.Request, status int, err error) {
+func errorIt(w http.ResponseWriter, _ *http.Request, status int, err error) {
 	w.WriteHeader(status)
 	_, _ = w.Write([]byte(err.Error()))
 }

@@ -2,6 +2,7 @@ package gosmee
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -41,6 +42,7 @@ type goSmee struct {
 	ignoreEvents                []string
 	channel                     string
 	targetCnxTimeout            int
+	insecureTLSVerify           bool
 }
 
 type payloadMsg struct {
@@ -233,7 +235,8 @@ func (c goSmee) replayData(b []byte) error {
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(c.targetCnxTimeout)*time.Second)
 	defer cancel()
-	client := http.Client{}
+	//nolint: gosec
+	client := http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: !c.insecureTLSVerify}}}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.targetURL, strings.NewReader(string(pm.body)))
 	if err != nil {
 		return err
