@@ -1,5 +1,7 @@
 # System services
 
+Somne system integrations, you may want to edit the download file and adjust your URL before applying it directly on your system/cluster
+
 ## macOS
 
 ```shell
