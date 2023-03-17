@@ -162,7 +162,7 @@ http://localhost:3333/NqybHcEi
 
 ### Caddy
 
-Caddy is the advised way to run gosmee server, you just need this:
+[Caddy](https://caddyserver.com/) is the advised way to run gosmee server, you just need this:
 
 ```caddyfile
 https://webhook.mydomain {
