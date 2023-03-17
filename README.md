@@ -143,14 +143,15 @@ You really want to secure that endpoint, you can generate some letsencrypt
 certificate and use the `--tls-cert` and `--tls-key` flags to specify them.
 
 If you really lazy (and who isn't) you can just give the flag `--auto-cert` and
-it will automatically generate certs but that need to be run as root.
+it will automatically generate certs. Unfortunately this require to run on 
+port 443 which need root and very secure. It may be better to just have [caddy](#Caddy) installed in front of gosmee.
 
 To use it you go to your URL and a suffix with your random ID. For example :
 
 <https://myserverurl/RANDOM_ID>
 
-The random ID accepted to the server needs to be at least 12 characters (and you
-really want to be it random).
+The random ID accepted to the server needs to be 12 characters (and you
+probably want to be it random).
 
 With `/new` you can easily generate a random ID, ie:
 
@@ -159,6 +160,15 @@ With `/new` you can easily generate a random ID, ie:
 http://localhost:3333/NqybHcEi
 ```
 
+### Caddy
+
+Caddy is the advised way to run gosmee server, you just need this:
+
+```caddyfile
+https://webhook.mydomain {
+    reverse_proxy http://127.0.0.1:3333
+}
+```
 ### Nginx
 
 Running gosmee server behind nginx may require some configuration to work properly.
@@ -174,17 +184,7 @@ Here is a `proxy_pass location` to a locally running gosmee server on port local
     }
 ```
 
-### Caddy
-
-Running with Caddy is trivial :
-
-```caddyfile
-https://webhook.mydomain {
-    reverse_proxy http://127.0.0.1:3333
-}
-```
-
-default seems good enough!
+There is maybe some errors appearing some time with nginx with long running connexion
 
 ### Kubernetes
 
