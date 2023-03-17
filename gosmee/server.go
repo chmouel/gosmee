@@ -52,39 +52,38 @@ func serve(c *cli.Context) error {
 	})
 
 	router.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		url := fmt.Sprintf("%s/%s", publicURL, randomString(12))
-		w.WriteHeader(http.StatusOK)
-		// parse template  file in indexTmpl
-		t, err := template.New("index").Parse(string(indexTmpl))
-		if err != nil {
-			errorIt(w, r, http.StatusInternalServerError, err)
-			return
-		}
-		varmap := map[string]string{
-			"URL":     url,
-			"Version": string(Version),
-		}
-		w.Header().Set("Content-Type", "text/html")
-		if err := t.ExecuteTemplate(w, "index", varmap); err != nil {
-			errorIt(w, r, http.StatusInternalServerError, err)
-			return
-		}
+		// redirect to /new
+		w.Header().Set("Location", fmt.Sprintf("%s/%s", publicURL, randomString(12)))
+		w.WriteHeader(http.StatusFound)
 	})
 
 	router.Get("/new", func(w http.ResponseWriter, r *http.Request) {
-		url := fmt.Sprintf("%s%s\n", publicURL,
-			strings.ReplaceAll(r.URL.String(), "/new", fmt.Sprintf("/%s",
-				randomString(12))))
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, url)
+		w.Header().Set("Location", fmt.Sprintf("%s/%s", publicURL, randomString(12)))
+		w.WriteHeader(http.StatusFound)
 	})
+
 	router.Get("/{channel:[a-zA-Z0-9]{12,}}", func(w http.ResponseWriter, r *http.Request) {
 		channel := chi.URLParam(r, "channel")
-		accept := r.Header.Get("Accept")
-		if strings.Contains(accept, "text/html") {
+		accept := r.Header.Get("User-Agent")
+		if !strings.Contains(accept, "gosmee") {
 			w.WriteHeader(http.StatusOK)
-			fmt.Fprintf(w, "Use the gosmee client to connect, eg: gosmee client %s/%s http://yourlocalservice:port\n",
-				publicURL, channel)
+
+			url := fmt.Sprintf("%s/%s", publicURL, channel)
+			w.WriteHeader(http.StatusOK)
+			// // parse template  file in indexTmpl
+			t, err := template.New("index").Parse(string(indexTmpl))
+			if err != nil {
+				errorIt(w, r, http.StatusInternalServerError, err)
+				return
+			}
+			varmap := map[string]string{
+				"URL":     url,
+				"Version": string(Version),
+			}
+			w.Header().Set("Content-Type", "text/html")
+			if err := t.ExecuteTemplate(w, "index", varmap); err != nil {
+				errorIt(w, r, http.StatusInternalServerError, err)
+			}
 			return
 		}
 		newURL, err := r.URL.Parse(fmt.Sprintf("%s?stream=%s", r.URL.Path, channel))
