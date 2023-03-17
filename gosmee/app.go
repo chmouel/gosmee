@@ -49,6 +49,11 @@ accessible endpoint and forward request to your local service`,
 						Value:   defaultServerPort,
 						Usage:   "Port to listen on",
 					},
+					&cli.BoolFlag{
+						Name:  "auto-cert",
+						Value: false,
+						Usage: "Automatically generate letsencrypt certs",
+					},
 					&cli.StringFlag{
 						Name:    "address",
 						Aliases: []string{"a"},

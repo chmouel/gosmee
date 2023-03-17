@@ -17,6 +17,7 @@ import (
 	"github.com/mgutz/ansi"
 	"github.com/r3labs/sse/v2"
 	"github.com/urfave/cli/v2"
+	"golang.org/x/crypto/acme/autocert"
 )
 
 var (
@@ -137,6 +138,7 @@ func serve(c *cli.Context) error {
 	})
 	config := goSmee{}
 
+	autoCert := c.Bool("auto-cert")
 	certFile := c.String("tls-cert")
 	certKey := c.String("tls-key")
 	sslEnabled := certFile != "" && certKey != ""
@@ -155,6 +157,9 @@ func serve(c *cli.Context) error {
 	if sslEnabled {
 		//nolint:gosec
 		return http.ListenAndServeTLS(portAddr, certFile, certKey, router)
+	} else if autoCert {
+		//nolint: gosec
+		return http.Serve(autocert.NewListener(publicURL), router)
 	}
 	//nolint:gosec
 	return http.ListenAndServe(portAddr, router)
