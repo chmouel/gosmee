@@ -217,10 +217,7 @@ func (c goSmee) saveData(b []byte) error {
 	}
 
 	// set permission
-	if err := os.Chmod(shscript, 0o755); err != nil {
-		return err
-	}
-	return nil
+	return os.Chmod(shscript, 0o755)
 }
 
 func (c goSmee) replayData(b []byte) error {
