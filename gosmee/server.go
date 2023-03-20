@@ -35,6 +35,7 @@ func errorIt(w http.ResponseWriter, _ *http.Request, status int, err error) {
 
 func serve(c *cli.Context) error {
 	publicURL := c.String("public-url")
+	footer := c.String("footer")
 	router := chi.NewRouter()
 	router.Use(middleware.Logger)
 	router.Use(middleware.RequestID)
@@ -70,7 +71,6 @@ func serve(c *cli.Context) error {
 
 			url := fmt.Sprintf("%s/%s", publicURL, channel)
 			w.WriteHeader(http.StatusOK)
-			// // parse template  file in indexTmpl
 			t, err := template.New("index").Parse(string(indexTmpl))
 			if err != nil {
 				errorIt(w, r, http.StatusInternalServerError, err)
@@ -79,6 +79,7 @@ func serve(c *cli.Context) error {
 			varmap := map[string]string{
 				"URL":     url,
 				"Version": string(Version),
+				"Footer":  footer,
 			}
 			w.Header().Set("Content-Type", "text/html")
 			if err := t.ExecuteTemplate(w, "index", varmap); err != nil {

@@ -55,6 +55,10 @@ accessible endpoint and forward request to your local service`,
 						Usage: "Automatically generate letsencrypt certs",
 					},
 					&cli.StringFlag{
+						Name:  "footer",
+						Usage: "An HTML string to show in footer for copyright and author",
+					},
+					&cli.StringFlag{
 						Name:    "address",
 						Aliases: []string{"a"},
 						Value:   defaultServerAddress,
