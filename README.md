@@ -143,8 +143,8 @@ You really want to secure that endpoint, you can generate some letsencrypt
 certificate and use the `--tls-cert` and `--tls-key` flags to specify them.
 
 If you really lazy (and who isn't) you can just give the flag `--auto-cert` and
-it will automatically generate certs. Unfortunately this require to run on 
-port 443 which need root and very secure. It may be better to just have [caddy](#Caddy) installed in front of gosmee.
+it will automatically generate certs. Unfortunately this require to run on
+port 443 which need root and very secure. It may be better to just have [caddy](#caddy) installed in front of gosmee.
 
 To use it you go to your URL and a suffix with your random ID. For example :
 
@@ -169,6 +169,7 @@ https://webhook.mydomain {
     reverse_proxy http://127.0.0.1:3333
 }
 ```
+
 ### Nginx
 
 Running gosmee server behind nginx may require some configuration to work properly.

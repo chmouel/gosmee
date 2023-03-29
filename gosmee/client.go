@@ -81,7 +81,8 @@ func (c goSmee) parse(data []byte) (payloadMsg, error) {
 				pm.headers[title(payloadKey)] = pv
 			}
 		}
-		if payloadKey == "bodyB" {
+		switch payloadKey {
+		case "bodyB":
 			mb := &messageBody{}
 			err := json.NewDecoder(strings.NewReader(string(data))).Decode(mb)
 			if err != nil {
@@ -91,22 +92,19 @@ func (c goSmee) parse(data []byte) (payloadMsg, error) {
 			if err != nil {
 				return pm, err
 			}
-
 			pm.body = decoded
-		} else if payloadKey == "body" {
+		case "body":
 			mb := &messageBody{}
 			err := json.NewDecoder(strings.NewReader(string(data))).Decode(mb)
 			if err != nil {
 				return pm, err
 			}
 			pm.body = mb.Body
-		}
-		if payloadKey == "content-type" {
+		case "content-type":
 			if pv, ok := payloadValue.(string); ok {
 				pm.contentType = pv
 			}
-		}
-		if payloadKey == "timestamp" {
+		case "timestamp":
 			var ts string
 			if pv, ok := payloadValue.(float64); ok {
 				ts = fmt.Sprintf("%.f", pv)
