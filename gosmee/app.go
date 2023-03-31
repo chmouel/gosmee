@@ -2,6 +2,7 @@ package gosmee
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 
@@ -81,13 +82,22 @@ accessible endpoint and forward request to your local service`,
 				UsageText: "gosmee [command options] SMEE_URL LOCAL_SERVICE_URL",
 				Usage:     "Make a client from the relay server to your local service",
 				Action: func(c *cli.Context) error {
-					if c.NArg() != 2 {
-						return fmt.Errorf("need at least a serverURL and a targetURL as arguments, ie: gosmee client https://smee.io/aBcDeF http://localhost:8080")
+					var smeeURL, targetURL string
+					if os.Getenv("GOSMEE_URL") != "" && os.Getenv("GOSMEE_TARGET_URL") != "" {
+						smeeURL = os.Getenv("GOSMEE_URL")
+						targetURL = os.Getenv("GOSMEE_TARGET_URL")
+					} else {
+						if c.NArg() != 2 {
+							return fmt.Errorf("need at least a smeeURL and a targetURL as arguments, ie: gosmee client https://server.smee.url/aBcdeFghijklmn http://localhost:8080")
+						}
+						smeeURL = c.Args().Get(0)
+						targetURL = c.Args().Get(1)
 					}
-					smeeURL := c.Args().Get(0)
-					targetURL := c.Args().Get(1)
-					if !strings.HasPrefix(targetURL, "http") {
-						return fmt.Errorf("targetURL should start with http(s)")
+					if _, err := url.Parse(smeeURL); err != nil {
+						return fmt.Errorf("smeeURL %s is not a valid url %w", smeeURL, err)
+					}
+					if _, err := url.Parse(targetURL); err != nil {
+						return fmt.Errorf("target url %s is not a valid url %w", targetURL, err)
 					}
 					decorate := true
 					if !isatty.IsTerminal(os.Stdout.Fd()) {

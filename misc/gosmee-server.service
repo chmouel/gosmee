@@ -1,0 +1,10 @@
+[Unit]
+Description=Gosmee Server
+
+[Service]
+ExecStart=gosmee server
+User=gosmee
+EnvironmentFile=/etc/gosmee.env
+
+[Install]
+WantedBy=default.target
