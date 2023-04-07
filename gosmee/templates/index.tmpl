@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+</html>
 
 <head>
     <meta charset='utf-8'>
@@ -74,9 +74,9 @@
         <h2>Gosmee webhook forwarder</h2>
         <ul>
             <li>Download the gosmee client for your platform: <a href="https://github.com/chmouel/gosmee/#install">here</a></li>
-            <li>Use this endpoint URL to configure your webhook service (ie: Github, Gitlab, Zapier etc..):</li>
+            <li>Use this endpoint URL to configure your webhook service (ie: <a href="https://docs.github.com/en/webhooks-and-events/webhooks/creating-webhooks">Github</a>, <a href="https://docs.gitlab.com/ee/user/project/integrations/webhooks.html">Gitlab</a>, <a href="https://zapier.com/apps/webhook/integrations">Zapier</a> etc..):</li>
             <li><a href="{{ .URL }}" target="_blank">{{ .URL }}</a></li>
-            <li>Using the gosmee client you can then forward the endpoint URL to your local service (for example here on <b>http://localhost:8080</b>):</li>
+            <li>Using the gosmee client you can then forward the endpoint URL to your local service (for example on <b>http://localhost:8080</b>):</li>
             <li><div class="code">$ gosmee client {{ .URL }} http://localhost:8080</div></li>
             <li>See <b>gosmee help</b> for more options.</li>
         </ul>
