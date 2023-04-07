@@ -1,19 +1,14 @@
 # gosmee - A webhook forwader/relayer
 
-gosmee is a webhook forwarder that you can easily run anywhere.
+Gosmee is a versatile webhook relayer that can be conveniently executed anywhere.
 
 ## Description
 
-Gosmee let you relays webhooks from itself (acting as a server) or from <https://smee.io> to your local notebook.
+Gosmee enables you to relay webhooks from either itself (as a server) or from https://smee.io to your local notebook.
 
-With `gosmee` you can easily expose the service on your local network or behind a VPN, letting a
-public service (ie: GitHub) to push webhooks to it.
+With gosmee, you can effortlessly expose the service on your local network or behind a VPN, allowing a public service (such as GitHub) to push webhooks to it.
 
-For example, if you setup your GitHub Webhook to point to a <https://smee.io/> URL or where `gosmee server` listen to.
-
-You then use the `gosmee client` on your local notebook to get the events from
-the server and relay it to the local service. So effectively connecting github
-webhook to your local service on your local workstation.
+For instance, if you configure your GitHub Webhook to direct to a https://smee.io/ URL or where gosmee server is listening, you can then use the gosmee client on your local notebook to obtain the events from the server and forward them to the local service, thereby establishing a connection between the GitHub webhook and your local service on your workstation.
 
 ### Diagram
 
@@ -104,33 +99,28 @@ source <(gosmee completion zsh)
 ## Usage
 
 ### Client
+If you intend to use https://smee.io, you might want to generate your own smee URL by visiting https://smee.io/new.
 
-If you want to use <https://smee.io> you  may want to generate your own smee URL by going to <https://smee.io/new>.
-
-When you have it, the basic usage is the following :
+Once you have it, the basic usage is as follows:
 
 ```shell
-gosmee client https://smee.io/aBcDeF https://localhost:8080
+gosmee client https://smee.io/aBcDeF https://localhost:8080 
 ```
+This command will relay all payloads received at the smee URL to a service running on http://localhost:8080.
 
-It will replay all payload coming to to the smee URL on a service running on `http://localhost:8080`
-
-Another option is to be able to save all the replay as a handy shell script :
+Another option is to save all the relays as shell script that can be replayed withouthaving to recreate the event:
 
 ```shell
 gosmee client --saveDir /tmp/savedreplay https://smee.io/aBcDeF https://localhost:8080
 ```
 
-What this will do is when you have a new payload comming to your smee URL, gosmee will save the json to
-`/tmp/savedreplay/timestamp.json` and generate a shell script with curl options  to
-`/tmp/savedreplay/timestamp.sh`. You then can simply replay the webhook at ease by
-launching the shell script again and again..
+This command will save the JSON data of new payloads received at your smee URL to `/tmp/savedreplay/timestamp.json` and create a shell script with cURL options to `/tmp/savedreplay/timestamp.sh`. You can replay the webhook effortlessly by repeatedly running the shell script. You can add the `-l` flag to the shell script to replay on `localhost:8080`.
 
-You can ignore some events (if we detect it from Gitlab/GitHub/Bitbucket) if you add one or multiple `--ignore-event` flags.
+You can ignore certain events (identified by GitLab/GitHub/Bitbucket) by adding one or more `--ignore-even`t flags.
 
-You can add `--noReplay` if you only want the saving and not replaying.
+If you want to save the payloads but not replay them, you can use `--noReplay`.
 
-You will have a pretty colored emoji unless you specify `--nocolor` as argument.
+By default, you will have colored emoji output unless you specify `--nocolor` as an argument.
 
 ### Server
 
