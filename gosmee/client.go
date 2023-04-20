@@ -239,6 +239,7 @@ func (c goSmee) replayData(b []byte) error {
 	for k, v := range pm.headers {
 		req.Header.Add(k, v)
 	}
+	req.Header.Add("content-type", "application/json")
 	resp, err := client.Do(req)
 	if err != nil {
 		return err
