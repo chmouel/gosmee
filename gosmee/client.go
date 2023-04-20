@@ -127,18 +127,22 @@ func (c goSmee) parse(data []byte) (payloadMsg, error) {
 				pm.contentType = pv
 			}
 		case "timestamp":
-			var ts string
+			var dt time.Time
 			if pv, ok := payloadValue.(float64); ok {
+				var ts string
 				ts = fmt.Sprintf("%.f", pv)
 				ts = ts[:len(ts)-3]
-			}
-			tsInt, err := strconv.ParseInt(ts, 10, 64)
-			if err != nil {
-				return payloadMsg{}, fmt.Errorf("cannot convert timestamp to int64")
-			}
-			dt := time.Unix(tsInt, 0)
 
-			pm.timestamp = dt.Format("20060102T15h04")
+				tsInt, err := strconv.ParseInt(ts, 10, 64)
+				if err != nil {
+					return payloadMsg{}, fmt.Errorf("cannot convert timestamp to int64")
+				}
+				dt = time.Unix(tsInt, 0)
+			} else {
+				dt = time.Now()
+			}
+
+			pm.timestamp = dt.Format("2006-01-02T15.04.01.000")
 		}
 	}
 
@@ -254,7 +258,7 @@ func (c goSmee) replayData(pm payloadMsg) error {
 		msg = fmt.Sprintf("%s %s", pm.eventID, msg)
 	}
 
-	msg = fmt.Sprintf("%s replayed to %s, status: %s", msg, ansi.Color(c.targetURL, "green+ub"), ansi.Color(fmt.Sprintf("%d", resp.StatusCode), "blue+b"))
+	msg = fmt.Sprintf("%s %s replayed to %s, status: %s", pm.timestamp, msg, ansi.Color(c.targetURL, "green+ub"), ansi.Color(fmt.Sprintf("%d", resp.StatusCode), "blue+b"))
 	if resp.StatusCode > 299 {
 		msg = fmt.Sprintf("%s, error: %s", msg, resp.Status)
 	}
