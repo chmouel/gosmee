@@ -161,15 +161,7 @@ func (c goSmee) emoji(emoji, color string) string {
 	return ansi.Color(emoji, color) + " "
 }
 
-func (c goSmee) saveData(b []byte) error {
-	pm, err := c.parse(b)
-	if err != nil {
-		return err
-	}
-	if len(pm.headers) == 0 {
-		return nil
-	}
-
+func (c goSmee) saveData(pm payloadMsg) error {
 	// check if saveDir is created
 	if _, err := os.Stat(c.saveDir); os.IsNotExist(err) {
 		if err := os.MkdirAll(c.saveDir, 0o755); err != nil {
@@ -229,16 +221,7 @@ func (c goSmee) saveData(b []byte) error {
 	return os.Chmod(shscript, 0o755)
 }
 
-func (c goSmee) replayData(b []byte) error {
-	// replay data to targetURL
-	pm, err := c.parse(b)
-	if err != nil {
-		return err
-	}
-	if len(pm.headers) == 0 {
-		return nil
-	}
-
+func (c goSmee) replayData(pm payloadMsg) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(c.targetCnxTimeout)*time.Second)
 	defer cancel()
 	//nolint: gosec
@@ -297,16 +280,26 @@ func (c goSmee) clientSetup() error {
 				ansi.Color(c.targetURL, "green+u"))
 			return
 		}
+
+		pm, err := c.parse(msg.Data)
+		if err != nil {
+			fmt.Fprintf(os.Stdout, "%s Parsing %s\n", ansi.Color("ERROR", "red+b"), err.Error())
+			return
+		}
+		if len(pm.headers) == 0 {
+			return
+		}
+
 		if string(msg.Data) != "{}" {
 			if c.saveDir != "" {
-				err := c.saveData(msg.Data)
+				err := c.saveData(pm)
 				if err != nil {
-					fmt.Fprintf(os.Stdout, "%s Forwarding %s\n", ansi.Color("ERROR", "red+b"), err.Error())
+					fmt.Fprintf(os.Stdout, "%s Saving %s\n", ansi.Color("ERROR", "red+b"), err.Error())
 					return
 				}
 			}
 			if !c.noReplay {
-				if err := c.replayData(msg.Data); err != nil {
+				if err := c.replayData(pm); err != nil {
 					fmt.Fprintf(os.Stdout, "%s Forwarding %s\n", ansi.Color("ERROR", "red+b"), err.Error())
 					return
 				}
