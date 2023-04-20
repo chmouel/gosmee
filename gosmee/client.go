@@ -239,6 +239,10 @@ func (c goSmee) replayData(b []byte) error {
 	for k, v := range pm.headers {
 		req.Header.Add(k, v)
 	}
+	// add content-type if it's not already set
+	if _, ok := pm.headers["Content-Type"]; !ok {
+		req.Header.Add("Content-Type", pm.contentType)
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return err
