@@ -51,6 +51,7 @@ type payloadMsg struct {
 	timestamp   string
 	contentType string
 	eventType   string
+	eventID     string
 }
 
 type messageBody struct {
@@ -68,6 +69,7 @@ func (c goSmee) parse(data []byte) (payloadMsg, error) {
 	pm := payloadMsg{
 		headers: make(map[string]string),
 	}
+	pm.eventID = ""
 	var message interface{}
 	_ = json.Unmarshal(data, &message)
 	var payload map[string]interface{}
@@ -76,10 +78,30 @@ func (c goSmee) parse(data []byte) (payloadMsg, error) {
 		return pm, err
 	}
 	for payloadKey, payloadValue := range payload {
+		if payloadKey == "x-github-event" || payloadKey == "x-gitlab-event" || payloadKey == "x-event-key" {
+			if pv, ok := payloadValue.(string); ok {
+				pm.headers[title(payloadKey)] = pv
+				// github action don't like it
+				replace := strings.NewReplacer(":", "-", " ", "_", "/", "_")
+				pv = replace.Replace(strings.ToLower(pv))
+				// remove all non-alphanumeric characters and don't let directory straversal
+				pv = pmEventRe.FindString(pv)
+				pm.eventType = pv
+			}
+			continue
+		}
+		if payloadKey == "x-github-delivery" {
+			if pv, ok := payloadValue.(string); ok {
+				pm.headers[title(payloadKey)] = pv
+				pm.eventID = pv
+			}
+			continue
+		}
 		if strings.HasPrefix(payloadKey, "x-") || payloadKey == "user-agent" {
 			if pv, ok := payloadValue.(string); ok {
 				pm.headers[title(payloadKey)] = pv
 			}
+			continue
 		}
 		switch payloadKey {
 		case "bodyB":
@@ -117,17 +139,6 @@ func (c goSmee) parse(data []byte) (payloadMsg, error) {
 			dt := time.Unix(tsInt, 0)
 
 			pm.timestamp = dt.Format("20060102T15h04")
-		}
-
-		if payloadKey == "x-github-event" || payloadKey == "x-gitlab-event" || payloadKey == "x-event-key" {
-			if pv, ok := payloadValue.(string); ok {
-				// github action don't like it
-				replace := strings.NewReplacer(":", "-", " ", "_", "/", "_")
-				pv = replace.Replace(strings.ToLower(pv))
-				// remove all non-alphanumeric characters and don't let directory straversal
-				pv = pmEventRe.FindString(pv)
-				pm.eventType = pv
-			}
 		}
 	}
 
@@ -255,6 +266,9 @@ func (c goSmee) replayData(b []byte) error {
 		msg = fmt.Sprintf("%s event", pm.eventType)
 	} else {
 		msg = "request"
+	}
+	if pm.eventID != "" {
+		msg = fmt.Sprintf("%s %s", pm.eventID, msg)
 	}
 
 	msg = fmt.Sprintf("%s replayed to %s, status: %s", msg, ansi.Color(c.targetURL, "green+ub"), ansi.Color(fmt.Sprintf("%d", resp.StatusCode), "blue+b"))
