@@ -1,4 +1,4 @@
-# gosmee - A webhook forwader/relayer
+# gosmee - A webhook forwarder/relayer
 
 Gosmee is a versatile webhook relayer that can be conveniently executed anywhere.
 
@@ -108,7 +108,7 @@ gosmee client https://smee.io/aBcDeF https://localhost:8080
 ```
 This command will relay all payloads received at the smee URL to a service running on http://localhost:8080.
 
-Another option is to save all the relays as shell script that can be replayed withouthaving to recreate the event:
+Another option is to save all the relays as shell script that can be replayed without having to recreate the event:
 
 ```shell
 gosmee client --saveDir /tmp/savedreplay https://smee.io/aBcDeF https://localhost:8080
@@ -116,7 +116,7 @@ gosmee client --saveDir /tmp/savedreplay https://smee.io/aBcDeF https://localhos
 
 This command will save the JSON data of new payloads received at your smee URL to `/tmp/savedreplay/timestamp.json` and create a shell script with cURL options to `/tmp/savedreplay/timestamp.sh`. You can replay the webhook effortlessly by repeatedly running the shell script. You can add the `-l` flag to the shell script to replay on `localhost:8080`.
 
-You can ignore certain events (identified by GitLab/GitHub/Bitbucket) by adding one or more `--ignore-even`t flags.
+You can ignore certain events (identified by GitLab/GitHub/Bitbucket) by adding one or more `--ignore-event` flags.
 
 If you want to save the payloads but not replay them, you can use `--noReplay`.
 
@@ -132,11 +132,11 @@ behind a proxy with the flags `--address` and `--port`.
 You really want to secure that endpoint, you can generate some letsencrypt
 certificate and use the `--tls-cert` and `--tls-key` flags to specify them.
 
-If you really lazy (and who isn't) you can just give the flag `--auto-cert` and
+If you're really lazy (and who isn't) you can just give the flag `--auto-cert` and
 it will automatically generate certs. Unfortunately this require to run on
 port 443 which need root and very secure. It may be better to just have [caddy](#caddy) installed in front of gosmee.
 
-To use it you go to your URL and a suffix with your random ID. For example :
+To use it you go to your URL and a suffix with your random ID. For example:
 
 <https://myserverurl/RANDOM_ID>
 
@@ -175,15 +175,13 @@ Here is a `proxy_pass location` to a locally running gosmee server on port local
     }
 ```
 
-There is maybe some errors appearing some time with nginx with long running connexion
+There is maybe some errors appearing some time with nginx with long running connections.
 
 ### Kubernetes
 
-You can expose an internal kubernetes deployment or service with gosmee  by using [this file](./misc/kubernetes-deployment.yaml)
+You can expose an internal kubernetes deployment or service with gosmee by using [this file](./misc/kubernetes-deployment.yaml).
 
-Adjust the SMEE_URL in there to your endpoint
-
-and the `http://deployment.name.namespace.name:PORT_OF_SERVICE` URL is the Kubernetes internal URL of your deployment running on your cluster, for example :
+Adjust the `SMEE_URL` in there to your endpoint and the `http://deployment.name.namespace.name:PORT_OF_SERVICE` URL is the Kubernetes internal URL of your deployment running on your cluster, for example:
 
    <http://service.namespace:8080>
 
