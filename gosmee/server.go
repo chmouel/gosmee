@@ -96,6 +96,11 @@ func serve(c *cli.Context) error {
 		events.ServeHTTP(w, r)
 	})
 	router.Post("/{channel:[a-zA-Z0-9]{12,}}", func(w http.ResponseWriter, r *http.Request) {
+		// check if we have content-type json
+		if !strings.Contains(r.Header.Get("Content-Type"), "application/json") {
+			errorIt(w, r, http.StatusBadRequest, fmt.Errorf("content-type must be application/json"))
+			return
+		}
 		channel := chi.URLParam(r, "channel")
 		// try to json decode body
 		var d interface{}
@@ -106,11 +111,6 @@ func serve(c *cli.Context) error {
 		}
 		if err := json.Unmarshal(body, &d); err != nil {
 			errorIt(w, r, http.StatusBadRequest, err)
-			return
-		}
-		// check if we have content-type json
-		if !strings.Contains(r.Header.Get("Content-Type"), "application/json") {
-			errorIt(w, r, http.StatusBadRequest, fmt.Errorf("content-type must be application/json"))
 			return
 		}
 		// convert headers to map[string]string
