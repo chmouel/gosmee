@@ -3,6 +3,7 @@ package gosmee
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"gotest.tools/v3/assert"
 )
@@ -20,7 +21,7 @@ var simpleJSON = `{
 
 func TestGoSmeeGood(t *testing.T) {
 	p := goSmee{}
-	m, err := p.parse([]byte(simpleJSON))
+	m, err := p.parse(time.Now().UTC(), []byte(simpleJSON))
 	assert.NilError(t, err)
 	assert.Equal(t, m.headers["X-Foo"], "bar")
 	assert.Equal(t, m.headers["User-Agent"], "gosmee")
@@ -34,6 +35,6 @@ func TestGoSmeeGood(t *testing.T) {
 
 func TestGoSmeeBad(t *testing.T) {
 	p := goSmee{}
-	pm, _ := p.parse([]byte(`xxxXXXxx`))
+	pm, _ := p.parse(time.Now().UTC(), []byte(`xxxXXXxx`))
 	assert.Equal(t, string(pm.body), "")
 }

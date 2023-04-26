@@ -37,7 +37,6 @@ func serve(c *cli.Context) error {
 	publicURL := c.String("public-url")
 	footer := c.String("footer")
 	router := chi.NewRouter()
-	router.Use(middleware.Logger)
 	router.Use(middleware.RequestID)
 	router.Use(middleware.RealIP)
 	router.Use(middleware.Logger)
@@ -97,7 +96,7 @@ func serve(c *cli.Context) error {
 	})
 	router.Post("/{channel:[a-zA-Z0-9]{12,}}", func(w http.ResponseWriter, r *http.Request) {
 		// grab current time stamp before we take any further actions
-		timestamp := time.Now().UTC().UnixMilli()
+		now := time.Now().UTC()
 		// check if we have content-type json
 		if !strings.Contains(r.Header.Get("Content-Type"), "application/json") {
 			errorIt(w, r, http.StatusBadRequest, fmt.Errorf("content-type must be application/json"))
@@ -115,13 +114,15 @@ func serve(c *cli.Context) error {
 			errorIt(w, r, http.StatusBadRequest, err)
 			return
 		}
-		// convert headers to map[string]string
+		// convert headers to map[string]string and accumlate for log entry
+		headers := ""
 		payload := map[string]interface{}{}
 		for k, v := range r.Header {
+			headers += fmt.Sprintf(" %s=%s", k, v)
 			payload[strings.ToLower(k)] = v[0]
 		}
 		// easier with base64 for server instead of string
-		payload["timestamp"] = fmt.Sprintf("%d", timestamp)
+		payload["timestamp"] = fmt.Sprintf("%d", now.UnixMilli())
 		payload["bodyB"] = base64.StdEncoding.EncodeToString(body)
 		reencoded, err := json.Marshal(payload)
 		if err != nil {
@@ -135,6 +136,7 @@ func serve(c *cli.Context) error {
 		w.WriteHeader(http.StatusAccepted)
 
 		fmt.Fprintf(w, "{\"status\": %d, \"channel\": \"%s\", \"message\": \"ok\"}\n", http.StatusAccepted, channel)
+		fmt.Fprintf(os.Stdout, "%s Published %s%s on channel %s\n", now.Format("2006-01-02T15.04.01.000"), middleware.GetReqID(r.Context()), headers, channel)
 	})
 	config := goSmee{}
 

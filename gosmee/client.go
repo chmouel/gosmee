@@ -36,6 +36,8 @@ const defaultTimeout = 5
 
 const smeeChannel = "messages"
 
+const tsFormat = "2006-01-02T15.04.01.000"
+
 type goSmee struct {
 	saveDir, smeeURL, targetURL string
 	decorate, noReplay          bool
@@ -65,7 +67,8 @@ func title(source string) string {
 	return cases.Title(language.Und, cases.NoLower).String(source)
 }
 
-func (c goSmee) parse(data []byte) (payloadMsg, error) {
+func (c goSmee) parse(now time.Time, data []byte) (payloadMsg, error) {
+	dt := now
 	pm := payloadMsg{
 		headers: make(map[string]string),
 	}
@@ -127,7 +130,6 @@ func (c goSmee) parse(data []byte) (payloadMsg, error) {
 				pm.contentType = pv
 			}
 		case "timestamp":
-			dt := time.Now().UTC()
 			if pv, ok := payloadValue.(string); ok {
 				// timestamp payload value is in milliseconds since the Epoch
 				tsInt, err := strconv.ParseInt(pv, 10, 64)
@@ -137,9 +139,10 @@ func (c goSmee) parse(data []byte) (payloadMsg, error) {
 					dt = time.Unix(tsInt/int64(1000), (tsInt%int64(1000))*int64(1000000)).UTC()
 				}
 			}
-			pm.timestamp = dt.Format("2006-01-02T15.04.01.000")
 		}
 	}
+
+	pm.timestamp = dt.Format(tsFormat)
 
 	if len(c.ignoreEvents) > 0 && pm.eventType != "" {
 		for _, v := range c.ignoreEvents {
@@ -181,7 +184,7 @@ func (c goSmee) saveData(pm payloadMsg) error {
 		return err
 	}
 	defer f.Close()
-	// // write data
+	// write data
 	_, err = f.Write(pm.body)
 	if err != nil {
 		return err
@@ -273,33 +276,61 @@ func (c goSmee) clientSetup() error {
 		channel = smeeChannel
 	}
 	err := client.Subscribe(channel, func(msg *sse.Event) {
+		now := time.Now().UTC()
+		nowStr := now.Format(tsFormat)
+
 		if string(msg.Event) == "ready" || string(msg.Data) == "ready" {
 			fmt.Fprintf(os.Stdout,
-				"%sForwarding %s to %s\n", c.emoji("✓", "yellow+b"), ansi.Color(c.smeeURL, "green+u"),
+				"%s %sForwarding %s to %s\n",
+				nowStr,
+				c.emoji("✓", "yellow+b"),
+				ansi.Color(c.smeeURL, "green+u"),
 				ansi.Color(c.targetURL, "green+u"))
 			return
 		}
 
-		pm, err := c.parse(msg.Data)
+		pm, err := c.parse(now, msg.Data)
 		if err != nil {
-			fmt.Fprintf(os.Stdout, "%s Parsing %s\n", ansi.Color("ERROR", "red+b"), err.Error())
+			fmt.Fprintf(os.Stdout,
+				"%s %s parsing message %s\n",
+				nowStr,
+				ansi.Color("ERROR", "red+b"),
+				err.Error())
 			return
 		}
 		if len(pm.headers) == 0 {
+			fmt.Fprintf(os.Stdout,
+				"%s %s no headers found in message\n",
+				nowStr,
+				ansi.Color("ERROR", "red+b"))
 			return
+		}
+		headers := ""
+		for k, v := range pm.headers {
+			headers += fmt.Sprintf("%s=%s ", k, v)
 		}
 
 		if string(msg.Data) != "{}" {
 			if c.saveDir != "" {
 				err := c.saveData(pm)
 				if err != nil {
-					fmt.Fprintf(os.Stdout, "%s Saving %s\n", ansi.Color("ERROR", "red+b"), err.Error())
+					fmt.Fprintf(os.Stdout,
+						"%s %s saving message with headers '%s' - %s\n",
+						nowStr,
+						ansi.Color("ERROR", "red+b"),
+						headers,
+						err.Error())
 					return
 				}
 			}
 			if !c.noReplay {
 				if err := c.replayData(pm); err != nil {
-					fmt.Fprintf(os.Stdout, "%s Forwarding %s\n", ansi.Color("ERROR", "red+b"), err.Error())
+					fmt.Fprintf(os.Stdout,
+						"%s %s forwarding message with headers '%s' - %s\n",
+						nowStr,
+						ansi.Color("ERROR", "red+b"),
+						headers,
+						err.Error())
 					return
 				}
 			}
