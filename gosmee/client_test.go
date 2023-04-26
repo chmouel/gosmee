@@ -10,7 +10,7 @@ import (
 var simpleJSON = `{
 	"x-foo": "bar",
 	"user-agent": "gosmee",
-	"timestamp": 1650391429188,
+	"timestamp": "1650391429188",
 	"otherheader": "yolo",
 	"content-type": "application/json",
 	"x-github-event": "push",

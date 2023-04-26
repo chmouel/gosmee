@@ -96,6 +96,8 @@ func serve(c *cli.Context) error {
 		events.ServeHTTP(w, r)
 	})
 	router.Post("/{channel:[a-zA-Z0-9]{12,}}", func(w http.ResponseWriter, r *http.Request) {
+		// grab current time stamp before we take any further actions
+		timestamp := time.Now().UTC().UnixMilli()
 		// check if we have content-type json
 		if !strings.Contains(r.Header.Get("Content-Type"), "application/json") {
 			errorIt(w, r, http.StatusBadRequest, fmt.Errorf("content-type must be application/json"))
@@ -103,12 +105,12 @@ func serve(c *cli.Context) error {
 		}
 		channel := chi.URLParam(r, "channel")
 		// try to json decode body
-		var d interface{}
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			errorIt(w, r, http.StatusInternalServerError, err)
 			return
 		}
+		var d interface{}
 		if err := json.Unmarshal(body, &d); err != nil {
 			errorIt(w, r, http.StatusBadRequest, err)
 			return
@@ -119,10 +121,8 @@ func serve(c *cli.Context) error {
 			payload[strings.ToLower(k)] = v[0]
 		}
 		// easier with base64 for server instead of string
-		bodyEncoded := base64.StdEncoding.EncodeToString(body)
-		timestamp := time.Now().UTC().UnixMilli()
-		payload["timestamp"] = timestamp
-		payload["bodyB"] = bodyEncoded
+		payload["timestamp"] = fmt.Sprintf("%d", timestamp)
+		payload["bodyB"] = base64.StdEncoding.EncodeToString(body)
 		reencoded, err := json.Marshal(payload)
 		if err != nil {
 			errorIt(w, r, http.StatusInternalServerError, err)
