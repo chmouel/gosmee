@@ -127,21 +127,16 @@ func (c goSmee) parse(data []byte) (payloadMsg, error) {
 				pm.contentType = pv
 			}
 		case "timestamp":
-			var dt time.Time
-			if pv, ok := payloadValue.(float64); ok {
-				var ts string
-				ts = fmt.Sprintf("%.f", pv)
-				ts = ts[:len(ts)-3]
-
-				tsInt, err := strconv.ParseInt(ts, 10, 64)
+			dt := time.Now().UTC()
+			if pv, ok := payloadValue.(string); ok {
+				// timestamp payload value is in milliseconds since the Epoch
+				tsInt, err := strconv.ParseInt(pv, 10, 64)
 				if err != nil {
-					return payloadMsg{}, fmt.Errorf("cannot convert timestamp to int64")
+					fmt.Fprintf(os.Stdout, "%s cannot convert timestamp to int64,  %s\n", ansi.Color("ERROR", "red+b"), err.Error())
+				} else {
+					dt = time.Unix(tsInt/int64(1000), (tsInt%int64(1000))*int64(1000000)).UTC()
 				}
-				dt = time.Unix(tsInt, 0)
-			} else {
-				dt = time.Now()
 			}
-
 			pm.timestamp = dt.Format("2006-01-02T15.04.01.000")
 		}
 	}
