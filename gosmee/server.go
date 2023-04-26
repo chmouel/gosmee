@@ -134,7 +134,7 @@ func serve(c *cli.Context) error {
 		})
 		w.WriteHeader(http.StatusAccepted)
 
-		fmt.Fprintf(w, `{"status":%d, "channel": "%s", "message":"ok"}`, http.StatusAccepted, channel)
+		fmt.Fprintf(w, "{\"status\": %d, \"channel\": \"%s\", \"message\": \"ok\"}\n", http.StatusAccepted, channel)
 	})
 	config := goSmee{}
 
