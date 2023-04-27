@@ -267,7 +267,7 @@ func (c goSmee) replayData(pm payloadMsg) error {
 func (c goSmee) clientSetup() error {
 	version := strings.TrimSpace(string(Version))
 	fmt.Fprintf(os.Stdout, "%sStarting gosmee version: %s\n", c.emoji("⇉", "green+b"), version)
-	client := sse.NewClient(c.smeeURL)
+	client := sse.NewClient(c.smeeURL, sse.ClientMaxBufferSize(1<<20))
 	client.Headers["User-Agent"] = fmt.Sprintf("gosmee/%s", version)
 	// this is to get nginx to work
 	client.Headers["X-Accel-Buffering"] = "no"
