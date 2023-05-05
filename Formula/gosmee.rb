@@ -5,11 +5,11 @@
 class Gosmee < Formula
   desc "gosmee - A webhook and https://smee.io forwarder"
   homepage "https://github.com/chmouel/gosmee"
-  version "0.17.0"
+  version "0.18.0"
 
   on_macos do
-    url "https://github.com/chmouel/gosmee/releases/download/0.17.0/gosmee_0.17.0_MacOS_all.tar.gz"
-    sha256 "8ba73fe4d00766d7c04a2713067bcc2466feb7c24674df09f5e9cc1aeb502f0d"
+    url "https://github.com/chmouel/gosmee/releases/download/0.18.0/gosmee_0.18.0_MacOS_all.tar.gz"
+    sha256 "92108b9202711d75f008d489f376bce0ffd504d7577667f72a0965d8565a2c99"
 
     def install
       output = Utils.popen_read("SHELL=bash #{bin}/gosmee completion bash")
@@ -23,9 +23,9 @@ class Gosmee < Formula
   end
 
   on_linux do
-    if Hardware::CPU.arm? && Hardware::CPU.is_64_bit?
-      url "https://github.com/chmouel/gosmee/releases/download/0.17.0/gosmee_0.17.0_Linux_arm64.tar.gz"
-      sha256 "ae0cd0990214aa84fe17f0e2be5009001b3496e3779e2613cf2013079fda2d4c"
+    if Hardware::CPU.intel?
+      url "https://github.com/chmouel/gosmee/releases/download/0.18.0/gosmee_0.18.0_Linux_x86_64.tar.gz"
+      sha256 "e7575a959df435906464ac6e32d40286e65e5d29ee313fcbc37fc3674e713c08"
 
       def install
         output = Utils.popen_read("SHELL=bash #{bin}/gosmee completion bash")
@@ -37,9 +37,9 @@ class Gosmee < Formula
         prefix.install_metafiles
       end
     end
-    if Hardware::CPU.intel?
-      url "https://github.com/chmouel/gosmee/releases/download/0.17.0/gosmee_0.17.0_Linux_x86_64.tar.gz"
-      sha256 "79e735428561753cba68b17ff40f9f453dafe45c45a38c12d1a75bea07bf633c"
+    if Hardware::CPU.arm? && Hardware::CPU.is_64_bit?
+      url "https://github.com/chmouel/gosmee/releases/download/0.18.0/gosmee_0.18.0_Linux_arm64.tar.gz"
+      sha256 "62b6960fcca3fab3e77d034394b4fba647e3da7731754a8f9bce30728da28c7e"
 
       def install
         output = Utils.popen_read("SHELL=bash #{bin}/gosmee completion bash")
