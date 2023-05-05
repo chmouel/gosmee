@@ -120,7 +120,7 @@ This command will save the JSON data of new payloads received at your smee URL t
 
 You can ignore certain events (identified by GitLab/GitHub/Bitbucket) by adding one or more `--ignore-event` flags.
 
-If you want to save the payloads but not replay them, you can use `--noReplay`.
+If you only want to save the payloads but not replay them, you can use `--noReplay`.
 
 By default, you will have colored emoji output unless you specify `--nocolor` as an argument.
 
