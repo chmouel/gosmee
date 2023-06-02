@@ -13,7 +13,7 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - uses: alexellis/setup-arkade@v2
+      - uses: alexellis/setup-arkade@v3
       - uses: alexellis/arkade-get@master
         with:
           golangci-lint: latest
