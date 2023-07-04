@@ -10,7 +10,7 @@ require (
 	github.com/r3labs/sse/v2 v2.10.0
 	github.com/urfave/cli/v2 v2.25.7
 	golang.org/x/crypto v0.10.0
-	golang.org/x/text v0.10.0
+	golang.org/x/text v0.11.0
 	gotest.tools/v3 v3.4.0
 )
 
