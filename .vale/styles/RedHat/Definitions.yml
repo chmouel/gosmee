@@ -4,7 +4,6 @@ ignorecase: false
 level: suggestion
 link: https://redhat-documentation.github.io/vale-at-red-hat/docs/reference-guide/definitions/
 message: "Define acronyms and abbreviations (such as '%s') on first occurrence if they're likely to be unfamiliar."
-source: "IBM - Abbreviations, p. 1"
 # Ensures that the existence of 'first' implies the existence of 'second'.
 first: '\b([A-Z]{3,5}s?)\b'
 second: '\(([A-Z]{3,5}s?)\)'

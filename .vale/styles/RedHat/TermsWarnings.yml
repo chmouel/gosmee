@@ -4,7 +4,6 @@ ignorecase: true
 level: warning
 link: https://redhat-documentation.github.io/vale-at-red-hat/docs/reference-guide/termswarnings/
 message: "Consider using '%s' rather than '%s' unless updating existing content that uses it."
-source: "https://redhat-documentation.github.io/supplementary-style-guide/glossary-terms-conventions; IBM - Appendix C. Word usage, p. 300"
 action:
   name: replace
 swap:

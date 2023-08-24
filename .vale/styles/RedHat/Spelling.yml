@@ -3,7 +3,6 @@ extends: spelling
 level: warning
 link: https://redhat-documentation.github.io/vale-at-red-hat/docs/reference-guide/spelling/
 message: "Use correct American English spelling. Did you really mean '%s'?"
-source: https://redhat-documentation.github.io/vale-at-red-hat/docs/reference-guide/spelling/
 # A "filter" is a case-sensitive regular expression specifying words to ignore during spell checking.
 # Spelling rule applies to individual words
 filters:

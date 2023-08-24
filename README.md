@@ -4,11 +4,11 @@ Gosmee is a versatile webhook relayer that can be conveniently executed anywhere
 
 ## Description
 
-Gosmee enables you to relay webhooks from either itself (as a server) or from https://smee.io to your local notebook.
+Gosmee enables you to relay webhooks from either itself (as a server) or from <https://smee.io> to your local notebook.
 
 With gosmee, you can effortlessly expose the service on your local network or behind a VPN, allowing a public service (such as GitHub) to push webhooks to it.
 
-For instance, if you configure your GitHub Webhook to direct to a https://smee.io/ URL or where gosmee server is listening, you can then use the gosmee client on your local notebook to obtain the events from the server and forward them to the local service, thereby establishing a connection between the GitHub webhook and your local service on your workstation.
+For instance, if you configure your GitHub Webhook to direct to a <https://smee.io/> URL or where gosmee server is listening, you can then use the gosmee client on your local notebook to obtain the events from the server and forward them to the local service, thereby establishing a connection between the GitHub webhook and your local service on your workstation.
 
 ### Diagram
 
@@ -101,14 +101,16 @@ source <(gosmee completion zsh)
 ## Usage
 
 ### Client
-If you intend to use https://smee.io, you might want to generate your own smee URL by visiting https://smee.io/new.
+
+If you intend to use <https://smee.io>, you might want to generate your own smee URL by visiting <https://smee.io/new>.
 
 Once you have it, the basic usage is as follows:
 
 ```shell
 gosmee client https://smee.io/aBcDeF https://localhost:8080 
 ```
-This command will relay all payloads received at the smee URL to a service running on http://localhost:8080.
+
+This command will relay all payloads received at the smee URL to a service running on <http://localhost:8080>.
 
 Another option is to save all the relays as shell script that can be replayed without having to recreate the event:
 

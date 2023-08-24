@@ -4,7 +4,6 @@ ignorecase: true
 level: error
 link: https://redhat-documentation.github.io/vale-at-red-hat/docs/reference-guide/termserrors/
 message: "Use '%s' rather than '%s'."
-source: "https://redhat-documentation.github.io/supplementary-style-guide/glossary-terms-conventions; IBM - Appendix C. Word usage, p. 300"
 action:
   name: replace
 # swap maps tokens in form of bad: good
@@ -215,7 +214,6 @@ swap:
   on-premise: on-premises|off-premises|onsite|offsite
   on-ramp: access method
   op-code: opcode
-  open-source|OpenSource|opensource: open source
   organise: organize
   organised: organized
   organising: organizing

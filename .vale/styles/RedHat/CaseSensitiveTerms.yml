@@ -4,7 +4,6 @@ ignorecase: false
 level: error
 link: https://redhat-documentation.github.io/vale-at-red-hat/docs/reference-guide/casesensitiveterms/
 message: Use '%s' rather than '%s'.
-source: "https://redhat-documentation.github.io/supplementary-style-guide/#glossary-terms-conventions"
 action:
   name: replace
 swap:
