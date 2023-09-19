@@ -289,6 +289,15 @@ func (c goSmee) clientSetup() error {
 			return
 		}
 
+        if string(msg.Event) == "ping" {
+            return
+        } /* Without this we get 
+           * "ERROR no headers found in message"
+           * because apparently github sends
+           * a ping every minute but it's not
+           * documented anywhere for some reason
+           */
+
 		pm, err := c.parse(now, msg.Data)
 		if err != nil {
 			fmt.Fprintf(os.Stdout,
