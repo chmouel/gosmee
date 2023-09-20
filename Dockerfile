@@ -1,6 +1,6 @@
 FROM --platform=$BUILDPLATFORM golang:latest
-COPY . /go/src/github.com/aaamosljp/gosmee
-WORKDIR /go/src/github.com/aaamosljp/gosmee
+COPY . /go/src/github.com/chmouel/gosmee
+WORKDIR /go/src/github.com/chmouel/gosmee
 ARG TARGETARCH
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build -a  -ldflags="-s -w"  -installsuffix cgo -o /tmp/gosmee .
 
