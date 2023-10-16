@@ -1,10 +1,10 @@
 # gosmee - A webhook forwarder/relayer
 
-Gosmee is a versatile webhook relayer that can be conveniently executed anywhere.
+Gosmee is a webhook relayer that can be easily run anywhere.
 
 ## Description
 
-Gosmee enables you to relay webhooks from either itself (as a server) or from <https://smee.io> to your local notebook.
+Gosmee enables you to relay webhooks from either itself (as a server) or from <https://smee.io> to your local laptop or an infrastructure that is not publicly available from the internet.
 
 With gosmee, you can effortlessly expose the service on your local network or behind a VPN, allowing a public service (such as GitHub) to push webhooks to it.
 
