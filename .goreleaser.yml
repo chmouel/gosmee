@@ -20,13 +20,16 @@ builds:
       - -w
       - -s
 archives:
-  - name_template: "{{ .Binary }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
-    replacements:
-      darwin: MacOS
-      linux: Linux
-      windows: Windows
-      386: i386
-      amd64: x86_64
+  - name_template: >-
+      {{ .Binary }}_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else if eq .Arch "darwin" }}MacOS
+      {{- else if eq .Arch "linux" }}Linux
+      {{- else if eq .Arch "windows" }}Windows
+      {{- else }}{{ .Arch }}{{ end }}
     format_overrides:
       - goos: windows
         format: zip
@@ -56,7 +59,15 @@ release:
   prerelease: "false"
 
 nfpms:
-  - file_name_template: "gosmee-{{.Version}}_{{.Os}}-{{.Arch}}"
+  - file_name_template: >-
+      tkn-pac-
+      {{- .Version}}_{{.Os}}-
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else if eq .Arch "darwin" }}MacOS
+      {{- else if eq .Arch "linux" }}Linux
+      {{- else if eq .Arch "windows" }}Windows
+      {{- else }}{{ .Arch }}{{ end }}
     homepage: https://github.com/chmouel/gosmee
     description: "gosmee - A webhook and https://smee.io forwarder"
     maintainer: Chmouel Boudjnah <chmouel@chmouel.com>
@@ -66,14 +77,6 @@ nfpms:
       - deb
       - rpm
     bindir: /usr/bin
-    replacements:
-      amd64: 64bit
-      386: 32bit
-      arm: ARM
-      arm64: ARM64
-      darwin: macOS
-      linux: Linux
-      windows: Windows
     contents:
       - src: ./misc/gosmee-server.service
         dst: /etc/systemd/system/gosmee-server.service
