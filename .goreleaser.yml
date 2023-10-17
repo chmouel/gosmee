@@ -61,7 +61,7 @@ release:
 
 nfpms:
   - file_name_template: >-
-      tkn-pac-
+      gosmee-
       {{- .Version}}_{{.Os}}-
       {{- if eq .Arch "amd64" }}x86_64
       {{- else if eq .Arch "386" }}i386
