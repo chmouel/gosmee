@@ -42,6 +42,7 @@ brews:
     homepage: "https://github.com/chmouel/gosmee"
     description: "gosmee - A webhook and https://smee.io forwarder"
     install: |
+      bin.install "gosmee" => "gosmee"
       output = Utils.popen_read("SHELL=bash #{bin}/gosmee completion bash")
       (bash_completion/"gosmee").write output
       output = Utils.popen_read("SHELL=zsh #{bin}/gosmee completion zsh")
