@@ -6,7 +6,7 @@ Gosmee is a webhook relayer that can be easily run anywhere.
 
 Gosmee enables you to relay webhooks from either itself (as a server) or from <https://smee.io> to your local laptop or an infrastructure that is not publicly available from the internet.
 
-With gosmee, you can effortlessly expose the service on your local network or behind a VPN, allowing a public service (such as GitHub) to push webhooks to it.
+gosmee let you easily expose the service on your local network (like a web service on [localhost](https://en.wikipedia.org/wiki/Localhost)) or behind a VPN, allowing a public service (such as GitHub) push webhooks intoo it.
 
 For instance, if you configure your GitHub Webhook to direct to a <https://smee.io/> URL or where gosmee server is listening, you can then use the gosmee client on your local notebook to obtain the events from the server and forward them to the local service, thereby establishing a connection between the GitHub webhook and your local service on your workstation.
 
