@@ -5,11 +5,11 @@
 class Gosmee < Formula
   desc "gosmee - A webhook and https://smee.io forwarder"
   homepage "https://github.com/chmouel/gosmee"
-  version "0.19.2"
+  version "0.19.3"
 
   on_macos do
-    url "https://github.com/chmouel/gosmee/releases/download/v0.19.2/gosmee_0.19.2_darwin_all.tar.gz"
-    sha256 "0d46778d0fd91b0dcc671b0364419020d909ba6a9f38cf7eec6d0ea0c1d1406e"
+    url "https://github.com/chmouel/gosmee/releases/download/v0.19.3/gosmee_0.19.3_darwin_all.tar.gz"
+    sha256 "b7e6822d4f54d16c3339149147ff3367b1429d1837a37dccca4ed15fc43119f3"
 
     def install
       bin.install "gosmee" => "gosmee"
@@ -25,8 +25,8 @@ class Gosmee < Formula
 
   on_linux do
     if Hardware::CPU.intel?
-      url "https://github.com/chmouel/gosmee/releases/download/v0.19.2/gosmee_0.19.2_linux_x86_64.tar.gz"
-      sha256 "320605cc01e45e7ec04e93993c28f7b6d444dea57c6fa8ea55b2143181296efb"
+      url "https://github.com/chmouel/gosmee/releases/download/v0.19.3/gosmee_0.19.3_linux_x86_64.tar.gz"
+      sha256 "45fd65f0c73a8120964cd150db6f10796fefe2891d7c73631423a9692d787090"
 
       def install
         bin.install "gosmee" => "gosmee"
@@ -40,8 +40,8 @@ class Gosmee < Formula
       end
     end
     if Hardware::CPU.arm? && Hardware::CPU.is_64_bit?
-      url "https://github.com/chmouel/gosmee/releases/download/v0.19.2/gosmee_0.19.2_linux_arm64.tar.gz"
-      sha256 "35ab080dfe697617727cd032fd6b33bcafa525521cafbf0a242f798569c421a0"
+      url "https://github.com/chmouel/gosmee/releases/download/v0.19.3/gosmee_0.19.3_linux_arm64.tar.gz"
+      sha256 "d6c0e3c4423844ecc4ff64d5960fdd33124489c9ae1ddd54efd5ba6c597c1d17"
 
       def install
         bin.install "gosmee" => "gosmee"
