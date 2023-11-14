@@ -87,16 +87,16 @@ accessible endpoint and forward request to your local service`,
 				Action: func(c *cli.Context) error {
 					nocolor := c.Bool("nocolor")
 					w := os.Stdout
-					logger := slog.New(tint.NewHandler(w, &tint.Options{
-						TimeFormat: time.RFC1123,
-						NoColor:    !isatty.IsTerminal(w.Fd()),
-					}))
+					logger := &slog.Logger{}
 					switch c.String("output") {
 					case "json":
 						logger = slog.New(slog.NewJSONHandler(os.Stdout, nil))
 						nocolor = true
 					case "pretty":
-						logger = logger
+						logger = slog.New(tint.NewHandler(w, &tint.Options{
+							TimeFormat: time.RFC1123,
+							NoColor:    !isatty.IsTerminal(w.Fd()),
+						}))
 					default:
 						return fmt.Errorf("invalid output format %s", c.String("output"))
 					}
