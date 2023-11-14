@@ -87,7 +87,7 @@ accessible endpoint and forward request to your local service`,
 				Action: func(c *cli.Context) error {
 					nocolor := c.Bool("nocolor")
 					w := os.Stdout
-					logger := &slog.Logger{}
+					var logger *slog.Logger
 					switch c.String("output") {
 					case "json":
 						logger = slog.New(slog.NewJSONHandler(os.Stdout, nil))

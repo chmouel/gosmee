@@ -73,8 +73,6 @@ nixos-unstable, `nixos-version` >= 22.05)
 nix run github:chmouel/gosmee -- --help # your args are here
 ```
 
-
-
 also use it to test and develop the source code:
 
 ```shell
@@ -118,7 +116,7 @@ Another option is to save all the relays as shell script that can be replayed wi
 gosmee client --saveDir /tmp/savedreplay https://smee.io/aBcDeF https://localhost:8080
 ```
 
-This command will save the JSON data of new payloads received at your smee URL to `/tmp/savedreplay/timestamp.json` and create a shell script with cURL options to `/tmp/savedreplay/timestamp.sh`. You can replay the webhook effortlessly by repeatedly running the shell script. 
+This command will save the JSON data of new payloads received at your smee URL to `/tmp/savedreplay/timestamp.json` and create a shell script with cURL options to `/tmp/savedreplay/timestamp.sh`. You can replay the webhook effortlessly by repeatedly running the shell script.
 
 You can ignore certain events (identified by GitLab/GitHub/Bitbucket) by adding one or more `--ignore-event` flags.
 
