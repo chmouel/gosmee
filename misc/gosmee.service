@@ -2,7 +2,7 @@
 Description=Gosmee Forward
 
 [Service]
-ExecStart=gosmee client https://smee.io/abcdef http://localhost:8080
+ExecStart=gosmee client --output=json https://smee.io/abcdef http://localhost:8080
 EnvironmentFile=/etc/gosmee.env
 
 [Install]

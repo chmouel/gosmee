@@ -2,12 +2,15 @@ package gosmee
 
 import (
 	"fmt"
+	"log/slog"
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	_ "embed"
 
+	"github.com/lmittmann/tint"
 	"github.com/mattn/go-isatty"
 	"github.com/mgutz/ansi"
 	"github.com/urfave/cli/v2"
@@ -82,6 +85,22 @@ accessible endpoint and forward request to your local service`,
 				UsageText: "gosmee [command options] SMEE_URL LOCAL_SERVICE_URL",
 				Usage:     "Make a client from the relay server to your local service",
 				Action: func(c *cli.Context) error {
+					nocolor := c.Bool("nocolor")
+					w := os.Stdout
+					logger := slog.New(tint.NewHandler(w, &tint.Options{
+						TimeFormat: time.RFC1123,
+						NoColor:    !isatty.IsTerminal(w.Fd()),
+					}))
+					switch c.String("output") {
+					case "json":
+						logger = slog.New(slog.NewJSONHandler(os.Stdout, nil))
+						nocolor = true
+					case "pretty":
+						logger = logger
+					default:
+						return fmt.Errorf("invalid output format %s", c.String("output"))
+					}
+
 					var smeeURL, targetURL string
 					if os.Getenv("GOSMEE_URL") != "" && os.Getenv("GOSMEE_TARGET_URL") != "" {
 						smeeURL = os.Getenv("GOSMEE_URL")
@@ -104,7 +123,7 @@ accessible endpoint and forward request to your local service`,
 						ansi.DisableColors(true)
 						decorate = false
 					}
-					if c.Bool("nocolor") {
+					if nocolor {
 						ansi.DisableColors(true)
 						decorate = false
 					}
@@ -118,6 +137,7 @@ accessible endpoint and forward request to your local service`,
 						channel:           c.String("channel"),
 						targetCnxTimeout:  c.Int("target-connection-timeout"),
 						insecureTLSVerify: c.Bool("insecure-skip-tls-verify"),
+						logger:            logger,
 					}
 					err := cfg.clientSetup()
 					return err
@@ -128,6 +148,12 @@ accessible endpoint and forward request to your local service`,
 						Aliases: []string{"c"},
 						Usage:   "gosmee channel to listen, only useful when you are not use smee.io",
 						Value:   smeeChannel,
+					},
+					&cli.StringFlag{
+						Name:    "output",
+						Usage:   `Output format, one of "json", "pretty"`,
+						Value:   "pretty",
+						Aliases: []string{"o"},
 					},
 					&cli.StringSliceFlag{
 						Name:    "ignore-event",

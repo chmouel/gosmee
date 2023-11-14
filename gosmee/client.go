@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -45,6 +46,7 @@ type goSmee struct {
 	channel                     string
 	targetCnxTimeout            int
 	insecureTLSVerify           bool
+	logger                      *slog.Logger
 }
 
 type payloadMsg struct {
@@ -134,7 +136,8 @@ func (c goSmee) parse(now time.Time, data []byte) (payloadMsg, error) {
 				// timestamp payload value is in milliseconds since the Epoch
 				tsInt, err := strconv.ParseInt(pv, 10, 64)
 				if err != nil {
-					fmt.Fprintf(os.Stdout, "%s cannot convert timestamp to int64,  %s\n", ansi.Color("ERROR", "red+b"), err.Error())
+					s := fmt.Sprintf("%s cannot convert timestamp to int64, %s", ansi.Color("ERROR", "red+b"), err.Error())
+					c.logger.Error(s)
 				} else {
 					dt = time.Unix(tsInt/int64(1000), (tsInt%int64(1000))*int64(1000000)).UTC()
 				}
@@ -147,7 +150,8 @@ func (c goSmee) parse(now time.Time, data []byte) (payloadMsg, error) {
 	if len(c.ignoreEvents) > 0 && pm.eventType != "" {
 		for _, v := range c.ignoreEvents {
 			if v == pm.eventType {
-				fmt.Fprintf(os.Stdout, "%sskipping event %s as requested\n", c.emoji("!", "blue+b"), pm.eventType)
+				s := fmt.Sprintf("%sskipping event %s as requested", c.emoji("!", "blue+b"), pm.eventType)
+				c.logger.Error(s)
 				return payloadMsg{}, nil
 			}
 		}
@@ -192,7 +196,7 @@ func (c goSmee) saveData(pm payloadMsg) error {
 
 	shscript := fmt.Sprintf("%s/%s.sh", c.saveDir, fbasepath)
 
-	fmt.Fprintf(os.Stdout, "%s%s and %s has been saved\n", c.emoji("⌁", "yellow+b"), shscript, jsonfile)
+	c.logger.Info(fmt.Sprintf("%s%s and %s has been saved", c.emoji("⌁", "yellow+b"), shscript, jsonfile))
 	s, err := os.Create(shscript)
 	if err != nil {
 		return err
@@ -260,13 +264,15 @@ func (c goSmee) replayData(pm payloadMsg) error {
 	if resp.StatusCode > 299 {
 		msg = fmt.Sprintf("%s, error: %s", msg, resp.Status)
 	}
-	fmt.Fprintf(os.Stdout, "%s%s\n", c.emoji("•", "magenta+b"), msg)
+	s := fmt.Sprintf("%s%s", c.emoji("•", "magenta+b"), msg)
+	c.logger.Info(s)
 	return nil
 }
 
 func (c goSmee) clientSetup() error {
 	version := strings.TrimSpace(string(Version))
-	fmt.Fprintf(os.Stdout, "%sStarting gosmee version: %s\n", c.emoji("⇉", "green+b"), version)
+	s := fmt.Sprintf("%sStarting gosmee version: %s", c.emoji("⇉", "green+b"), version)
+	c.logger.Info(s)
 	client := sse.NewClient(c.smeeURL, sse.ClientMaxBufferSize(1<<20))
 	client.Headers["User-Agent"] = fmt.Sprintf("gosmee/%s", version)
 	// this is to get nginx to work
@@ -280,36 +286,29 @@ func (c goSmee) clientSetup() error {
 		nowStr := now.Format(tsFormat)
 
 		if string(msg.Event) == "ready" || string(msg.Data) == "ready" {
-			fmt.Fprintf(os.Stdout,
-				"%s %sForwarding %s to %s\n",
-				nowStr,
-				c.emoji("✓", "yellow+b"),
-				ansi.Color(c.smeeURL, "green+u"),
-				ansi.Color(c.targetURL, "green+u"))
+			s := fmt.Sprintf("%s %sForwarding %s to %s", nowStr, c.emoji("✓", "yellow+b"), ansi.Color(c.smeeURL, "green+u"), ansi.Color(c.targetURL, "green+u"))
+			c.logger.Info(s)
 			return
 		}
 
 		if string(msg.Event) == "ping" {
 			return
-		} /* Apparently github sends
-		 * a ping every minute but it's not
-		 * documented anywhere for some reason
-		 */
+		}
 
 		pm, err := c.parse(now, msg.Data)
 		if err != nil {
-			fmt.Fprintf(os.Stdout,
-				"%s %s parsing message %s\n",
+			s := fmt.Sprintf("%s %s parsing message %s",
 				nowStr,
 				ansi.Color("ERROR", "red+b"),
 				err.Error())
+			c.logger.Error(s)
 			return
 		}
 		if len(pm.headers) == 0 {
-			fmt.Fprintf(os.Stdout,
-				"%s %s no headers found in message\n",
+			s := fmt.Sprintf("%s %s no headers found in message",
 				nowStr,
 				ansi.Color("ERROR", "red+b"))
+			c.logger.Error(s)
 			return
 		}
 		headers := ""
@@ -321,23 +320,23 @@ func (c goSmee) clientSetup() error {
 			if c.saveDir != "" {
 				err := c.saveData(pm)
 				if err != nil {
-					fmt.Fprintf(os.Stdout,
-						"%s %s saving message with headers '%s' - %s\n",
+					s := fmt.Sprintf("%s %s saving message with headers '%s' - %s",
 						nowStr,
 						ansi.Color("ERROR", "red+b"),
 						headers,
 						err.Error())
+					c.logger.Error(s)
 					return
 				}
 			}
 			if !c.noReplay {
 				if err := c.replayData(pm); err != nil {
-					fmt.Fprintf(os.Stdout,
-						"%s %s forwarding message with headers '%s' - %s\n",
+					s := fmt.Sprintf("%s %s forwarding message with headers '%s' - %s",
 						nowStr,
 						ansi.Color("ERROR", "red+b"),
 						headers,
 						err.Error())
+					c.logger.Error(s)
 					return
 				}
 			}

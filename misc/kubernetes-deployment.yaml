@@ -20,6 +20,8 @@ spec:
           args:
             [
               "client",
+              "--output",
+              "json",
               "--saveDir",
               "/tmp/save",
               "https://yousmee.url",
