@@ -126,6 +126,8 @@ If you only want to save the payloads but not replay them, you can use `--noRepl
 
 By default, you will have colored emoji output unless you specify `--nocolor` as an argument.
 
+You can output the logs as json with the `--output json` which imply `--nocolor`
+
 ### Server
 
 With `gosmee server` you can use your own server rather than <https://smee.io>
