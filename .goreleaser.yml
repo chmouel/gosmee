@@ -35,7 +35,7 @@ archives:
         format: zip
 brews:
   - name: gosmee
-    tap:
+    repository:
       owner: chmouel
       name: gosmee
     folder: Formula
