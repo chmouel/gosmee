@@ -1,8 +1,7 @@
 run:
-  build-tags:
-    - e2e
   skip-dirs:
     - vendor
+    - tint
 linters-settings:
   gocritic:
     disabled-checks:

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lmittmann/tint"
+	"github.com/chmouel/gosmee/tint"
 	"github.com/mattn/go-isatty"
 	"github.com/mgutz/ansi"
 	"github.com/urfave/cli/v2"

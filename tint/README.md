@@ -18,7 +18,7 @@ that writes tinted (colorized) logs. Its output format is inspired by the `zerol
 The output format can be customized using [`Options`](https://pkg.go.dev/github.com/lmittmann/tint#Options)
 which is a drop-in replacement for [`slog.HandlerOptions`](https://pkg.go.dev/log/slog#HandlerOptions).
 
-```
+```shell
 go get github.com/lmittmann/tint
 ```
 

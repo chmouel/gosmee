@@ -57,13 +57,14 @@ import (
 	"encoding"
 	"fmt"
 	"io"
-	"log/slog"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"sync"
 	"time"
 	"unicode"
+
+	"golang.org/x/exp/slog"
 )
 
 // ANSI modes
