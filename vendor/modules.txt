@@ -45,6 +45,13 @@ github.com/xrash/smetrics
 ## explicit; go 1.18
 golang.org/x/crypto/acme
 golang.org/x/crypto/acme/autocert
+# golang.org/x/exp v0.0.0-20231110203233-9a3e6036ecaa
+## explicit; go 1.20
+golang.org/x/exp/constraints
+golang.org/x/exp/slices
+golang.org/x/exp/slog
+golang.org/x/exp/slog/internal
+golang.org/x/exp/slog/internal/buffer
 # golang.org/x/net v0.18.0
 ## explicit; go 1.18
 golang.org/x/net/context

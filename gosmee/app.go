@@ -1,19 +1,18 @@
 package gosmee
 
 import (
+	_ "embed"
 	"fmt"
-	"log/slog"
 	"net/url"
 	"os"
 	"strings"
 	"time"
 
-	_ "embed"
-
 	"github.com/lmittmann/tint"
 	"github.com/mattn/go-isatty"
 	"github.com/mgutz/ansi"
 	"github.com/urfave/cli/v2"
+	"golang.org/x/exp/slog"
 )
 
 //go:embed templates/zsh_completion.zsh

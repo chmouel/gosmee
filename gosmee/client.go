@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -21,6 +20,7 @@ import (
 	"github.com/mgutz/ansi"
 	"github.com/mitchellh/mapstructure"
 	"github.com/r3labs/sse/v2"
+	"golang.org/x/exp/slog"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 )
