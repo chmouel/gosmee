@@ -9,6 +9,7 @@
 set -euxfo pipefail
 cd $(dirname $(readlink -f $0))
 
+targetURL="{{ .TargetURL }}"
 if [[ ${1:-""} == -l ]]; then
 	targetURL="http://localhost:8080"
 elif [[ -n ${1:-""} ]]; then
