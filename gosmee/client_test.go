@@ -20,7 +20,9 @@ var simpleJSON = `{
 `
 
 func TestGoSmeeGood(t *testing.T) {
-	p := goSmee{}
+	p := goSmee{
+		replayDataOpts: &replayDataOpts{},
+	}
 	m, err := p.parse(time.Now().UTC(), []byte(simpleJSON))
 	assert.NilError(t, err)
 	assert.Equal(t, m.headers["X-Foo"], "bar")
@@ -34,7 +36,9 @@ func TestGoSmeeGood(t *testing.T) {
 }
 
 func TestGoSmeeBad(t *testing.T) {
-	p := goSmee{}
+	p := goSmee{
+		replayDataOpts: &replayDataOpts{},
+	}
 	pm, _ := p.parse(time.Now().UTC(), []byte(`xxxXXXxx`))
 	assert.Equal(t, string(pm.body), "")
 }
