@@ -40,13 +40,9 @@ const smeeChannel = "messages"
 const tsFormat = "2006-01-02T15.04.01.000"
 
 type goSmee struct {
-	saveDir, smeeURL, targetURL string
-	decorate, noReplay          bool
-	ignoreEvents                []string
-	channel                     string
-	targetCnxTimeout            int
-	insecureTLSVerify           bool
-	logger                      *slog.Logger
+	replayDataOpts *replayDataOpts
+	channel        string
+	logger         *slog.Logger
 }
 
 type payloadMsg struct {
@@ -147,10 +143,10 @@ func (c goSmee) parse(now time.Time, data []byte) (payloadMsg, error) {
 
 	pm.timestamp = dt.Format(tsFormat)
 
-	if len(c.ignoreEvents) > 0 && pm.eventType != "" {
-		for _, v := range c.ignoreEvents {
+	if len(c.replayDataOpts.ignoreEvents) > 0 && pm.eventType != "" {
+		for _, v := range c.replayDataOpts.ignoreEvents {
 			if v == pm.eventType {
-				s := fmt.Sprintf("%sskipping event %s as requested", c.emoji("!", "blue+b"), pm.eventType)
+				s := fmt.Sprintf("%sskipping event %s as requested", emoji("!", "blue+b", c.replayDataOpts.decorate), pm.eventType)
 				c.logger.Error(s)
 				return payloadMsg{}, nil
 			}
@@ -160,8 +156,8 @@ func (c goSmee) parse(now time.Time, data []byte) (payloadMsg, error) {
 	return pm, nil
 }
 
-func (c goSmee) emoji(emoji, color string) string {
-	if !c.decorate {
+func emoji(emoji, color string, decorate bool) string {
+	if !decorate {
 		return ""
 	}
 	return ansi.Color(emoji, color) + " "
@@ -169,8 +165,8 @@ func (c goSmee) emoji(emoji, color string) string {
 
 func (c goSmee) saveData(pm payloadMsg) error {
 	// check if saveDir is created
-	if _, err := os.Stat(c.saveDir); os.IsNotExist(err) {
-		if err := os.MkdirAll(c.saveDir, 0o755); err != nil {
+	if _, err := os.Stat(c.replayDataOpts.saveDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(c.replayDataOpts.saveDir, 0o755); err != nil {
 			return err
 		}
 	}
@@ -182,7 +178,7 @@ func (c goSmee) saveData(pm payloadMsg) error {
 		fbasepath = pm.timestamp
 	}
 
-	jsonfile := fmt.Sprintf("%s/%s.json", c.saveDir, fbasepath)
+	jsonfile := fmt.Sprintf("%s/%s.json", c.replayDataOpts.saveDir, fbasepath)
 	f, err := os.Create(jsonfile)
 	if err != nil {
 		return err
@@ -194,9 +190,9 @@ func (c goSmee) saveData(pm payloadMsg) error {
 		return err
 	}
 
-	shscript := fmt.Sprintf("%s/%s.sh", c.saveDir, fbasepath)
+	shscript := fmt.Sprintf("%s/%s.sh", c.replayDataOpts.saveDir, fbasepath)
 
-	c.logger.Info(fmt.Sprintf("%s%s and %s has been saved", c.emoji("⌁", "yellow+b"), shscript, jsonfile))
+	c.logger.Info(fmt.Sprintf("%s%s and %s has been saved", emoji("⌁", "yellow+b", c.replayDataOpts.decorate), shscript, jsonfile))
 	s, err := os.Create(shscript)
 	if err != nil {
 		return err
@@ -216,7 +212,7 @@ func (c goSmee) saveData(pm payloadMsg) error {
 		FileBase    string
 	}{
 		Headers:     headers,
-		TargetURL:   c.targetURL,
+		TargetURL:   c.replayDataOpts.targetURL,
 		ContentType: pm.contentType,
 		FileBase:    fbasepath,
 	}); err != nil {
@@ -227,12 +223,20 @@ func (c goSmee) saveData(pm payloadMsg) error {
 	return os.Chmod(shscript, 0o755)
 }
 
-func (c goSmee) replayData(pm payloadMsg) error {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(c.targetCnxTimeout)*time.Second)
+type replayDataOpts struct {
+	insecureTLSVerify           bool
+	targetCnxTimeout            int
+	decorate, noReplay          bool
+	saveDir, smeeURL, targetURL string
+	ignoreEvents                []string
+}
+
+func replayData(ropts *replayDataOpts, logger *slog.Logger, pm payloadMsg) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(ropts.targetCnxTimeout)*time.Second)
 	defer cancel()
 	//nolint: gosec
-	client := http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: !c.insecureTLSVerify}}}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.targetURL, strings.NewReader(string(pm.body)))
+	client := http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: !ropts.insecureTLSVerify}}}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, ropts.targetURL, strings.NewReader(string(pm.body)))
 	if err != nil {
 		return err
 	}
@@ -260,25 +264,25 @@ func (c goSmee) replayData(pm payloadMsg) error {
 		msg = fmt.Sprintf("%s %s", pm.eventID, msg)
 	}
 
-	msg = fmt.Sprintf("%s %s replayed to %s, status: %s", pm.timestamp, msg, ansi.Color(c.targetURL, "green+ub"), ansi.Color(fmt.Sprintf("%d", resp.StatusCode), "blue+b"))
+	msg = fmt.Sprintf("%s %s replayed to %s, status: %s", pm.timestamp, msg, ansi.Color(ropts.targetURL, "green+ub"), ansi.Color(fmt.Sprintf("%d", resp.StatusCode), "blue+b"))
 	if resp.StatusCode > 299 {
 		msg = fmt.Sprintf("%s, error: %s", msg, resp.Status)
 	}
-	s := fmt.Sprintf("%s%s", c.emoji("•", "magenta+b"), msg)
-	c.logger.Info(s)
+	s := fmt.Sprintf("%s%s", emoji("•", "magenta+b", ropts.decorate), msg)
+	logger.Info(s)
 	return nil
 }
 
 func (c goSmee) clientSetup() error {
 	version := strings.TrimSpace(string(Version))
-	s := fmt.Sprintf("%sStarting gosmee version: %s", c.emoji("⇉", "green+b"), version)
+	s := fmt.Sprintf("%sStarting gosmee version: %s\n", emoji("⇉", "green+b", c.replayDataOpts.decorate), version)
 	c.logger.Info(s)
-	client := sse.NewClient(c.smeeURL, sse.ClientMaxBufferSize(1<<20))
+	client := sse.NewClient(c.replayDataOpts.smeeURL, sse.ClientMaxBufferSize(1<<20))
 	client.Headers["User-Agent"] = fmt.Sprintf("gosmee/%s", version)
 	// this is to get nginx to work
 	client.Headers["X-Accel-Buffering"] = "no"
-	channel := filepath.Base(c.smeeURL)
-	if strings.HasPrefix(c.smeeURL, "https://smee.io") {
+	channel := filepath.Base(c.replayDataOpts.smeeURL)
+	if strings.HasPrefix(c.replayDataOpts.smeeURL, "https://smee.io") {
 		channel = smeeChannel
 	}
 	err := client.Subscribe(channel, func(msg *sse.Event) {
@@ -286,7 +290,7 @@ func (c goSmee) clientSetup() error {
 		nowStr := now.Format(tsFormat)
 
 		if string(msg.Event) == "ready" || string(msg.Data) == "ready" {
-			s := fmt.Sprintf("%s %sForwarding %s to %s", nowStr, c.emoji("✓", "yellow+b"), ansi.Color(c.smeeURL, "green+u"), ansi.Color(c.targetURL, "green+u"))
+			s := fmt.Sprintf("%s %sForwarding %s to %s", nowStr, emoji("✓", "yellow+b", c.replayDataOpts.decorate), ansi.Color(c.replayDataOpts.smeeURL, "green+u"), ansi.Color(c.replayDataOpts.targetURL, "green+u"))
 			c.logger.Info(s)
 			return
 		}
@@ -317,7 +321,7 @@ func (c goSmee) clientSetup() error {
 		}
 
 		if string(msg.Data) != "{}" {
-			if c.saveDir != "" {
+			if c.replayDataOpts.saveDir != "" {
 				err := c.saveData(pm)
 				if err != nil {
 					s := fmt.Sprintf("%s %s saving message with headers '%s' - %s",
@@ -329,8 +333,8 @@ func (c goSmee) clientSetup() error {
 					return
 				}
 			}
-			if !c.noReplay {
-				if err := c.replayData(pm); err != nil {
+			if !c.replayDataOpts.noReplay {
+				if err := replayData(c.replayDataOpts, c.logger, pm); err != nil {
 					s := fmt.Sprintf("%s %s forwarding message with headers '%s' - %s",
 						nowStr,
 						ansi.Color("ERROR", "red+b"),

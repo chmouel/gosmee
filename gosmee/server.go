@@ -14,7 +14,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/mgutz/ansi"
 	"github.com/r3labs/sse/v2"
 	"github.com/urfave/cli/v2"
 	"golang.org/x/crypto/acme/autocert"
@@ -45,19 +44,19 @@ func serve(c *cli.Context) error {
 	events := sse.New()
 	events.AutoReplay = false
 	events.AutoStream = true
-	events.OnSubscribe = (func(sid string, sub *sse.Subscriber) {
+	events.OnSubscribe = (func(sid string, _ *sse.Subscriber) {
 		events.Publish(sid, &sse.Event{
 			Data: []byte("ready"),
 		})
 	})
 
-	router.Get("/", func(w http.ResponseWriter, r *http.Request) {
+	router.Get("/", func(w http.ResponseWriter, _ *http.Request) {
 		// redirect to /new
 		w.Header().Set("Location", fmt.Sprintf("%s/%s", publicURL, randomString(12)))
 		w.WriteHeader(http.StatusFound)
 	})
 
-	router.Get("/new", func(w http.ResponseWriter, r *http.Request) {
+	router.Get("/new", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Location", fmt.Sprintf("%s/%s", publicURL, randomString(12)))
 		w.WriteHeader(http.StatusFound)
 	})
@@ -114,7 +113,6 @@ func serve(c *cli.Context) error {
 			errorIt(w, r, http.StatusBadRequest, err)
 			return
 		}
-		// convert headers to map[string]string and accumlate for log entry
 		headers := ""
 		payload := map[string]interface{}{}
 		for k, v := range r.Header {
@@ -138,7 +136,6 @@ func serve(c *cli.Context) error {
 		fmt.Fprintf(w, "{\"status\": %d, \"channel\": \"%s\", \"message\": \"ok\"}\n", http.StatusAccepted, channel)
 		fmt.Fprintf(os.Stdout, "%s Published %s%s on channel %s\n", now.Format("2006-01-02T15.04.01.000"), middleware.GetReqID(r.Context()), headers, channel)
 	})
-	config := goSmee{}
 
 	autoCert := c.Bool("auto-cert")
 	certFile := c.String("tls-cert")
@@ -153,8 +150,7 @@ func serve(c *cli.Context) error {
 		publicURL = fmt.Sprintf("%s%s", publicURL, portAddr)
 	}
 
-	fmt.Fprintf(os.Stdout, "%sServing for webhooks on %s\n", config.emoji("✓", "yellow+b"),
-		ansi.Color(publicURL, "green+u"))
+	fmt.Fprintf(os.Stdout, "Serving for webhooks on %s\n", publicURL)
 
 	if sslEnabled {
 		//nolint:gosec
