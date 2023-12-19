@@ -3,6 +3,7 @@ package gosmee
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"net/url"
 	"os"
 	"strconv"
@@ -56,9 +57,20 @@ func (r *replayOpts) replayHooks(ctx context.Context, hookid int64) error {
 		// reverse deliveries to replay from oldest to newest
 		deliveries = r.chooseDeliveries(deliveries)
 		for _, hd := range deliveries {
-			delivery, _, err := r.client.Repositories.GetHookDelivery(ctx, r.org, r.repo, hookid, hd.GetID())
-			if err != nil {
-				return fmt.Errorf("cannot get delivery: %w", err)
+			var delivery *github.HookDelivery
+			// There can be a race between the time listhookdeliveries show the
+			// id and Gethookdelivery is created on the API, so wait for it for a bit
+			for range []int{1, 2, 3} {
+				var resp *github.Response
+				var err error
+				delivery, resp, err = r.client.Repositories.GetHookDelivery(ctx, r.org, r.repo, hookid, hd.GetID())
+				if resp.StatusCode == http.StatusNotFound {
+					time.Sleep(1 * time.Second)
+					continue
+				}
+				if err != nil {
+					return fmt.Errorf("cannot get delivery: %w", err)
+				}
 			}
 			pm := payloadMsg{}
 			var ok bool
