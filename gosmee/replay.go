@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -25,65 +24,29 @@ type replayOpts struct {
 	org            string
 	cacheDir       string
 	logger         *slog.Logger
-}
-
-func saveCursor(cacheFile, cursor string) error {
-	f, err := os.OpenFile(cacheFile, os.O_RDWR|os.O_CREATE, 0o600)
-	if err != nil {
-		return fmt.Errorf("cannot open cache file: %w", err)
-	}
-	defer f.Close()
-	_, err = f.WriteString(cursor)
-	if err != nil {
-		return fmt.Errorf("cannot write to cache file: %w", err)
-	}
-	return nil
-}
-
-func readCursor(cacheFile string) (string, error) {
-	f, err := os.OpenFile(cacheFile, os.O_RDONLY, 0o600)
-	if err != nil {
-		return "", fmt.Errorf("cannot open cache file: %w", err)
-	}
-	defer f.Close()
-	buf := make([]byte, 1024)
-	n, err := f.Read(buf)
-	if err != nil {
-		return "", fmt.Errorf("cannot read cache file: %w", err)
-	}
-	return strings.TrimSpace(string(buf[:n])), nil
+	sinceTime      time.Time
 }
 
 // chooseDeliveries reverses the deliveries slice and only show the deliveries since the cache file id.
-func chooseDeliveries(deliveries []*github.HookDelivery, cacheFileID string) []*github.HookDelivery {
-	for i := len(deliveries)/2 - 1; i >= 0; i-- {
-		opp := len(deliveries) - 1 - i
-		deliveries[i], deliveries[opp] = deliveries[opp], deliveries[i]
-	}
-	if cacheFileID == "" {
-		return deliveries
-	}
-	iCacheFileID, err := strconv.ParseInt(cacheFileID, 10, 64)
-	if err != nil {
-		return deliveries
-	}
-
+func (r *replayOpts) chooseDeliveries(dlvs []*github.HookDelivery) []*github.HookDelivery {
 	retdeliveries := make([]*github.HookDelivery, 0)
-	for _, d := range deliveries {
-		if d.GetID() == iCacheFileID {
-			retdeliveries = []*github.HookDelivery{}
-			continue
+	for _, d := range dlvs {
+		if d.DeliveredAt.Before(r.sinceTime) {
+			break
 		}
 		retdeliveries = append(retdeliveries, d)
+	}
+	// finally reverse the slice to make sure we get the oldest first
+	for i := len(retdeliveries)/2 - 1; i >= 0; i-- {
+		opp := len(retdeliveries) - 1 - i
+		retdeliveries[i], retdeliveries[opp] = retdeliveries[opp], retdeliveries[i]
 	}
 	return retdeliveries
 }
 
 func (r *replayOpts) replayHooks(ctx context.Context, hookid int64) error {
-	cacheFile := filepath.Join(r.cacheDir, fmt.Sprintf("%s-%s-%d", r.org, r.repo, hookid))
 	opt := &github.ListCursorOptions{}
-	cursor, _ := readCursor(cacheFile)
-	var changed bool
+	r.logger.Info(fmt.Sprintf("starting watching deliveries for %s/%s", r.org, r.repo))
 	for {
 		for {
 			deliveries, resp, err := r.client.Repositories.ListHookDeliveries(ctx, r.org, r.repo, hookid, opt)
@@ -91,10 +54,8 @@ func (r *replayOpts) replayHooks(ctx context.Context, hookid int64) error {
 				return fmt.Errorf("cannot list deliveries: %w", err)
 			}
 			// reverse deliveries to replay from oldest to newest
-			deliveries = chooseDeliveries(deliveries, cursor)
+			deliveries = r.chooseDeliveries(deliveries)
 			for _, hd := range deliveries {
-				cursor = fmt.Sprintf("%d", hd.GetID())
-				changed = true
 				delivery, _, err := r.client.Repositories.GetHookDelivery(ctx, r.org, r.repo, hookid, hd.GetID())
 				if err != nil {
 					return fmt.Errorf("cannot get delivery: %w", err)
@@ -121,26 +82,22 @@ func (r *replayOpts) replayHooks(ctx context.Context, hookid int64) error {
 				}
 
 				dt := delivery.DeliveredAt.GetTime()
+				r.sinceTime = *delivery.DeliveredAt.GetTime()
 				pm.timestamp = dt.Format(tsFormat)
 
 				if err := replayData(r.replayDataOpts, r.logger, pm); err != nil {
-					fmt.Fprintf(os.Stdout,
+					s := fmt.Sprintf(
 						"%s forwarding message with headers '%s' - %s\n",
 						ansi.Color("ERROR", "red+b"),
 						pm.headers,
 						err.Error())
+					r.logger.Error(s)
 					continue
 				}
+
 			}
 
 			if resp.NextPage == 0 {
-				break
-			}
-		}
-		// save the cursor to cache file
-		if changed {
-			if err := saveCursor(cacheFile, cursor); err != nil {
-				fmt.Fprintf(os.Stdout, "error saving cursor to cache file %s: %s\n", r.cacheDir, err.Error())
 				break
 			}
 		}
@@ -239,6 +196,20 @@ func replay(c *cli.Context) error {
 		ansi.DisableColors(true)
 		decorate = false
 	}
+
+	sinceTime := c.String("time-since")
+	if sinceTime == "" {
+		// start from now
+		ropt.sinceTime = time.Now()
+	}
+	if sinceTime != "" {
+		since, err := time.Parse(tsFormat, sinceTime)
+		if err != nil {
+			return fmt.Errorf("cannot parse time-since: %w", err)
+		}
+		ropt.sinceTime = since
+	}
+
 	ropt.replayDataOpts = &replayDataOpts{
 		targetURL:         targetURL,
 		saveDir:           c.String("saveDir"),

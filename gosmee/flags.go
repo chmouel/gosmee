@@ -92,9 +92,10 @@ var replayFlags = []cli.Flag{
 		Aliases: []string{"L"},
 	},
 	&cli.StringFlag{
-		Name:  "cache-dir",
-		Usage: "Cache dir where to store the last delivered event",
-		Value: cachePath,
+		Name:    "time-since",
+		Aliases: []string{"T"},
+		Usage:   "Replay events from this time",
+		Value:   cachePath,
 	},
 }
 
