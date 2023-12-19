@@ -8,7 +8,6 @@ import (
 )
 
 func TestChooseDeliveries(t *testing.T) {
-
 	type args struct {
 		sinceTime  time.Time
 		deliveries []*github.HookDelivery
