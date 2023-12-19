@@ -103,6 +103,17 @@ func (r *replayOpts) replayHooks(ctx context.Context, hookid int64) error {
 				r.logger.Error(s)
 				continue
 			}
+			if r.replayDataOpts.saveDir != "" {
+				err := saveData(r.replayDataOpts, r.logger, pm)
+				if err != nil {
+					s := fmt.Sprintf("%s saving payload to local directory %s - %s\n",
+						ansi.Color("ERROR", "red+b"),
+						r.replayDataOpts.saveDir,
+						err.Error())
+					r.logger.Error(s)
+					continue
+				}
+			}
 		}
 
 		if len(deliveries) != 0 {

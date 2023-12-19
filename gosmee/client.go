@@ -163,10 +163,10 @@ func emoji(emoji, color string, decorate bool) string {
 	return ansi.Color(emoji, color) + " "
 }
 
-func (c goSmee) saveData(pm payloadMsg) error {
+func saveData(rd *replayDataOpts, logger *slog.Logger, pm payloadMsg) error {
 	// check if saveDir is created
-	if _, err := os.Stat(c.replayDataOpts.saveDir); os.IsNotExist(err) {
-		if err := os.MkdirAll(c.replayDataOpts.saveDir, 0o755); err != nil {
+	if _, err := os.Stat(rd.saveDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(rd.saveDir, 0o755); err != nil {
 			return err
 		}
 	}
@@ -178,7 +178,7 @@ func (c goSmee) saveData(pm payloadMsg) error {
 		fbasepath = pm.timestamp
 	}
 
-	jsonfile := fmt.Sprintf("%s/%s.json", c.replayDataOpts.saveDir, fbasepath)
+	jsonfile := fmt.Sprintf("%s/%s.json", rd.saveDir, fbasepath)
 	f, err := os.Create(jsonfile)
 	if err != nil {
 		return err
@@ -190,9 +190,9 @@ func (c goSmee) saveData(pm payloadMsg) error {
 		return err
 	}
 
-	shscript := fmt.Sprintf("%s/%s.sh", c.replayDataOpts.saveDir, fbasepath)
+	shscript := fmt.Sprintf("%s/%s.sh", rd.saveDir, fbasepath)
 
-	c.logger.Info(fmt.Sprintf("%s%s and %s has been saved", emoji("⌁", "yellow+b", c.replayDataOpts.decorate), shscript, jsonfile))
+	logger.Info(fmt.Sprintf("%s%s and %s has been saved", emoji("⌁", "yellow+b", rd.decorate), shscript, jsonfile))
 	s, err := os.Create(shscript)
 	if err != nil {
 		return err
@@ -212,7 +212,7 @@ func (c goSmee) saveData(pm payloadMsg) error {
 		FileBase    string
 	}{
 		Headers:     headers,
-		TargetURL:   c.replayDataOpts.targetURL,
+		TargetURL:   rd.targetURL,
 		ContentType: pm.contentType,
 		FileBase:    fbasepath,
 	}); err != nil {
@@ -322,7 +322,7 @@ func (c goSmee) clientSetup() error {
 
 		if string(msg.Data) != "{}" {
 			if c.replayDataOpts.saveDir != "" {
-				err := c.saveData(pm)
+				err := saveData(c.replayDataOpts, c.logger, pm)
 				if err != nil {
 					s := fmt.Sprintf("%s %s saving message with headers '%s' - %s",
 						nowStr,
