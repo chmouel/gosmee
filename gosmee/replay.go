@@ -16,18 +16,19 @@ import (
 	"golang.org/x/exp/slog"
 )
 
+const userTSFormat = "2006-01-02T15:04:05"
+
 type replayOpts struct {
 	replayDataOpts *replayDataOpts
 	cliCtx         *cli.Context
 	client         *github.Client
 	repo           string
 	org            string
-	cacheDir       string
 	logger         *slog.Logger
 	sinceTime      time.Time
 }
 
-// chooseDeliveries reverses the deliveries slice and only show the deliveries since the cache file id.
+// chooseDeliveries reverses the deliveries slice and only show the deliveries since the last date we parsed.
 func (r *replayOpts) chooseDeliveries(dlvs []*github.HookDelivery) []*github.HookDelivery {
 	retdeliveries := make([]*github.HookDelivery, 0)
 	for _, d := range dlvs {
@@ -45,65 +46,58 @@ func (r *replayOpts) chooseDeliveries(dlvs []*github.HookDelivery) []*github.Hoo
 }
 
 func (r *replayOpts) replayHooks(ctx context.Context, hookid int64) error {
-	opt := &github.ListCursorOptions{}
 	r.logger.Info(fmt.Sprintf("starting watching deliveries for %s/%s", r.org, r.repo))
 	for {
-		for {
-			deliveries, resp, err := r.client.Repositories.ListHookDeliveries(ctx, r.org, r.repo, hookid, opt)
+		opt := &github.ListCursorOptions{PerPage: 100}
+		deliveries, _, err := r.client.Repositories.ListHookDeliveries(ctx, r.org, r.repo, hookid, opt)
+		if err != nil {
+			return fmt.Errorf("cannot list deliveries: %w", err)
+		}
+		// reverse deliveries to replay from oldest to newest
+		deliveries = r.chooseDeliveries(deliveries)
+		for _, hd := range deliveries {
+			delivery, _, err := r.client.Repositories.GetHookDelivery(ctx, r.org, r.repo, hookid, hd.GetID())
 			if err != nil {
-				return fmt.Errorf("cannot list deliveries: %w", err)
+				return fmt.Errorf("cannot get delivery: %w", err)
 			}
-			// reverse deliveries to replay from oldest to newest
-			deliveries = r.chooseDeliveries(deliveries)
-			for _, hd := range deliveries {
-				delivery, _, err := r.client.Repositories.GetHookDelivery(ctx, r.org, r.repo, hookid, hd.GetID())
-				if err != nil {
-					return fmt.Errorf("cannot get delivery: %w", err)
-				}
-				pm := payloadMsg{}
-				var ok bool
-				if pm.contentType, ok = delivery.Request.Headers["Content-Type"]; !ok {
-					pm.contentType = "application/json"
-				}
-				pm.body = delivery.Request.GetRawPayload()
-				pm.headers = delivery.Request.GetHeaders()
+			pm := payloadMsg{}
+			var ok bool
+			if pm.contentType, ok = delivery.Request.Headers["Content-Type"]; !ok {
+				pm.contentType = "application/json"
+			}
+			pm.body = delivery.Request.GetRawPayload()
+			pm.headers = delivery.Request.GetHeaders()
+			pm.eventID = hd.GetGUID()
 
-				// get the event type
-				if pv, ok := pm.headers["X-GitHub-Event"]; ok {
-					// github action don't like it
-					replace := strings.NewReplacer(":", "-", " ", "_", "/", "_")
-					pv = replace.Replace(strings.ToLower(pv))
-					// remove all non-alphanumeric characters and don't let directory traversal
-					pv = pmEventRe.FindString(pv)
-					pm.eventType = pv
-				}
-				if pd, ok := pm.headers["X-GitHub-Delivery"]; ok {
-					pm.eventID = pd
-				}
-
-				dt := delivery.DeliveredAt.GetTime()
-				r.sinceTime = *delivery.DeliveredAt.GetTime()
-				pm.timestamp = dt.Format(tsFormat)
-
-				if err := replayData(r.replayDataOpts, r.logger, pm); err != nil {
-					s := fmt.Sprintf(
-						"%s forwarding message with headers '%s' - %s\n",
-						ansi.Color("ERROR", "red+b"),
-						pm.headers,
-						err.Error())
-					r.logger.Error(s)
-					continue
-				}
-
+			// get the event type
+			if pv, ok := pm.headers["X-GitHub-Event"]; ok {
+				// github action don't like it
+				replace := strings.NewReplacer(":", "-", " ", "_", "/", "_")
+				pv = replace.Replace(strings.ToLower(pv))
+				// remove all non-alphanumeric characters and don't let directory traversal
+				pv = pmEventRe.FindString(pv)
+				pm.eventType = pv
 			}
 
-			if resp.NextPage == 0 {
-				break
+			dt := delivery.DeliveredAt.GetTime()
+			pm.timestamp = dt.Format(tsFormat)
+
+			if err := replayData(r.replayDataOpts, r.logger, pm); err != nil {
+				s := fmt.Sprintf(
+					"%s forwarding message with headers '%s' - %s\n",
+					ansi.Color("ERROR", "red+b"),
+					pm.headers,
+					err.Error())
+				r.logger.Error(s)
+				continue
 			}
+		}
+
+		if len(deliveries) != 0 {
+			r.sinceTime = deliveries[len(deliveries)-1].DeliveredAt.GetTime().Add(1 * time.Second)
 		}
 		time.Sleep(5 * time.Second)
 	}
-	return nil
 }
 
 func (r *replayOpts) listHooks(ctx context.Context) error {
@@ -137,13 +131,9 @@ func replay(c *cli.Context) error {
 	}
 
 	ropt := &replayOpts{
-		cliCtx:   c,
-		client:   client,
-		cacheDir: cachePath,
-		logger:   logger,
-	}
-	if c.String("cache-dir") != "" {
-		ropt.cacheDir = c.String("cache-dir")
+		cliCtx: c,
+		client: client,
+		logger: logger,
 	}
 
 	orgRepo := c.Args().Get(0)
@@ -203,7 +193,7 @@ func replay(c *cli.Context) error {
 		ropt.sinceTime = time.Now()
 	}
 	if sinceTime != "" {
-		since, err := time.Parse(tsFormat, sinceTime)
+		since, err := time.Parse(userTSFormat, sinceTime)
 		if err != nil {
 			return fmt.Errorf("cannot parse time-since: %w", err)
 		}

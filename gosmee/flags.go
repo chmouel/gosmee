@@ -1,41 +1,8 @@
 package gosmee
 
 import (
-	"os"
-
 	"github.com/urfave/cli/v2"
 )
-
-// getCachePath returns the cache path for the application.
-// It first checks if the GOSMEE_CACHE_PATH environment variable is set.
-// If not, it checks the XDG_CACHE_HOME environment variable.
-// If neither is set, it defaults to using the HOME environment variable.
-// If none of the above environment variables are set, it defaults to "/tmp/gosmee".
-// It also ensures that the cache directory exists, creating it if necessary.
-func getCachePath() string {
-	var cachePath string
-	switch {
-	case os.Getenv("GOSMEE_CACHE_PATH") != "":
-		cachePath = os.Getenv("GOSMEE_CACHE_PATH")
-	case os.Getenv("XDG_CACHE_HOME") != "":
-		cachePath = os.Getenv("XDG_CACHE_HOME") + "/gosmee"
-	case os.Getenv("HOME") != "":
-		cachePath = os.Getenv("HOME") + "/.cache/gosmee"
-	default:
-		cachePath = "/tmp/gosmee"
-	}
-
-	// create base dir if not exists
-	if _, err := os.Stat(cachePath); os.IsNotExist(err) {
-		err := os.MkdirAll(cachePath, 0o755)
-		if err != nil {
-			panic(err)
-		}
-	}
-	return cachePath
-}
-
-var cachePath = getCachePath()
 
 var commonFlags = []cli.Flag{
 	&cli.StringFlag{
@@ -95,7 +62,6 @@ var replayFlags = []cli.Flag{
 		Name:    "time-since",
 		Aliases: []string{"T"},
 		Usage:   "Replay events from this time",
-		Value:   cachePath,
 	},
 }
 
