@@ -1,14 +1,17 @@
-# gosmee - A webhook forwarder/relayer
+# gosmee - A webhook forwarder/relayer and replayer
 
 Gosmee is a webhook relayer that can be easily run anywhere.
+It can act as well as a replayer using the GitHub API for GitHub Hooks.
 
 ## Description
 
 Gosmee enables you to relay webhooks from either itself (as a server) or from <https://smee.io> to your local laptop or an infrastructure that is not publicly available from the internet.
 
-gosmee let you easily expose the service on your local network (like a web service on [localhost](https://en.wikipedia.org/wiki/Localhost)) or behind a VPN, allowing a public service (such as GitHub) push webhooks into it.
+Gosmee let you easily expose the service on your local network (like a web service on [localhost](https://en.wikipedia.org/wiki/Localhost)) or behind a VPN, allowing a public service (such as GitHub) push webhooks into it.
 
 For instance, if you configure your GitHub Webhook to direct to a <https://smee.io/> URL or where gosmee server is listening, you can then use the gosmee client on your local notebook to obtain the events from the server and forward them to the local service, thereby establishing a connection between the GitHub webhook and your local service on your workstation.
+
+Alternatively if you don't want to use a relay server and use GitHub you can replay the hooks deliveries via the GitHub API.
 
 ### Diagram
 
@@ -46,7 +49,7 @@ yay -S gosmee-bin
 docker run ghcr.io/chmouel/gosmee:latest
 ```
 
-## GO
+### GO
 
 ```shell
 go install -v github.com/chmouel/gosmee@latest
@@ -84,9 +87,17 @@ nix flake check # runs tests
 
 System Service example file for macOS and Linux is available in the [misc](./misc) directory.
 
+### Kubernetes
+
+You can expose an internal kubernetes deployment or service with gosmee by using [this file](./misc/kubernetes-deployment.yaml).
+
+Adjust the `SMEE_URL` in there to your endpoint and the `http://deployment.name.namespace.name:PORT_OF_SERVICE` URL is the Kubernetes internal URL of your deployment running on your cluster, for example:
+
+   <http://service.namespace:8080>
+
 ### Shell completion
 
-Shell completion is available with:
+Shell completions is available for gosmee:
 
 ```shell
 # BASH
@@ -154,7 +165,7 @@ With `/new` you can easily generate a random ID, ie:
 http://localhost:3333/NqybHcEi
 ```
 
-### Caddy
+#### Caddy
 
 [Caddy](https://caddyserver.com/) is the best way to run gosmee server, you just need this:
 
@@ -166,7 +177,7 @@ https://webhook.mydomain {
 
 It will automatically configure a letsencrypt certificate for you
 
-### Nginx
+#### Nginx
 
 Running gosmee server behind nginx may require some configuration to work properly.
 Here is a `proxy_pass location` to a locally running gosmee server on port localhost:3333:
@@ -181,15 +192,58 @@ Here is a `proxy_pass location` to a locally running gosmee server on port local
     }
 ```
 
-There is maybe some errors appearing some time with nginx with long running connections.
+There is maybe some errors appearing some time with nginx with long running connections. Help is welcome to help debug this.
 
-### Kubernetes
+## Replay
 
-You can expose an internal kubernetes deployment or service with gosmee by using [this file](./misc/kubernetes-deployment.yaml).
+Alternatively if you don't want to use a relay server and use GitHub you can
+replay the hooks deliveries via the GitHub API. Compared to the relay server
+method this is more reliable and you don't have to worry about the relay server
+being down. The downside is that it only works with GitHub and you need to have
+a GitHub token with the `repo` scope.
 
-Adjust the `SMEE_URL` in there to your endpoint and the `http://deployment.name.namespace.name:PORT_OF_SERVICE` URL is the Kubernetes internal URL of your deployment running on your cluster, for example:
+It currently only supports Repository and not yet organisation hooks.
 
-   <http://service.namespace:8080>
+You will need to know the Hook ID of the webhook you want to replay, you can
+get it with the `--hook-id` command:
+
+```shell
+goplay replay --github-token=$GITHUB_TOKEN --list-hooks org/repo
+```
+
+This will list all the hooks for the repository and their ID. When you grab the
+appropriate you can start to listen to the events and replay them on a local
+server:
+
+```shell
+goplay replay --github-token=$GITHUB_TOKEN org/repo HOOK_ID http://localhost:8080
+```
+
+This will listen to all **new** events and replay them on <http://localhost:8080>.
+
+You can also replay all the events that have been previously received by the
+hook from a date time. The date is is in UTC and in the format of
+`2023-12-19T12:31:12` and it will replay all the events from that date to now:
+
+```shell
+goplay replay --time-since=2023-12-19T09:00:00 --github-token=$GITHUB_TOKEN org/repo HOOK_ID http://localhost:8080
+```
+
+To make it easier to know the date you can use the `--list-deliveries` command
+to list all the deliveries and their date:
+
+```shell
+goplay replay --github-token=$GITHUB_TOKEN --list-deliveries org/repo HOOK_ID
+```
+
+>[!NOTE]
+>`gosmee replay` does not support paging yet, and list only the last
+>100 deliveries. So if you specify a date that is older than the last 100
+>deliveries it will not work.
+
+>[!NOTE]
+>When the token gets rate limited, gosmee will be just failing and do not at the
+>moment do anything to manage this.
 
 ## Thanks
 
