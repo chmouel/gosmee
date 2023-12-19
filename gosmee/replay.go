@@ -100,26 +100,6 @@ func (r *replayOpts) replayHooks(ctx context.Context, hookid int64) error {
 	}
 }
 
-func (r *replayOpts) listHooks(ctx context.Context) error {
-	hooks, _, err := r.client.Repositories.ListHooks(ctx, r.org, r.repo, nil)
-	if err != nil {
-		return fmt.Errorf("cannot list hooks: %w", err)
-	}
-
-	fmt.Fprintf(os.Stdout, "%-20s %-20s %s\n", "ID", "Name", "URL")
-	for _, h := range hooks {
-		url := ""
-		if _url, here := h.Config["url"]; here {
-			var ok bool
-			if url, ok = _url.(string); !ok {
-				url = ""
-			}
-		}
-		fmt.Fprintf(os.Stdout, "%-20d %-20s %s\n", h.GetID(), h.GetName(), url)
-	}
-	return nil
-}
-
 func replay(c *cli.Context) error {
 	ctx := context.Background()
 	client := github.NewClient(nil)
@@ -164,6 +144,9 @@ func replay(c *cli.Context) error {
 		return fmt.Errorf("hook-id is required, use --list-hooks to get the hook id")
 	}
 
+	if c.IsSet("list-deliveries") {
+		return ropt.listDeliveries(ctx, hookID)
+	}
 	// TODO: remove duplication from client and here
 	var targetURL string
 	if os.Getenv("GOSMEE_TARGET_URL") != "" {

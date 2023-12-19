@@ -55,8 +55,13 @@ var replayFlags = []cli.Flag{
 	},
 	&cli.BoolFlag{
 		Name:    "list-hooks",
-		Usage:   "List hooks and its a IDs from a repository",
+		Usage:   "List hooks and its IDs on a repository",
 		Aliases: []string{"L"},
+	},
+	&cli.BoolFlag{
+		Name:    "list-deliveries",
+		Usage:   "List deliveries from on hook ID",
+		Aliases: []string{"D"},
 	},
 	&cli.StringFlag{
 		Name:    "time-since",
