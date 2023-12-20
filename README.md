@@ -15,7 +15,7 @@ For instance, if you configure your GitHub Webhook to direct to a <https://smee.
 For the people who rather prefer to understand on how it works with a small
 diagram:
 
-![diagram](./.github/gosmee-diag.jpg)
+![diagram](./.github/gosmee-diag.png)
 
 ## Screenshot
 
