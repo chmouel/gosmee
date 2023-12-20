@@ -20,6 +20,10 @@ diagram:
 
 ![diagram](./.github/gosmee-diag.png)
 
+## Blog Post
+
+There is a blog post as well that explains it the background of this project and some of its features: <https://blog.chmouel.com/posts/gosmee-webhook-forwarder-relayer>
+
 ## Screenshot
 
 ![Screenshot](./.github/screenshot.png)
