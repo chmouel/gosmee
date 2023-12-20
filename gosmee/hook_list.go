@@ -10,8 +10,9 @@ import (
 )
 
 func (r *replayOpts) listHooks(ctx context.Context) error {
-	hooks, _, err := r.client.Repositories.ListHooks(ctx, r.org, r.repo, nil)
-	if err != nil {
+	var hooks []*github.Hook
+	var err error
+	if hooks, _, err = r.ghop.ListHooks(ctx, r.org, r.repo, nil); err != nil {
 		return fmt.Errorf("cannot list hooks: %w", err)
 	}
 
@@ -30,8 +31,10 @@ func (r *replayOpts) listHooks(ctx context.Context) error {
 }
 
 func (r *replayOpts) listDeliveries(ctx context.Context, hookID int64) error {
-	deliveries, _, err := r.client.Repositories.ListHookDeliveries(ctx, r.org, r.repo, hookID, &github.ListCursorOptions{PerPage: 50})
-	if err != nil {
+	var deliveries []*github.HookDelivery
+	var err error
+	opt := &github.ListCursorOptions{PerPage: 50}
+	if deliveries, _, err = r.ghop.ListHookDeliveries(ctx, r.org, r.repo, hookID, opt); err != nil {
 		return fmt.Errorf("cannot list deliveries: %w", err)
 	}
 	fmt.Fprintf(os.Stdout, ansi.Color(fmt.Sprintf("%-12s %-12s %s\n", "ID", "Event", "Delivered At"), "cyan+b"))

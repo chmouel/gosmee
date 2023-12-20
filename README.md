@@ -120,7 +120,7 @@ If you intend to use <https://smee.io>, you might want to generate your own smee
 Once you have it, the basic usage is as follows:
 
 ```shell
-gosmee client https://smee.io/aBcDeF https://localhost:8080 
+gosmee client https://smee.io/aBcDeF https://localhost:8080
 ```
 
 This command will relay all payloads received at the smee URL to a service running on <http://localhost:8080>.
@@ -189,10 +189,10 @@ Here is a `proxy_pass location` to a locally running gosmee server on port local
 ```nginx
     location / {
         proxy_pass         http://127.0.0.1:3333;
-        proxy_set_header Connection '';   
-        proxy_http_version 1.1;           
-        chunked_transfer_encoding off;    
-        proxy_read_timeout 372h; 
+        proxy_set_header Connection '';
+        proxy_http_version 1.1;
+        chunked_transfer_encoding off;
+        proxy_read_timeout 372h;
     }
 ```
 
@@ -204,9 +204,13 @@ Alternatively if you don't want to use a relay server and use GitHub you can
 replay the hooks deliveries via the GitHub API. Compared to the relay server
 method this is more reliable and you don't have to worry about the relay server
 being down. The downside is that it only works with GitHub and you need to have
-a GitHub token with the `repo` scope.
+a GitHub token. The scopes needed are:
 
-It currently only supports Repository and not yet organisation hooks.
+- For repository webhooks, the token must have the `read:repo_hook` or `repo` scope
+- For organizations webhooks, you must have the `admin:org_hook` scope.
+
+It currently only supports replaying webhook installed on Repositories and
+Organizations but not supporting webhooks events from GitHub apps.
 
 You will need to know the Hook ID of the webhook you want to replay, you can
 get it with the `--hook-id` command:
@@ -215,8 +219,17 @@ get it with the `--hook-id` command:
 goplay replay --github-token=$GITHUB_TOKEN --list-hooks org/repo
 ```
 
-This will list all the hooks for the repository and their ID. When you grab the
-appropriate you can start to listen to the events and replay them on a local
+This will list all the hooks for the repository and their ID.
+
+If you want to list the hooks on an organization you can just specify the org
+name with no slash (same goes for the rest of this documentation, it behaves the
+same between org and repo):
+
+```shell
+goplay replay --github-token=$GITHUB_TOKEN --list-hooks org
+```
+
+When you grab the appropriate you can start to listen to the events and replay them on a local
 server:
 
 ```shell

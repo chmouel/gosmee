@@ -27,6 +27,7 @@ type replayOpts struct {
 	org            string
 	logger         *slog.Logger
 	sinceTime      time.Time
+	ghop           GHOp
 }
 
 // chooseDeliveries reverses the deliveries slice and only show the deliveries since the last date we parsed.
@@ -47,10 +48,10 @@ func (r *replayOpts) chooseDeliveries(dlvs []*github.HookDelivery) []*github.Hoo
 }
 
 func (r *replayOpts) replayHooks(ctx context.Context, hookid int64) error {
-	r.logger.Info(fmt.Sprintf("starting watching deliveries for %s/%s", r.org, r.repo))
+	r.ghop.Starting()
 	for {
 		opt := &github.ListCursorOptions{PerPage: 100}
-		deliveries, _, err := r.client.Repositories.ListHookDeliveries(ctx, r.org, r.repo, hookid, opt)
+		deliveries, _, err := r.ghop.ListHookDeliveries(ctx, r.org, r.repo, hookid, opt)
 		if err != nil {
 			return fmt.Errorf("cannot list deliveries: %w", err)
 		}
@@ -63,7 +64,7 @@ func (r *replayOpts) replayHooks(ctx context.Context, hookid int64) error {
 			for range []int{1, 2, 3} {
 				var resp *github.Response
 				var err error
-				delivery, resp, err = r.client.Repositories.GetHookDelivery(ctx, r.org, r.repo, hookid, hd.GetID())
+				delivery, resp, err = r.ghop.GetHookDelivery(ctx, r.org, r.repo, hookid, hd.GetID())
 				if resp.StatusCode == http.StatusNotFound {
 					time.Sleep(1 * time.Second)
 					continue
@@ -141,11 +142,15 @@ func replay(c *cli.Context) error {
 
 	orgRepo := c.Args().Get(0)
 	if strings.Contains(orgRepo, "/") {
-		ropt.org = strings.Split(orgRepo, "/")[0]
-		ropt.repo = strings.Split(orgRepo, "/")[1]
+		spt := strings.Split(orgRepo, "/")
+		ropt.org = spt[0]
+		ropt.repo = spt[1]
+	} else {
+		ropt.org = orgRepo
 	}
-	if ropt.org == "" || ropt.repo == "" {
-		return fmt.Errorf("org and repo are required, example: org/repo")
+
+	if ropt.org == "" {
+		return fmt.Errorf("at least an org is required or an org/repo")
 	}
 
 	if c.IsSet("list-hooks") {
@@ -204,6 +209,11 @@ func replay(c *cli.Context) error {
 			return fmt.Errorf("cannot parse time-since: %w", err)
 		}
 		ropt.sinceTime = since
+	}
+	if ropt.repo == "" {
+		ropt.ghop = NewOrgLister(client, logger, ropt.org, ropt.repo)
+	} else {
+		ropt.ghop = NewRepoLister(client, logger, ropt.org, ropt.repo)
 	}
 
 	ropt.replayDataOpts = &replayDataOpts{
