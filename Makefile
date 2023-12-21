@@ -54,5 +54,5 @@ fmt:
 	@go fmt `go list ./... | grep -v /vendor/`
 
 fumpt:
-	@gofumpt -w *.go
+	@gofumpt -e -w -extra ./
 
