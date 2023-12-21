@@ -14,8 +14,10 @@ type GHOp interface {
 	Starting()
 }
 
-var _ GHOp = (*RepoOP)(nil)
-var _ GHOp = (*OrgOP)(nil)
+var (
+	_ GHOp = (*RepoOP)(nil)
+	_ GHOp = (*OrgOP)(nil)
+)
 
 type RepoOP struct {
 	client    *github.Client
