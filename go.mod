@@ -9,7 +9,7 @@ require (
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/r3labs/sse/v2 v2.10.0
-	github.com/urfave/cli/v2 v2.26.0
+	github.com/urfave/cli/v2 v2.27.1
 	golang.org/x/crypto v0.17.0
 	golang.org/x/exp v0.0.0-20231214170342-aacd6d4b4611
 	golang.org/x/text v0.14.0
