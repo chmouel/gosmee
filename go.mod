@@ -3,7 +3,7 @@ module github.com/chmouel/gosmee
 go 1.20
 
 require (
-	github.com/go-chi/chi/v5 v5.0.10
+	github.com/go-chi/chi/v5 v5.0.11
 	github.com/google/go-github/v57 v57.0.0
 	github.com/mattn/go-isatty v0.0.20
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d
