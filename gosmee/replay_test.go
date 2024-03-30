@@ -17,12 +17,12 @@ func TestChooseDeliveries(t *testing.T) {
 		args          args
 		wantErr       bool
 		deliveryCount int
-		deliveryIDS   []int64
+		deliveryIDs   []int64
 	}{
 		{
 			name:          "choose deliveries",
 			deliveryCount: 2,
-			deliveryIDS:   []int64{2, 3},
+			deliveryIDs:   []int64{2, 3},
 			args: args{
 				sinceTime: time.Now(),
 				deliveries: []*github.HookDelivery{
@@ -50,8 +50,8 @@ func TestChooseDeliveries(t *testing.T) {
 				t.Errorf("chooseDeliveries() = %v, want %v", len(ret), tt.deliveryCount)
 			}
 			for i, d := range ret {
-				if *d.ID != tt.deliveryIDS[i] {
-					t.Errorf("chooseDeliveries() = %v, want %v", *d.ID, tt.deliveryIDS[i])
+				if *d.ID != tt.deliveryIDs[i] {
+					t.Errorf("chooseDeliveries() = %v, want %v", *d.ID, tt.deliveryIDs[i])
 				}
 			}
 		})
