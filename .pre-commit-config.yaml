@@ -4,13 +4,13 @@ default_install_hook_types: ["pre-push"]
 exclude: '(^docs/themes/hugo-book|^vendor|.*golden$|^\.vale)'
 repos:
 - repo: https://github.com/pre-commit/pre-commit-hooks
-  rev: v4.2.0
+  rev: v4.5.0
   hooks:
   - id: check-added-large-files
   - id: check-json
   - id: check-vcs-permalinks
 - repo: https://github.com/adrienverge/yamllint.git
-  rev: v1.28.0
+  rev: v1.35.1
   hooks:
     - id: yamllint
 - repo: local

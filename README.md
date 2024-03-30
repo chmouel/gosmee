@@ -257,10 +257,9 @@ goplay replay --github-token=$GITHUB_TOKEN --list-deliveries org/repo HOOK_ID
 >`gosmee replay` does not support paging yet, and list only the last
 >100 deliveries. So if you specify a date that is older than the last 100
 >deliveries it will not work.
-
->[!NOTE]
+>
 >When the token gets rate limited, gosmee will be just failing and do not at the
->moment do anything to manage this.
+>moment do anything to recover from this.
 
 ## Thanks
 
