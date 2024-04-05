@@ -2,6 +2,11 @@ issues:
   exclude-dirs:
     - tint
     - vendor
+  exclude-rules:
+    # Exclude some linters from running on tests files.
+    - path: \.go
+      linters:
+        - typecheck
 linters-settings:
   gocritic:
     disabled-checks:
