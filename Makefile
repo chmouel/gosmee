@@ -38,7 +38,8 @@ lint: lint-go lint-md
 
 lint-go:
 	@echo "linting."
-	@golangci-lint run ./... --modules-download-mode=vendor
+	golangci-lint version
+	golangci-lint run ./... --modules-download-mode=vendor
 
 .PHONY: lint-md
 lint-md: ${MD_FILES} ## runs markdownlint and vale on all markdown files
