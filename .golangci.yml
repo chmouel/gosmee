@@ -1,16 +1,23 @@
-run:
-  skip-dirs:
+issues:
+  exclude-dirs:
     - tint
     - vendor
 linters-settings:
   gocritic:
     disabled-checks:
       - unlambda
-  errcheck:
-    exclude: .errcheck.txt
   gofumpt:
     extra-rules: true
 linters:
+  errcheck:
+    exclude-functions:
+      - (*github.com/tektoncd/pipeline/vendor/go.uber.org/zap.SugaredLogger).Sync
+      - flag.Set
+      - logger.Sync
+      - fmt.Fprintf
+      - fmt.Fprintln
+      - (io.Closer).Close
+      - updateConfigMap
   enable:
     - asasalint
     - asciicheck
