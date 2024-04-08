@@ -53,6 +53,7 @@ yay -S gosmee-bin
 
 ```shell
 docker run ghcr.io/chmouel/gosmee:latest
+```
 
 #### Server
 
