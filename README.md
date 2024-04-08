@@ -54,7 +54,7 @@ yay -S gosmee-bin
 ```shell
 docker run ghcr.io/chmouel/gosmee:latest
 
-### Server
+#### Server
 
 ```shell
 docker run -d -p 3026:3026 --restart always --name example.org ghcr.io/chmouel/gosmee:latest server --port 3026 --address 0.0.0.0 --public-url https://example.org
