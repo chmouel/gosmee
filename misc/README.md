@@ -5,7 +5,7 @@ Somne system integrations, you may want to edit the download file and adjust you
 ## macOS
 
 ```shell
-cp $HOME/Library/LaunchAgents/
+mkdir -p $HOME/Library/LaunchAgents/
 curl -L https://raw.githubusercontent.com/chmouel/gosmee/main/misc/com.chmouel.gosmee.plist -o $HOME/Library/LaunchAgents/com.chmouel.gosmee.plist
 
 launchctl load -w ~/Library/LaunchAgents/com.chmouel.gosmee.plist
