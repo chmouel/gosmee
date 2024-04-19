@@ -42,7 +42,7 @@ github.com/russross/blackfriday/v2
 ## explicit; go 1.18
 github.com/urfave/cli/v2
 # github.com/xrash/smetrics v0.0.0-20240312152122-5f08fbb34913
-## explicit; go 1.15.0
+## explicit; go 1.15
 github.com/xrash/smetrics
 # golang.org/x/crypto v0.21.0
 ## explicit; go 1.18
@@ -55,7 +55,7 @@ golang.org/x/exp/slices
 golang.org/x/exp/slog
 golang.org/x/exp/slog/internal
 golang.org/x/exp/slog/internal/buffer
-# golang.org/x/net v0.22.0
+# golang.org/x/net v0.23.0
 ## explicit; go 1.18
 golang.org/x/net/context
 golang.org/x/net/idna
