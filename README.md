@@ -49,13 +49,13 @@ yay -S gosmee-bin
 
 ### [Docker](https://github.com/users/chmouel/packages/container/package/gosmee)
 
-#### Client
+#### Gosmee client with Docker
 
 ```shell
 docker run ghcr.io/chmouel/gosmee:latest
 ```
 
-#### Server
+#### Gosmee server with Docker
 
 ```shell
 docker run -d -p 3026:3026 --restart always --name example.org ghcr.io/chmouel/gosmee:latest server --port 3026 --address 0.0.0.0 --public-url https://example.org
