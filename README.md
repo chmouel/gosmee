@@ -82,21 +82,11 @@ Checkout the directory and use :
 
 ### [Nix/NixOS](https://nixos.org/)
 
-This repository includes a `flake` (see [NixOS Wiki on
-Flakes](https://nixos.wiki/wiki/Flakes)).
-
-If you have the `nix flake` command enabled (currenty on
-nixos-unstable, `nixos-version` >= 22.05)
+Gosmee is available from [`nixpkgs`](https://github.com/NixOS/nixpkgs).
 
 ```shell
-nix run github:chmouel/gosmee -- --help # your args are here
-```
-
-also use it to test and develop the source code:
-
-```shell
-nix develop # drops you in a shell with all the thing needed
-nix flake check # runs tests
+nix-env -iA gosmee
+nix run nixpkgs#gosmee -- --help # your args are here
 ```
 
 ### System Services
