@@ -41,7 +41,6 @@ linters:
     - errchkjson
     - errname
     - errorlint
-    - execinquery
     - exhaustive
     #- exhaustruct
     - exportloopref
