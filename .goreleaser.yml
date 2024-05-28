@@ -38,7 +38,7 @@ brews:
     repository:
       owner: chmouel
       name: gosmee
-    folder: Formula
+    directory: Formula
     homepage: "https://github.com/chmouel/gosmee"
     description: "gosmee - A webhook and https://smee.io forwarder"
     install: |
