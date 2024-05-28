@@ -9,13 +9,18 @@ It can act as well as a replayer using the GitHub API for GitHub Hooks.n
 
 ## Description
 
-Gosmee enables you to relay webhooks from either itself (as a server) or from <https://smee.io> to your local laptop or an infrastructure that is not publicly available from the internet.
+Gosmee enables you to relay webhooks from either itself (as a server) or from <https://smee.io> to your local laptop or an infrastructure that is not accessible from the public internet.
 
-Gosmee let you easily expose the service on your local network (like a web service on [localhost](https://en.wikipedia.org/wiki/Localhost)) or behind a VPN, allowing a public service (such as GitHub) push webhooks into it.
+Gosmee makes it easy to expose a service on your local network (such as a web service on localhost) or behind a VPN. This enables a public service, like GitHub, to push webhooks to your local environment.
 
-For instance, if you configure your GitHub Webhook to direct to a <https://smee.io/> URL or where gosmee server is listening, you can then use the gosmee client on your local notebook to obtain the events from the server and forward them to the local service, thereby establishing a connection between the GitHub webhook and your local service on your workstation.
+Here's how it works:
 
-Alternatively if you don't want to use a relay server and use GitHub you can replay the hooks deliveries via the GitHub API.
+1. Configure your Webhook to direct events to a https://smee.io/ URL or to a URL where your Gosmee server is publicly listening acting as a relay server.
+2. Use the Gosmee client on your local machine to retrieve these events from the relay server and forward them to your local service.
+
+This setup creates a bridge between the GitHub webhook and your local service on your workstation.
+
+Alternatively, if you prefer not to use a relay server, you can use the GitHub API to [replay the webhook](#replay-webhook-deliveries-via-the-github-api) deliveries directly.
 
 ### Diagram
 
