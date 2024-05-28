@@ -200,7 +200,7 @@ Here is a `proxy_pass location` to a locally running gosmee server on port local
 
 There is maybe some errors appearing some time with nginx with long running connections. Help is welcome to help debug this.
 
-## Replay
+## Replay webhook deliveries via the GitHub API
 
 Alternatively if you don't want to use a relay server and use GitHub you can
 replay the hooks deliveries via the GitHub API. Compared to the relay server
