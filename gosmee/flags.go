@@ -100,6 +100,10 @@ var serverFlags = []cli.Flag{
 		Usage: "An HTML string to show in footer for copyright and author",
 	},
 	&cli.StringFlag{
+		Name:  "footer-file",
+		Usage: "An HTML file to show in footer for copyright and author",
+	},
+	&cli.StringFlag{
 		Name:    "address",
 		Aliases: []string{"a"},
 		Value:   defaultServerAddress,

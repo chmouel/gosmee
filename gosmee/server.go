@@ -35,6 +35,17 @@ func errorIt(w http.ResponseWriter, _ *http.Request, status int, err error) {
 func serve(c *cli.Context) error {
 	publicURL := c.String("public-url")
 	footer := c.String("footer")
+	footerFile := c.String("footer-file")
+	if footer != "" && footerFile != "" {
+		return fmt.Errorf("cannot use both --footer and --footer-file")
+	}
+	if footerFile != "" {
+		b, err := os.ReadFile(footerFile)
+		if err != nil {
+			return err
+		}
+		footer = string(b)
+	}
 	router := chi.NewRouter()
 	router.Use(middleware.RequestID)
 	router.Use(middleware.RealIP)

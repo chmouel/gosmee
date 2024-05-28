@@ -153,9 +153,7 @@ behind a proxy with the flags `--address` and `--port`.
 You really want to secure that endpoint, you can generate some letsencrypt
 certificate and use the `--tls-cert` and `--tls-key` flags to specify them.
 
-If you're really lazy (and who isn't) you can just give the flag `--auto-cert` and
-it will automatically generate certs. Unfortunately this require to run on
-port 443 which need root and very secure. It may be better to just have [caddy](#caddy) installed in front of gosmee.
+There is a lot of other flags you can use to customize the server, you can see them with `gosmee server --help`.
 
 To use it you go to your URL and a suffix with your random ID. For example:
 
