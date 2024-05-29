@@ -266,6 +266,10 @@ goplay replay --github-token=$GITHUB_TOKEN --list-deliveries org/repo HOOK_ID
 >When the token gets rate limited, gosmee will be just failing and do not at the
 >moment do anything to recover from this.
 
+## Beyond Webhook
+
+gosmee will only works with webhooks, if you want an alternative solution you can try to looks the one you like from this list https://github.com/anderspitman/awesome-tunneling, my favourite would be [go-http-tunnel](https://github.com/mmatczuk/go-http-tunnel) or [tailscale](https://tailscale.com/).
+
 ## Thanks
 
 - Most of the works is done by the [go-sse](https://github.com/r3labs/sse) library.
