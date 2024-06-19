@@ -100,6 +100,24 @@ func (c goSmee) parse(now time.Time, data []byte) (payloadMsg, error) {
 		}
 		if strings.HasPrefix(payloadKey, "x-") || payloadKey == "user-agent" {
 			if pv, ok := payloadValue.(string); ok {
+				/* Remove port number from x-forwarded-for header
+					X-Forwarded-For header is added to the outgoing request as
+					expected, but it includes the port number, for example:
+
+					X-Forwarded-For: 127.0.0.1:1234
+
+					This is incorrect according to the specification:
+					developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Forwarded-For
+
+					and since this header is critical for security and spoofing many endpoints
+					reject any invalid x-forwarded-for header in the request with "400 bad request"
+					as expected.
+
+				  https://github.com/chmouel/gosmee/issues/135
+				*/
+				if strings.ToLower(payloadKey) == "x-forwarded-for" {
+					pv = strings.Split(pv, ":")[0]
+				}
 				pm.headers[title(payloadKey)] = pv
 			}
 			continue
