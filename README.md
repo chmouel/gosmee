@@ -15,7 +15,7 @@ Gosmee makes it easy to expose a service on your local network (such as a web se
 
 Here's how it works:
 
-1. Configure your Webhook to direct events to a https://smee.io/ URL or to a URL where your Gosmee server is publicly listening acting as a relay server.
+1. Configure your Webhook to direct events to a <https://smee.io/> URL or to a URL where your Gosmee server is publicly listening acting as a relay server.
 2. Use the Gosmee client on your local machine to retrieve these events from the relay server and forward them to your local service.
 
 This setup creates a bridge between the GitHub webhook and your local service on your workstation.
@@ -268,7 +268,7 @@ goplay replay --github-token=$GITHUB_TOKEN --list-deliveries org/repo HOOK_ID
 
 ## Beyond Webhook
 
-gosmee will only works with webhooks, if you want an alternative solution you can try to looks the one you like from this list https://github.com/anderspitman/awesome-tunneling, my favourite would be [go-http-tunnel](https://github.com/mmatczuk/go-http-tunnel) or [tailscale](https://tailscale.com/).
+gosmee will only works with webhooks, if you want an alternative solution you can try to looks the one you like from this list <https://github.com/anderspitman/awesome-tunneling>, my favourite would be [go-http-tunnel](https://github.com/mmatczuk/go-http-tunnel) or [tailscale](https://tailscale.com/).
 
 ## Thanks
 
