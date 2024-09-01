@@ -12,7 +12,7 @@ require (
 	github.com/urfave/cli/v2 v2.27.3
 	golang.org/x/crypto v0.24.0
 	golang.org/x/exp v0.0.0-20240613232115-7f521ea00fb8
-	golang.org/x/text v0.16.0
+	golang.org/x/text v0.17.0
 	gotest.tools/v3 v3.5.1
 )
 
