@@ -10,5 +10,5 @@ RUN microdnf -y update && microdnf -y --nodocs install tar rsync shadow-utils &&
 COPY --from=0 /tmp/gosmee /usr/local/bin/gosmee
 
 WORKDIR /home/gosmee
-USER gosmee
+USER 1001
 ENTRYPOINT ["/usr/local/bin/gosmee"]
