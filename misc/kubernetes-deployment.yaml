@@ -13,8 +13,8 @@ spec:
         app: gosmee
     spec:
       containers:
-        - image: ghcr.io/chmouel/gosmee:latest
-          imagePullPolicy: IfNotPresent
+        - image: ghcr.io/chmouel/gosmee:main
+          imagePullPolicy: Always
           name: gosmee
           args:
             [
