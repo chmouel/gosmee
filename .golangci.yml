@@ -43,7 +43,7 @@ linters:
     - errorlint
     - exhaustive
     #- exhaustruct
-    - exportloopref
+    - copyloopvar
     - forbidigo
     - forcetypeassert
     #- funlen

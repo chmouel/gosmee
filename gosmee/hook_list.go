@@ -16,7 +16,7 @@ func (r *replayOpts) listHooks(ctx context.Context) error {
 		return fmt.Errorf("cannot list hooks: %w", err)
 	}
 
-	fmt.Fprintf(os.Stdout, ansi.Color(fmt.Sprintf("%-20s %-20s %s\n", "ID", "Name", "URL"), "cyan+b")) // nolint:staticcheck
+	fmt.Fprint(os.Stdout, ansi.Color(fmt.Sprintf("%-20s %-20s %s\n", "ID", "Name", "URL"), "cyan+b")) // nolint:staticcheck
 	for _, h := range hooks {
 		url := ""
 		if _url, here := h.Config["url"]; here {
@@ -37,7 +37,7 @@ func (r *replayOpts) listDeliveries(ctx context.Context, hookID int64) error {
 	if deliveries, _, err = r.ghop.ListHookDeliveries(ctx, r.org, r.repo, hookID, opt); err != nil {
 		return fmt.Errorf("cannot list deliveries: %w", err)
 	}
-	fmt.Fprintf(os.Stdout, ansi.Color(fmt.Sprintf("%-12s %-12s %s\n", "ID", "Event", "Delivered At"), "cyan+b")) // nolint:staticcheck
+	fmt.Fprint(os.Stdout, ansi.Color(fmt.Sprintf("%-12s %-12s %s\n", "ID", "Event", "Delivered At"), "cyan+b")) // nolint:staticcheck
 	for _, d := range deliveries {
 		fmt.Fprintf(os.Stdout, "%-12d %-12s %s\n", d.GetID(), d.GetEvent(), d.GetDeliveredAt().Format(userTSFormat))
 	}
