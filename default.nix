@@ -4,7 +4,7 @@ buildGoModule rec {
   name = "gosmee-${version}";
 
   src = packageSrc;
-  vendorSha256 = null;
+  vendorHash = null;
 
   postUnpack = ''
     printf ${version} > $sourceRoot/gosmee/templates/version
@@ -19,7 +19,8 @@ buildGoModule rec {
   '';
 
   meta = {
-    description = "Command line server and client for webhooks deliveries (and https://smee.io)";
+    description =
+      "Command line server and client for webhooks deliveries (and https://smee.io)";
     homepage = "https://github.com/chmouel/gosmee";
     license = lib.licenses.asl20;
   };
