@@ -34,7 +34,7 @@
         devShell = pkgs.mkShell
           {
             nativeBuildInputs = [
-              pkgs.go_1_21
+              pkgs.go_1_22
               pkgs.gnumake
               pkgs.pre-commit # needed for pre-commit install
               pkgs.git # needed for pre-commit install
