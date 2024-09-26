@@ -1,6 +1,8 @@
 module github.com/chmouel/gosmee
 
-go 1.20
+go 1.22.0
+
+toolchain go1.23.1
 
 require (
 	github.com/go-chi/chi/v5 v5.1.0
@@ -9,22 +11,22 @@ require (
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/r3labs/sse/v2 v2.10.0
-	github.com/urfave/cli/v2 v2.27.3
-	golang.org/x/crypto v0.24.0
-	golang.org/x/exp v0.0.0-20240613232115-7f521ea00fb8
-	golang.org/x/text v0.16.0
+	github.com/urfave/cli/v2 v2.27.4
+	golang.org/x/crypto v0.27.0
+	golang.org/x/exp v0.0.0-20240909161429-701f63a606c0
+	golang.org/x/text v0.18.0
 	gotest.tools/v3 v3.5.1
 )
 
 require (
-	github.com/cpuguy83/go-md2man/v2 v2.0.4 // indirect
+	github.com/cpuguy83/go-md2man/v2 v2.0.5 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
-	golang.org/x/net v0.26.0 // indirect
-	golang.org/x/sys v0.22.0 // indirect
+	golang.org/x/net v0.29.0 // indirect
+	golang.org/x/sys v0.25.0 // indirect
 	gopkg.in/cenkalti/backoff.v1 v1.1.0 // indirect
 )
