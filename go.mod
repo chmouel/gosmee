@@ -12,8 +12,8 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/r3labs/sse/v2 v2.10.0
 	github.com/urfave/cli/v2 v2.27.5
-	golang.org/x/crypto v0.31.0
-	golang.org/x/exp v0.0.0-20241215155358-4a5509556b9e
+	golang.org/x/crypto v0.32.0
+	golang.org/x/exp v0.0.0-20250106191152-7588d65b2ba8
 	golang.org/x/text v0.21.0
 	gotest.tools/v3 v3.5.1
 )
@@ -23,10 +23,10 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
-	github.com/mattn/go-colorable v0.1.13 // indirect
+	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
-	golang.org/x/net v0.32.0 // indirect
-	golang.org/x/sys v0.28.0 // indirect
+	golang.org/x/net v0.34.0 // indirect
+	golang.org/x/sys v0.29.0 // indirect
 	gopkg.in/cenkalti/backoff.v1 v1.1.0 // indirect
 )
