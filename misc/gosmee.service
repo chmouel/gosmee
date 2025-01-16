@@ -1,9 +1,15 @@
 [Unit]
 Description=Gosmee Forward
+After=network.target
 
 [Service]
+ExecStartPre=/bin/sh -c 'until curl -s http://localhost:8080; do sleep 5; done'
 ExecStart=gosmee client --output=json https://smee.io/abcdef http://localhost:8080
 EnvironmentFile=/etc/gosmee.env
+Restart=on-failure
+RestartSec=10
+StartLimitInterval=600
+StartLimitBurst=5
 
 [Install]
 WantedBy=default.target
