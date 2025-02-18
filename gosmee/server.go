@@ -72,7 +72,7 @@ func serve(c *cli.Context) error {
 		w.WriteHeader(http.StatusFound)
 	})
 
-	router.Get("/{channel:[a-zA-Z0-9]{12,}}", func(w http.ResponseWriter, r *http.Request) {
+	router.Get("/{channel:[a-zA-Z0-9-_]{12,}}", func(w http.ResponseWriter, r *http.Request) {
 		channel := chi.URLParam(r, "channel")
 		accept := r.Header.Get("User-Agent")
 		if !strings.Contains(accept, "gosmee") {
