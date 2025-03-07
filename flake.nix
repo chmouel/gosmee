@@ -14,7 +14,7 @@
         pkgs = nixpkgs.legacyPackages.${system};
         gosmee = pkgs.callPackage ./default.nix {
           packageSrc = self;
-          buildGoModule = pkgs.buildGo122Module;
+          buildGoModule = pkgs.buildGo123Module;
           version = version;
         };
       in {
@@ -35,7 +35,7 @@
         # };
         devShell = pkgs.mkShell {
           nativeBuildInputs = [
-            pkgs.go_1_22
+            pkgs.go_1_23
             pkgs.gnumake
             pkgs.pre-commit # needed for pre-commit install
             pkgs.git # needed for pre-commit install
