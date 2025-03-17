@@ -11,10 +11,10 @@ require (
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/r3labs/sse/v2 v2.10.0
-	github.com/urfave/cli/v2 v2.27.5
-	golang.org/x/crypto v0.35.0
-	golang.org/x/exp v0.0.0-20250215185904-eff6e970281f
-	golang.org/x/text v0.22.0
+	github.com/urfave/cli/v2 v2.27.6
+	golang.org/x/crypto v0.36.0
+	golang.org/x/exp v0.0.0-20250305212735-054e65f0b394
+	golang.org/x/text v0.23.0
 	gotest.tools/v3 v3.5.2
 )
 
@@ -26,7 +26,7 @@ require (
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
-	golang.org/x/net v0.36.0 // indirect
-	golang.org/x/sys v0.30.0 // indirect
+	golang.org/x/net v0.37.0 // indirect
+	golang.org/x/sys v0.31.0 // indirect
 	gopkg.in/cenkalti/backoff.v1 v1.1.0 // indirect
 )
