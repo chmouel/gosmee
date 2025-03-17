@@ -108,7 +108,8 @@ linters:
     - stylecheck
     - tagalign
     #- tagliatelle
-    - tenv
+    # - tenv
+    - usetesting
     - testableexamples
     - testifylint
     #- testpackage
