@@ -11,11 +11,11 @@ cd $(dirname $(readlink -f $0))
 
 targetURL="{{ .TargetURL }}"
 if [[ ${1:-""} == -l ]]; then
-	targetURL="http://localhost:8080"
+  targetURL="{{ .LocalDebugURL }}"
 elif [[ -n ${1:-""} ]]; then
-	targetURL=${1}
+  targetURL=${1}
 elif [[ -n ${GOSMEE_DEBUG_SERVICE:-""} ]]; then
-	targetURL=${GOSMEE_DEBUG_SERVICE}
+  targetURL=${GOSMEE_DEBUG_SERVICE}
 fi
 
 curl -sSi -H "Content-Type: {{ .ContentType }}" {{ .Headers }} -X POST -d @./{{ .FileBase }}.json ${targetURL}

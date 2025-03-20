@@ -105,10 +105,15 @@ non-publicly accessible endpoint, forward those requests to your local service.`
 						ansi.DisableColors(true)
 						decorate = false
 					}
+					localDebugURL := c.String("local-debug-url")
+					if localDebugURL == "" {
+						localDebugURL = defaultLocalDebugURL
+					}
 					cfg := goSmee{
 						replayDataOpts: &replayDataOpts{
 							smeeURL:           smeeURL,
 							targetURL:         targetURL,
+							localDebugURL:     localDebugURL,
 							saveDir:           c.String("saveDir"),
 							noReplay:          c.Bool("noReplay"),
 							decorate:          decorate,

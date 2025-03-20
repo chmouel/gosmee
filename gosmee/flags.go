@@ -77,6 +77,11 @@ var clientFlags = []cli.Flag{
 		Usage:   "gosmee channel to listen, only useful when you are not use smee.io",
 		Value:   smeeChannel,
 	},
+	&cli.StringFlag{
+		Name:  "local-debug-url",
+		Usage: "Local URL when debugging the payloads",
+		Value: defaultLocalDebugURL,
+	},
 }
 
 var serverFlags = []cli.Flag{

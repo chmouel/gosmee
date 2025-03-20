@@ -37,6 +37,8 @@ const defaultTimeout = 5
 
 const smeeChannel = "messages"
 
+const defaultLocalDebugURL = "http://localhost:8080"
+
 const tsFormat = "2006-01-02T15.04.01.000"
 
 type goSmee struct {
@@ -224,15 +226,17 @@ func saveData(rd *replayDataOpts, logger *slog.Logger, pm payloadMsg) error {
 	// parse shellScriptTmpl as template with arguments
 	t := template.Must(template.New("shellScriptTmpl").Parse(string(shellScriptTmpl)))
 	if err := t.Execute(s, struct {
-		Headers     string
-		TargetURL   string
-		ContentType string
-		FileBase    string
+		Headers       string
+		TargetURL     string
+		ContentType   string
+		FileBase      string
+		LocalDebugURL string
 	}{
-		Headers:     headers,
-		TargetURL:   rd.targetURL,
-		ContentType: pm.contentType,
-		FileBase:    fbasepath,
+		Headers:       headers,
+		TargetURL:     rd.targetURL,
+		LocalDebugURL: rd.localDebugURL,
+		ContentType:   pm.contentType,
+		FileBase:      fbasepath,
 	}); err != nil {
 		return err
 	}
@@ -246,6 +250,7 @@ type replayDataOpts struct {
 	targetCnxTimeout            int
 	decorate, noReplay          bool
 	saveDir, smeeURL, targetURL string
+	localDebugURL               string
 	ignoreEvents                []string
 }
 
