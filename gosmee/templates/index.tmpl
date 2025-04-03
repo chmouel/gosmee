@@ -1,86 +1,257 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
     <meta charset='utf-8'>
     <meta http-equiv='X-UA-Compatible' content='IE=edge'>
     <title>Gosmee - Webhook Forwarder</title>
     <meta name='viewport' content='width=device-width, initial-scale=1'>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
+        :root {
+            --primary: #4F46E5;
+            --secondary: #6366F1;
+            --accent: #818CF8;
+            --light: #F8FAFC;
+            --dark: #1E293B;
+            --code-bg: #F1F5F9;
+            --gradient: linear-gradient(135deg, var(--primary), var(--secondary));
+        }
+
         * {
             margin: 0;
             padding: 0;
+            box-sizing: border-box;
         }
 
         body {
-            font-family: Arial, Helvetica, sans-serif;
-            font-size: 16px;
-            line-height: 1.6;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            line-height: 1.5;
+            color: var(--dark);
+            background: var(--light);
         }
 
         .container {
-            width: 100%;
             max-width: 800px;
             margin: 0 auto;
-            padding: 50px;
+            padding: 2rem 1rem;
+        }
+
+        .hero {
+            text-align: center;
+            margin-bottom: 3rem;
+            padding: 2rem;
+            background: var(--gradient);
+            border-radius: 1rem;
+            color: white;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .hero h1 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
             display: flex;
-            flex-direction: column;
             align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+        }
+
+        .steps {
+            display: grid;
+            gap: 1.5rem;
+        }
+
+        .step {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            border-left: 4px solid var(--primary);
+        }
+
+        .step-number {
+            background: var(--gradient);
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: grid;
+            place-items: center;
+            color: white;
+            font-weight: 600;
+            margin-bottom: 1rem;
         }
 
         h2 {
-            font-size: 36px;
-            font-weight: bold;
-            margin-bottom: 30px;
+            font-size: 1.25rem;
+            margin-bottom: 1rem;
+            color: var(--dark);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .code-block {
+            background: var(--code-bg);
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin: 1rem 0;
+            position: relative;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 0.25rem 0.75rem;
+            border-radius: 0.25rem;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .copy-btn:hover {
+            opacity: 0.9;
+        }
+
+        .services {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin-top: 1rem;
+        }
+
+        .service {
+            background: var(--code-bg);
+            padding: 0.25rem 0.75rem;
+            border-radius: 999px;
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .footer {
             text-align: center;
-            text-decoration: underline;
-        }
-
-        ul {
-            list-style: none;
-            padding: 0;
-        }
-
-        li {
-            margin-bottom: 15px;
+            margin-top: 3rem;
+            color: #64748B;
+            font-size: 0.875rem;
         }
 
         a {
-            color: #007bff;
+            color: var(--primary);
             text-decoration: none;
+            font-weight: 500;
         }
 
-        .code {
-            background-color: #f2f2f2;
-            border-radius: 5px;
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 14px;
-            padding: 5px;
+        a:hover {
+            text-decoration: underline;
         }
 
-      .footer {
-        margin-top: 50px;
-        font-size: 10px;
-        color: #ccc;
-        font-style: italic;
-        text-decoration: none;
-      }
+        @media (max-width: 640px) {
+            .container {
+                padding: 1rem;
+            }
+            
+            .hero h1 {
+                font-size: 1.75rem;
+            }
+        }
     </style>
 </head>
 
 <body>
     <div class="container">
-        <h2>Gosmee webhook forwarder</h2>
-        <ul>
-            <li>Download the gosmee client for your platform: <a href="https://github.com/chmouel/gosmee/#install">here</a></li>
-            <li>Use this endpoint URL to configure your webhook service (ie: <a href="https://docs.github.com/en/webhooks-and-events/webhooks/creating-webhooks">Github</a>, <a href="https://docs.gitlab.com/ee/user/project/integrations/webhooks.html">Gitlab</a>, <a href="https://zapier.com/apps/webhook/integrations">Zapier</a> etc..):</li>
-            <li><a href="{{ .URL }}" target="_blank">{{ .URL }}</a></li>
-            <li>Using the gosmee client on your desktop computer (or via a <a href="https://github.com/chmouel/gosmee/#kubernetes">kubernetes service</a>) you can then forward the endpoint URL to your local service. For example to forward the webhook to a service running on your laptop on <b>http://localhost:8080</b>):</li>
-            <li><div class="code">$ gosmee client {{ .URL }} http://localhost:8080</div></li>
-            <li>See <b>gosmee help</b> for more options.</li>
-        </ul>
-        <p class="footer">{{ .Footer }} <a href="https://github.com/chmouel/gosmee" target="_blank">Powered by gosmee/{{ .Version }}</a></p>
+        <div class="hero">
+            <h1>
+                <i class="fas fa-exchange-alt"></i>
+                Gosmee Webhooks
+            </h1>
+            <p>Simple webhook forwarding to your local machine</p>
+        </div>
+
+        <div class="steps">
+            <div class="step">
+                <div class="step-number">1</div>
+                <h2><i class="fas fa-download"></i> Install Gosmee</h2>
+                <p>Download and install the client for your operating system:</p>
+                <div class="code-block">
+                    brew install gosmee
+                    <button class="copy-btn" onclick="copyText('brew install gosmee')">
+                        Copy
+                    </button>
+                </div>
+                <p>Or see <a href="https://github.com/chmouel/gosmee/#install" target="_blank">
+                    the detailed installation guide 
+                </a> for other platforms</p>
+            </div>
+
+            <div class="step">
+                <div class="step-number">2</div>
+                <h2><i class="fas fa-cog"></i> Setup Webhook</h2>
+                <p>Use this URL in your service's webhook settings:</p>
+                <div class="code-block">
+                    {{ .URL }}
+                    <button class="copy-btn" onclick="copyText('{{ .URL }}')">
+                        Copy
+                    </button>
+                </div>
+                <div class="services">
+                    <span>Works with:</span>
+                    <a href="#" class="service">
+                        <i class="fab fa-github"></i>
+                        GitHub
+                    </a>
+                    <a href="#" class="service">
+                        <i class="fab fa-gitlab"></i>
+                        GitLab
+                    </a>
+                    <a href="#" class="service">
+                        <i class="fas fa-bolt"></i>
+                        Zapier
+                    </a>
+                    and many more...
+                    
+                </div>
+            </div>
+
+            <div class="step">
+                <div class="step-number">3</div>
+                <h2><i class="fas fa-terminal"></i> Start Forwarding</h2>
+                <p>Run this command to start receiving webhooks:</p>
+                <div class="code-block">
+                    gosmee client {{ .URL }} http://localhost:8080
+                    <button class="copy-btn" 
+                        onclick="copyText('gosmee client {{ .URL }} http://localhost:8080')">
+                        Copy
+                    </button>
+                </div>
+                <em>make sure to replace <b>http://localhost:8080</b> with your local service URL</em>
+            </div>
+        </div>
+
+        <div class="footer">
+            {{ .Footer }} • 
+            <a href="https://github.com/chmouel/gosmee" target="_blank">
+                <i class="fab fa-github"></i> v{{ .Version }}
+            </a>
+        </div>
     </div>
+
+    <script>
+        function copyText(text) {
+            navigator.clipboard.writeText(text);
+            
+            // Show feedback
+            const btn = event.currentTarget;
+            btn.innerHTML = 'Copied!';
+            setTimeout(() => {
+                btn.innerHTML = 'Copy';
+            }, 2000);
+        }
+    </script>
 </body>
 
 </html>
