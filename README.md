@@ -270,6 +270,12 @@ goplay replay --github-token=$GITHUB_TOKEN --list-deliveries org/repo HOOK_ID
 
 gosmee will only works with webhooks, if you want an alternative solution you can try to looks the one you like from this list <https://github.com/anderspitman/awesome-tunneling>, my favourite would be [go-http-tunnel](https://github.com/mmatczuk/go-http-tunnel) or [tailscale](https://tailscale.com/).
 
+## ⚠️ Caveats ⚠️
+
+This tool is intended for local development and testing environments only.
+It has not undergone thorough security and performance reviews, and
+therefore should not be deployed in production systems.
+
 ## Thanks
 
 - Most of the works is done by the [go-sse](https://github.com/r3labs/sse) library.
