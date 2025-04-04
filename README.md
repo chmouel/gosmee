@@ -35,7 +35,29 @@ deliveries](#replay-webhook-deliveries-via-the-github-api) directly.
 
 For those who prefer a visual explanation of how gosmee works:
 
+#### Simple
+
 ![diagram](./.github/gosmee-diag.png)
+
+#### Detailed
+
+```mermaid
+sequenceDiagram
+    participant SP as Service Provider (e.g., GitHub)
+    participant GS as Gosmee Server (Public URL / smee.io)
+    participant GC as Gosmee Client (Local / Private Network)
+    participant LS as Local Service (e.g., localhost:3000)
+
+    Note over GC, LS: Runs in private network/local machine
+    Note over SP, GS: Accessible on the public internet
+
+    GC->>+GS: 1. Connect & Listen via SSE
+    SP->>+GS: 2. Event triggers -> Sends Webhook Payload (HTTP POST)
+    GS->>-GC: 3. Relays Webhook Payload (via SSE connection)
+    GC->>+LS: 4. Forwards Webhook Payload (HTTP POST)
+    LS-->>-GC: 5. (Optional) HTTP Response
+    GS-->>-SP: 6. (Optional) HTTP Response (e.g., 200 OK)
+````
 
 ## 📰 Blog Post
 
