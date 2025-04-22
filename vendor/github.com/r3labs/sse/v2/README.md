@@ -11,6 +11,7 @@ SSE is a client/server implementation for Server Sent Events for Golang.
 ## Quick start
 
 To install:
+
 ```
 go get github.com/r3labs/sse/v2
 ```
@@ -18,8 +19,8 @@ go get github.com/r3labs/sse/v2
 To Test:
 
 ```sh
-$ make deps
-$ make test
+make deps
+make test
 ```
 
 #### Example Server
@@ -29,7 +30,7 @@ The messaging system is started when running:
 
 ```go
 func main() {
-	server := sse.New()
+ server := sse.New()
 }
 ```
 
@@ -37,8 +38,8 @@ To add a stream to this handler:
 
 ```go
 func main() {
-	server := sse.New()
-	server.CreateStream("messages")
+ server := sse.New()
+ server.CreateStream("messages")
 }
 ```
 
@@ -49,18 +50,17 @@ Clients can connect to this stream once the http handler is started by specifyin
 http://server/events?stream=messages
 ```
 
-
 In order to start the http server:
 
 ```go
 func main() {
-	server := sse.New()
+ server := sse.New()
 
-	// Create a new Mux and set the handler
-	mux := http.NewServeMux()
-	mux.HandleFunc("/events", server.ServeHTTP)
+ // Create a new Mux and set the handler
+ mux := http.NewServeMux()
+ mux.HandleFunc("/events", server.ServeHTTP)
 
-	http.ListenAndServe(":8080", mux)
+ http.ListenAndServe(":8080", mux)
 }
 ```
 
@@ -68,12 +68,12 @@ To publish messages to a stream:
 
 ```go
 func main() {
-	server := sse.New()
+ server := sse.New()
 
-	// Publish a payload to the stream
-	server.Publish("messages", &sse.Event{
-		Data: []byte("ping"),
-	})
+ // Publish a payload to the stream
+ server.Publish("messages", &sse.Event{
+  Data: []byte("ping"),
+ })
 }
 ```
 
@@ -83,21 +83,21 @@ A way to detect disconnected clients:
 
 ```go
 func main() {
-	server := sse.New()
+ server := sse.New()
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/events", func(w http.ResponseWriter, r *http.Request) {
-		go func() {
-			// Received Browser Disconnection
-			<-r.Context().Done()
-			println("The client is disconnected here")
-			return
-		}()
+ mux := http.NewServeMux()
+ mux.HandleFunc("/events", func(w http.ResponseWriter, r *http.Request) {
+  go func() {
+   // Received Browser Disconnection
+   <-r.Context().Done()
+   println("The client is disconnected here")
+   return
+  }()
 
-		server.ServeHTTP(w, r)
-	})
+  server.ServeHTTP(w, r)
+ })
 
-	http.ListenAndServe(":8080", mux)
+ http.ListenAndServe(":8080", mux)
 }
 ```
 
@@ -109,7 +109,7 @@ To create a new client:
 
 ```go
 func main() {
-	client := sse.NewClient("http://server/events")
+ client := sse.NewClient("http://server/events")
 }
 ```
 
@@ -117,12 +117,12 @@ To subscribe to an event stream, please use the Subscribe function. This accepts
 
 ```go
 func main() {
-	client := sse.NewClient("http://server/events")
+ client := sse.NewClient("http://server/events")
 
-	client.Subscribe("messages", func(msg *sse.Event) {
-		// Got some data!
-		fmt.Println(msg.Data)
-	})
+ client.Subscribe("messages", func(msg *sse.Event) {
+  // Got some data!
+  fmt.Println(msg.Data)
+ })
 }
 ```
 
@@ -132,10 +132,10 @@ If you wish to have events sent to a channel, you can use SubscribeChan:
 
 ```go
 func main() {
-	events := make(chan *sse.Event)
+ events := make(chan *sse.Event)
 
-	client := sse.NewClient("http://server/events")
-	client.SubscribeChan("messages", events)
+ client := sse.NewClient("http://server/events")
+ client.SubscribeChan("messages", events)
 }
 ```
 
@@ -145,10 +145,10 @@ To add additional parameters to the http client, such as disabling ssl verificat
 
 ```go
 func main() {
-	client := sse.NewClient("http://server/events")
-	client.Connection.Transport =  &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
+ client := sse.NewClient("http://server/events")
+ client.Connection.Transport =  &http.Transport{
+  TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+ }
 }
 ```
 
@@ -158,20 +158,19 @@ To set custom query parameters on the client or disable the stream parameter alt
 
 ```go
 func main() {
-	client := sse.NewClient("http://server/events?search=example")
+ client := sse.NewClient("http://server/events?search=example")
 
-	client.SubscribeRaw(func(msg *sse.Event) {
-		// Got some data!
-		fmt.Println(msg.Data)
-	})
+ client.SubscribeRaw(func(msg *sse.Event) {
+  // Got some data!
+  fmt.Println(msg.Data)
+ })
 }
 ```
-
 
 ## Contributing
 
 Please read through our
-[contributing guidelines](CONTRIBUTING.md).
+[contributing guidelines](./CONTRIBUTING.md).
 Included are directions for opening issues, coding standards, and notes on
 development.
 

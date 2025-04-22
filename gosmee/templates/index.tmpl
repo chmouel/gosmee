@@ -6,16 +6,32 @@
     <meta http-equiv='X-UA-Compatible' content='IE=edge'>
     <title>Gosmee - Webhook Forwarder</title>
     <meta name='viewport' content='width=device-width, initial-scale=1'>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="icon" href="/favicon.ico" type="image/svg+xml">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+    <!-- JSON tree viewer -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jsoneditor@10.2.0/dist/jsoneditor.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/jsoneditor@10.2.0/dist/jsoneditor.min.js"></script>
+    <!-- Syntax highlighting -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/json.min.js"></script>
     <style>
         :root {
             --primary: #4F46E5;
             --secondary: #6366F1;
             --accent: #818CF8;
-            --light: #F8FAFC;
+            --light: rgba(248, 250, 252, 0.5);
             --dark: #1E293B;
-            --code-bg: #F1F5F9;
-            --gradient: linear-gradient(135deg, var(--primary), var(--secondary));
+            --code-bg: rgba(241, 245, 249, 0.7);
+            --gradient: linear-gradient(135deg, rgba(79, 70, 229, 0.9), rgba(99, 102, 241, 0.9));
+            --border-color: rgba(226, 232, 240, 0.6);
+            --text-muted: #64748B;
+            --card-bg: rgba(255, 255, 255, 0.8);
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12);
+            --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.15);
+            --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+            --glow: 0 0 15px rgba(79, 70, 229, 0.5);
+            --pop-transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
         }
 
         * {
@@ -28,23 +44,40 @@
             font-family: 'Inter', system-ui, -apple-system, sans-serif;
             line-height: 1.5;
             color: var(--dark);
-            background: var(--light);
+            background: linear-gradient(135deg, rgba(248, 250, 252, 0.8), rgba(241, 245, 249, 0.9));
+            backdrop-filter: blur(5px);
+            min-height: 100vh;
         }
 
         .container {
-            max-width: 800px;
+            max-width: 1200px;
+            width: 95%;
             margin: 0 auto;
-            padding: 2rem 1rem;
+            padding: 1rem;
         }
 
         .hero {
             text-align: center;
-            margin-bottom: 3rem;
-            padding: 2rem;
+            margin-bottom: 1.5rem;
+            padding: 1.5rem;
             background: var(--gradient);
             border-radius: 1rem;
             color: white;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            box-shadow: var(--shadow-lg);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            transform: translateZ(0);
+            animation: heroGlow 3s infinite alternate;
+        }
+
+        @keyframes heroGlow {
+            from {
+                box-shadow: var(--shadow-lg);
+            }
+
+            to {
+                box-shadow: var(--glow), var(--shadow-lg);
+            }
         }
 
         .hero h1 {
@@ -54,36 +87,72 @@
             align-items: center;
             justify-content: center;
             gap: 0.75rem;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
         }
 
-        .steps {
-            display: grid;
+        .hero h1 i {
+            animation: pulse 2s infinite alternate;
+        }
+
+        @keyframes pulse {
+            from {
+                transform: scale(1);
+            }
+
+            to {
+                transform: scale(1.1);
+            }
+        }
+
+        .main-content {
+            display: flex;
+            flex-direction: column;
             gap: 1.5rem;
         }
 
+        .steps {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            justify-content: space-between;
+        }
+
         .step {
-            background: white;
-            padding: 1.5rem;
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(7px);
+            -webkit-backdrop-filter: blur(7px);
+            padding: 1.25rem;
             border-radius: 0.75rem;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            box-shadow: var(--shadow-md);
             border-left: 4px solid var(--primary);
+            flex: 1;
+            min-width: 250px;
+            transition: var(--pop-transition);
+            transform: translateZ(0);
+        }
+
+        .step:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-lg);
+            border-left: 4px solid var(--accent);
         }
 
         .step-number {
             background: var(--gradient);
-            width: 32px;
-            height: 32px;
+            width: 28px;
+            height: 28px;
             border-radius: 50%;
             display: grid;
             place-items: center;
             color: white;
             font-weight: 600;
-            margin-bottom: 1rem;
+            margin-bottom: 0.75rem;
+            box-shadow: var(--shadow-sm);
         }
 
         h2 {
-            font-size: 1.25rem;
-            margin-bottom: 1rem;
+            font-size: 1.15rem;
+            margin-bottom: 0.75rem;
             color: var(--dark);
             display: flex;
             align-items: center;
@@ -91,29 +160,45 @@
         }
 
         .code-block {
-            background: var(--code-bg);
-            padding: 1rem;
+            background: rgba(241, 245, 249, 0.8);
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+            padding: 0.75rem;
             border-radius: 0.5rem;
-            margin: 1rem 0;
+            margin: 0.75rem 0;
             position: relative;
             font-family: 'JetBrains Mono', monospace;
+            font-size: 0.825rem;
+            overflow-x: auto;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(226, 232, 240, 0.8);
         }
 
         .copy-btn {
             position: absolute;
             top: 0.5rem;
             right: 0.5rem;
-            background: var(--accent);
+            /* background: rgba(79, 70, 229, 0.8); */
             color: white;
             border: none;
-            padding: 0.25rem 0.75rem;
+            padding: 0.25rem 0.5rem;
             border-radius: 0.25rem;
             cursor: pointer;
-            transition: opacity 0.2s;
+            transition: var(--pop-transition);
+            font-size: 0.75rem;
+            backdrop-filter: blur(3px);
+            -webkit-backdrop-filter: blur(3px);
+            box-shadow: var(--shadow-sm);
         }
 
         .copy-btn:hover {
-            opacity: 0.9;
+            background: var(--accent);
+            transform: translateY(-2px) scale(1.05);
+            box-shadow: var(--shadow-md);
+        }
+
+        .copy-btn:active {
+            transform: translateY(0) scale(0.95);
         }
 
         .services {
@@ -131,32 +216,502 @@
             display: flex;
             align-items: center;
             gap: 0.5rem;
+            box-shadow: var(--shadow-sm);
+            transition: var(--pop-transition);
+        }
+
+        .service:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
         }
 
         .footer {
             text-align: center;
-            margin-top: 3rem;
-            color: #64748B;
+            margin-top: 2rem;
+            color: var(--text-muted);
             font-size: 0.875rem;
+            grid-column: 1 / -1;
+            padding: 0.75rem;
+            border-top: 1px solid var(--border-color);
         }
 
         a {
             color: var(--primary);
             text-decoration: none;
             font-weight: 500;
+            transition: var(--pop-transition);
+            position: relative;
         }
 
         a:hover {
-            text-decoration: underline;
+            color: var(--accent);
+        }
+
+        a:after {
+            content: '';
+            position: absolute;
+            width: 0;
+            height: 2px;
+            bottom: -2px;
+            left: 0;
+            background: var(--accent);
+            transition: width 0.3s ease;
+        }
+
+        a:hover:after {
+            width: 100%;
+        }
+
+        /* Event Feed Styles */
+        .event-feed {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-radius: 0.75rem;
+            box-shadow: var(--shadow-lg);
+            padding: 1rem;
+            height: calc(85vh - 150px);
+            min-height: 400px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            transition: var(--pop-transition);
+        }
+
+        /* Collapsed state for the event feed */
+        .event-feed.collapsed {
+            max-height: 70px;
+            overflow: hidden;
+        }
+
+        .event-feed h2 {
+            margin-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.75rem;
+        }
+
+        #events-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            flex-grow: 1;
+        }
+
+        .event-item {
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            margin-bottom: 0.75rem;
+            background-color: rgba(248, 250, 252, 0.5);
+            box-shadow: var(--shadow-sm);
+            transition: var(--pop-transition);
+            transform: translateZ(0);
+        }
+
+        .event-item:hover {
+            transform: translateY(-3px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .event-header {
+            padding: 0.5rem 0.75rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+            border-top-left-radius: 0.5rem;
+            border-top-right-radius: 0.5rem;
+        }
+
+        .event-id {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--primary);
+            transition: var(--pop-transition);
+        }
+
+        .event-item:hover .event-id {
+            color: var(--accent);
+        }
+
+        .event-time {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .event-payload {
+            padding: 0.75rem;
+        }
+
+        .event-payload pre {
+            background-color: var(--code-bg);
+            padding: 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 180px;
+            overflow-y: auto;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .event-payload details summary {
+            cursor: pointer;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+            transition: var(--pop-transition);
+            user-select: none;
+        }
+
+        .event-payload details summary:hover {
+            color: var (--accent);
+        }
+
+        .event-payload details[open] summary {
+            margin-bottom: 0.75rem;
+        }
+
+        /* JSON editor styles */
+        .json-container {
+            height: 180px;
+            border-radius: 0.25rem;
+            overflow: hidden;
+            margin-top: 0.5rem;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+            vertical-align: middle;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+        }
+
+        .status-connected {
+            background-color: #10B981;
+            animation: pulse-green 2s infinite;
+        }
+
+        @keyframes pulse-green {
+            0% {
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+            }
+
+            70% {
+                box-shadow: 0 0 0 5px rgba(16, 185, 129, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+            }
+        }
+
+        .status-disconnected {
+            background-color: #F87171;
+        }
+
+        .status-connecting {
+            background-color: #FBBF24;
+            animation: pulse-amber 1s infinite;
+        }
+
+        @keyframes pulse-amber {
+            0% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+
+            100% {
+                opacity: 1;
+            }
+        }
+
+        @media (max-width: 767px) {
+
+            /* Stack columns on smaller screens */
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+
+            .event-feed {
+                height: calc(80vh - 120px);
+            }
         }
 
         @media (max-width: 640px) {
             .container {
-                padding: 1rem;
+                width: 98%;
+                padding: 0.5rem;
             }
-            
+
             .hero h1 {
-                font-size: 1.75rem;
+                font-size: 1.5rem;
+            }
+        }
+
+        /* Tabs for switching between raw JSON and tree view */
+        .tab-container {
+            display: flex;
+            margin-bottom: 0.5rem;
+        }
+
+        .tab {
+            padding: 0.25rem 1rem;
+            border: 1px solid var(--border-color);
+            border-bottom: none;
+            border-radius: 0.25rem 0.25rem 0 0;
+            cursor: pointer;
+            background: var(--code-bg);
+            font-size: 0.85rem;
+            margin-right: 2px;
+            transition: var(--pop-transition);
+        }
+
+        .tab:hover {
+            background: rgba(255, 255, 255, 0.9);
+        }
+
+        .tab.active {
+            background: white;
+            font-weight: 500;
+            border-bottom: 1px solid white;
+            box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.05);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        /* Headers table styles */
+        .headers-container {
+            margin-top: 0.5rem;
+            overflow-x: auto;
+        }
+
+        .headers-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+            box-shadow: var(--shadow-sm);
+            border-radius: 0.25rem;
+            overflow: hidden;
+        }
+
+        .headers-table th,
+        .headers-table td {
+            padding: 0.5rem;
+            text-align: left;
+            border: 1px solid var(--border-color);
+        }
+
+        .headers-table th {
+            background-color: var(--code-bg);
+            font-weight: 500;
+        }
+
+        .headers-table tr:nth-child(even) {
+            background-color: #f9fafc;
+        }
+
+        .headers-table tr {
+            transition: var(--pop-transition);
+        }
+
+        .headers-table tr:hover {
+            background-color: rgba(129, 140, 248, 0.1);
+        }
+
+        /* Copy payload button */
+        .copy-payload-btn {
+            background: transparent;
+            color: var(--primary);
+            border: none;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            cursor: pointer;
+            font-size: 0.75rem;
+            margin-left: 0.5rem;
+            vertical-align: middle;
+            transition: var(--pop-transition);
+        }
+
+        .copy-payload-btn:hover {
+            color: var(--accent);
+            transform: translateY(-1px) scale(1.05);
+        }
+
+        .copy-payload-btn:active {
+            transform: translateY(0) scale(0.95);
+        }
+
+        /* Replay button styles */
+        .replay-btn {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.25rem 0.75rem;
+            border-radius: 0.25rem;
+            cursor: pointer;
+            font-size: 0.75rem;
+            margin-right: 1rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            transition: var(--pop-transition);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .replay-btn:hover {
+            background-color: var(--accent);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .replay-btn:active {
+            transform: translateY(0);
+        }
+
+        .replay-btn.disabled {
+            background-color: var(--border-color);
+            color: var(--text-muted);
+            cursor: not-allowed;
+        }
+
+        /* Replay button */
+        .replay-btn {
+            background-color: rgba(79, 70, 229, 0.8);
+            color: white;
+            border: none;
+            border-radius: 0.25rem;
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+            cursor: pointer;
+            margin-right: 0.75rem;
+            transition: var(--pop-transition);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .replay-btn:hover {
+            background-color: var(--accent);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .replay-btn:active {
+            transform: translateY(0) scale(0.95);
+        }
+
+        .replay-btn i {
+            margin-right: 0.25rem;
+        }
+
+        /* Added styles for section visibility control */
+        #event-feed-container {
+            display: none;
+            margin-bottom: 2rem;
+            transition: var(--pop-transition);
+        }
+
+        #instructions-container {
+            display: block;
+            transition: var(--pop-transition);
+        }
+
+        /* When events are present, we'll apply these classes */
+        .events-active #event-feed-container {
+            display: block;
+            animation: slideDown 0.5s ease-out;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .events-active #instructions-container {
+            display: none;
+        }
+
+        /* Clear events button styling */
+        #clear-events {
+            background-color: rgba(248, 113, 113, 0.1);
+            color: #EF4444;
+            border: 1px solid rgba(248, 113, 113, 0.2);
+            border-radius: 4px;
+            padding: 0.25rem 0.5rem;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: var(--pop-transition);
+        }
+
+        #clear-events:hover {
+            background-color: rgba(248, 113, 113, 0.2);
+            transform: translateY(-1px);
+        }
+
+        #clear-events:active {
+            transform: translateY(0px);
+        }
+
+        /* Placeholder animation */
+        #placeholder {
+            animation: pulse 2s infinite alternate;
+        }
+
+        /* JSONEditor styling improvements */
+        .jsoneditor {
+            border: 1px solid var(--border-color) !important;
+            background-color: rgba(255, 255, 255, 0.6) !important;
+            box-shadow: var(--shadow-sm) !important;
+            transition: var(--pop-transition);
+        }
+
+        .jsoneditor:hover {
+            box-shadow: var(--shadow-md) !important;
+        }
+
+        .jsoneditor-menu {
+            background-color: rgba(79, 70, 229, 0.8) !important;
+            border-bottom: 1px solid var(--border-color) !important;
+        }
+
+        .jsoneditor-navigation-bar {
+            background-color: rgba(255, 255, 255, 0.7) !important;
+        }
+
+        @media (min-width: 1200px) {
+            .container {
+                max-width: 1400px;
             }
         }
     </style>
@@ -169,74 +724,72 @@
                 <i class="fas fa-exchange-alt"></i>
                 Gosmee Webhooks
             </h1>
-            <p>Simple webhook forwarding to your local machine</p>
+            <p>Forwarding webhooks from {{ .URL }}</p>
         </div>
 
-        <div class="steps">
-            <div class="step">
-                <div class="step-number">1</div>
-                <h2><i class="fas fa-download"></i> Install Gosmee</h2>
-                <p>Download and install the client for your operating system:</p>
-                <div class="code-block">
-                    brew tap chmouel/gosmee https://github.com/chmouel/gosmee<br>
-                    brew install gosmee
-                    <button class="copy-btn" onclick="copyText('brew tap chmouel/gosmee https://github.com/chmouel/gosmee && brew install gosmee')">
-                        Copy
-                    </button>
-                </div>
-                <p>Or see <a href="https://github.com/chmouel/gosmee/?tab=readme-ov-file#-install" target="_blank">
-                    the detailed installation guide 
-                </a> for other platforms</p>
+        <div class="main-content" id="main-content">
+            <!-- Event feed now at the top with an ID -->
+            <div class="event-feed" id="event-feed-container">
+                <h2>
+                    <span id="status-light" class="status-indicator status-disconnected"></span>
+                    Live Event Feed (<span id="event-count">0</span>)
+                    <button id="clear-events"
+                        style="float: right; font-size: 0.8rem; padding: 2px 5px; display: none;">Clear</button>
+                </h2>
+                <ul id="events-list">
+                    <li id="placeholder" style="text-align: center; color: var(--text-muted); margin-top: 2rem;">Waiting
+                        for events...</li>
+                </ul>
             </div>
 
-            <div class="step">
-                <div class="step-number">2</div>
-                <h2><i class="fas fa-cog"></i> Setup Webhook</h2>
-                <p>Use this URL in your service's webhook settings:</p>
-                <div class="code-block">
-                    {{ .URL }}
-                    <button class="copy-btn" onclick="copyText('{{ .URL }}')">
-                        Copy
-                    </button>
+            <!-- Instructions now at the bottom in a horizontal layout -->
+            <div class="steps" id="instructions-container">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <h2><i class="fas fa-download"></i> Install Gosmee Client</h2>
+                    <p>If you haven't already, install the client:</p>
+                    <div class="code-block">
+                        brew tap chmouel/gosmee https://github.com/chmouel/gosmee<br>
+                        brew install gosmee
+                        <button class="copy-btn"
+                            onclick="copyText('brew tap chmouel/gosmee https://github.com/chmouel/gosmee && brew install gosmee')">
+                            📋
+                        </button>
+                    </div>
+                    <p>Or see <a href="https://github.com/chmouel/gosmee/?tab=readme-ov-file#-install" target="_blank">
+                            the detailed installation guide
+                        </a>.</p>
                 </div>
-                <div class="services">
-                    <span>Works with:</span>
-                    <a href="https://docs.github.com/en/webhooks/using-webhooks/creating-webhooks" target="_blank" class="service">
-                        <i class="fab fa-github"></i>
-                        GitHub
-                    </a>
-                    <a href="https://docs.gitlab.com/user/project/integrations/webhooks/" target="_blank" class="service">
-                        <i class="fab fa-gitlab"></i>
-                        GitLab
-                    </a>
-                    <a href="https://www.chatbot.com/help/webhooks/create-webhook-with-zapier/" target="_blank" class="service">
-                        <i class="fas fa-bolt"></i>
-                        Zapier
-                    </a>
-                    <a href="https://github.com/realadeel/awesome-webhooks" target="_blank" class="service">
-                    and many more...
-                    </a>
-                    
-                </div>
-            </div>
 
-            <div class="step">
-                <div class="step-number">3</div>
-                <h2><i class="fas fa-terminal"></i> Start Forwarding</h2>
-                <p>Run this command to start receiving webhooks:</p>
-                <div class="code-block">
-                    gosmee client {{ .URL }} http://localhost:8080
-                    <button class="copy-btn" 
-                        onclick="copyText('gosmee client {{ .URL }} http://localhost:8080')">
-                        Copy
-                    </button>
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <h2><i class="fas fa-cog"></i> Use this Webhook URL</h2>
+                    <p>Configure your service (GitHub, GitLab, etc.) to send webhooks to:</p>
+                    <div class="code-block">
+                        {{ .URL }}
+                        <button class="copy-btn" onclick="copyText('{{ .URL }}')">
+                            📋
+                        </button>
+                    </div>
                 </div>
-                <em>make sure to replace <b>http://localhost:8080</b> with your local service URL</em>
+
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <h2><i class="fas fa-terminal"></i> Start Forwarding Locally</h2>
+                    <p>Run this command on your machine:</p>
+                    <div class="code-block">
+                        gosmee client {{ .URL }} http://localhost:8080
+                        <button class="copy-btn" onclick="copyText('gosmee client {{ .URL }} http://localhost:8080')">
+                            📋
+                        </button>
+                    </div>
+                    <em>Replace <b>http://localhost:8080</b> with your actual local service URL.</em>
+                </div>
             </div>
         </div>
 
         <div class="footer">
-            {{ .Footer }} • 
+            {{ .Footer }} •
             <a href="https://github.com/chmouel/gosmee/releases/v{{ .Version }}" target="_blank">
                 <i class="fab fa-github"></i> Gosmee v{{ .Version }}
             </a>
@@ -245,15 +798,470 @@
 
     <script>
         function copyText(text) {
-            navigator.clipboard.writeText(text);
-            
-            // Show feedback
-            const btn = event.currentTarget;
-            btn.innerHTML = 'Copied!';
-            setTimeout(() => {
-                btn.innerHTML = 'Copy';
-            }, 2000);
+            const btn = event.currentTarget; // Capture button here
+            navigator.clipboard.writeText(text).then(() => {
+                // Show feedback
+                const originalText = btn.textContent;
+                btn.textContent = 'Copied!';
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy text: ', err);
+            });
         }
+
+        const eventsList = document.getElementById('events-list');
+        const statusLight = document.getElementById('status-light');
+        const eventCountSpan = document.getElementById('event-count');
+        const clearButton = document.getElementById('clear-events');
+        const placeholder = document.getElementById('placeholder');
+        const eventFeedContainer = document.getElementById('event-feed-container'); // Get the container
+        const instructionsContainer = document.getElementById('instructions-container');
+        const mainContent = document.getElementById('main-content');
+        const eventsUrl = '{{ .EventsURL }}'; // Get SSE URL from Go template
+        let eventCount = 0;
+        let eventSource;
+        // Store JSON editors for each event
+        const jsonEditors = {};
+        let isFirstEvent = true; // Flag to track the first event
+
+        function connectSSE() {
+            if (eventSource) {
+                eventSource.close();
+            }
+
+            console.log(`Connecting to SSE endpoint: ${eventsUrl}`);
+            statusLight.className = 'status-indicator status-connecting';
+            eventSource = new EventSource(eventsUrl);
+
+            eventSource.onopen = function () {
+                console.log('SSE connection established.');
+                statusLight.className = 'status-indicator status-connected';
+                if (placeholder) placeholder.style.display = 'none'; // Hide placeholder on connect
+            };
+
+            eventSource.onerror = function (err) {
+                console.error('SSE connection error:', err);
+                statusLight.className = 'status-indicator status-disconnected';
+                // Optional: Implement retry logic here
+                eventSource.close();
+                // Reconnect after a delay
+                setTimeout(connectSSE, 5000);
+            };
+
+            eventSource.onmessage = function (event) {
+                console.log('Received event:', event.data);
+                try {
+                    const data = JSON.parse(event.data);
+
+                    // Handle connection-related messages (don't display these as events)
+                    if (data.message === "connected" || data.message === "ready") {
+                        console.log('Connection message received:', data.message);
+                        return; // Don't display connection messages as events
+                    }
+
+                    // Show event feed and hide instructions on first real event
+                    if (isFirstEvent) {
+                        showEventFeed();
+                        isFirstEvent = false;
+                    }
+
+                    addEventToList(data);
+                } catch (e) {
+                    console.error('Failed to parse event data:', e, event.data);
+                }
+            };
+        }
+
+        // Function to show event feed and hide instructions
+        function showEventFeed() {
+            mainContent.classList.add('events-active');
+            eventFeedContainer.style.display = 'block';
+            instructionsContainer.style.display = 'none';
+            if (eventFeedContainer.classList.contains('collapsed')) {
+                eventFeedContainer.classList.remove('collapsed');
+            }
+        }
+
+        // Function to hide event feed and show instructions
+        function showInstructions() {
+            mainContent.classList.remove('events-active');
+            eventFeedContainer.style.display = 'none';
+            instructionsContainer.style.display = 'block';
+        }
+
+        function formatTimestamp(unixMillisStr) {
+            const unixMillis = parseInt(unixMillisStr, 10);
+            if (isNaN(unixMillis)) return 'Invalid Date';
+            const date = new Date(unixMillis);
+            // Format like: Saturday, April 19th 2025, 10:03:51 a.m.
+            const options = {
+                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+                hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true
+            };
+            // Basic ordinal handling (st, nd, rd, th)
+            const day = date.getDate();
+            let daySuffix = 'th';
+            if (day % 10 === 1 && day !== 11) daySuffix = 'st';
+            else if (day % 10 === 2 && day !== 12) daySuffix = 'nd';
+            else if (day % 10 === 3 && day !== 13) daySuffix = 'rd';
+
+            let formattedDate = date.toLocaleDateString('en-US', options);
+            // Inject the suffix - this is a bit basic
+            formattedDate = formattedDate.replace(`, ${day},`, `, ${day}${daySuffix},`);
+            return formattedDate;
+        }
+
+        function addEventToList(data) {
+            if (placeholder) placeholder.style.display = 'none'; // Hide placeholder if it exists
+
+            // Always ensure event feed is visible when adding events
+            showEventFeed();
+
+            const eventId = data['x-github-delivery'] || data['x-gitlab-event'] || data['x-event-key'] || `event-${Date.now()}`;
+            const uniqueId = `event-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+            const timestamp = data.timestamp ? formatTimestamp(data.timestamp) : new Date().toLocaleString();
+
+            let bodyContent = '';
+            let bodyDecoded = false;
+            let jsonObject = null;
+
+            if (data.bodyB) {
+                try {
+                    bodyContent = atob(data.bodyB);
+                    bodyDecoded = true;
+                    // Try to parse as JSON
+                    try {
+                        jsonObject = JSON.parse(bodyContent);
+                    } catch (e) { /* Not JSON, keep as string */ }
+                } catch (e) {
+                    console.error('Failed to decode base64 body:', e);
+                    bodyContent = 'Error decoding body';
+                }
+            } else if (data.body) {
+                bodyContent = typeof data.body === 'object' ? JSON.stringify(data.body, null, 2) : data.body;
+                bodyDecoded = true;
+                try {
+                    jsonObject = typeof data.body === 'object' ? data.body : JSON.parse(bodyContent);
+                } catch (e) { /* Not JSON, keep as string */ }
+            } else {
+                bodyContent = 'No body content';
+            }
+
+            const listItem = document.createElement('li');
+            listItem.classList.add('event-item');
+            listItem.setAttribute('data-event-id', uniqueId);
+
+            // Extract headers from the data object
+            const headers = {};
+            Object.keys(data).forEach(key => {
+                // Consider common header prefixes and specific header names
+                if (key.startsWith('x-') ||
+                    key === 'user-agent' ||
+                    key === 'content-type' ||
+                    key === 'accept' ||
+                    key === 'authorization' ||
+                    key === 'host') {
+                    headers[key] = data[key];
+                }
+            });
+
+            listItem.innerHTML = `
+                <div class="event-header">
+                    <div>
+                        <button class="replay-btn" onclick="replayEvent('${uniqueId}', event)">
+                            <i class="fas fa-redo-alt"></i> 
+                        </button>
+                        <span class="event-id">Event ID: ${eventId}</span>
+                    </div>
+                    <span class="event-time">${timestamp}</span>
+                </div>
+                <div class="event-payload">
+                    <!-- Headers section -->
+                    <details class="headers-section">
+                        <summary>
+                            Headers (${Object.keys(headers).length})
+                            <button class="copy-payload-btn" onclick="copyHeaders('${uniqueId}', event)">
+                                📋
+                            </button>
+                        </summary>
+                        <div class="headers-container">
+                            <table class="headers-table" id="headers-table-${uniqueId}">
+                                <thead>
+                                    <tr>
+                                        <th>Header</th>
+                                        <th>Value</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${Object.entries(headers).map(([key, value]) =>
+                `<tr>
+                                            <td>${escapeHtml(key)}</td>
+                                            <td>${escapeHtml(String(value))}</td>
+                                        </tr>`
+            ).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </details>
+                    
+                    <!-- Payload section with copy button -->
+                    <details>
+                        <summary>
+                            Payload (${bodyDecoded ? 'Decoded' : 'Raw'})
+                            <button class="copy-payload-btn" onclick="copyPayload('${uniqueId}', event)">
+                                📋
+                            </button>
+                        </summary>
+                        <div class="tab-container">
+                            <div class="tab active" onclick="switchTab('${uniqueId}', 'tree')">Tree View</div>
+                            <div class="tab" onclick="switchTab('${uniqueId}', 'raw')">Raw JSON</div>
+                        </div>
+                        <div id="tree-${uniqueId}" class="tab-content active">
+                            <div id="jsoneditor-${uniqueId}" class="json-container"></div>
+                        </div>
+                        <div id="raw-${uniqueId}" class="tab-content">
+                            <pre><code id="raw-content-${uniqueId}" class="json">${escapeHtml(bodyContent)}</code></pre>
+                        </div>
+                    </details>
+                </div>
+            `;
+
+            // Prepend the new event to the top of the list
+            eventsList.insertBefore(listItem, eventsList.firstChild);
+
+            // Apply syntax highlighting to raw JSON
+            const rawContentElement = document.getElementById(`raw-content-${uniqueId}`);
+            if (rawContentElement && jsonObject) {
+                hljs.highlightElement(rawContentElement);
+            }
+
+            // Initialize JSON editor after the element is added to DOM
+            if (jsonObject) {
+                setTimeout(() => {
+                    const container = document.getElementById(`jsoneditor-${uniqueId}`);
+                    if (container) {
+                        const options = {
+                            mode: 'view',
+                            mainMenuBar: false,
+                            navigationBar: false,
+                            statusBar: false,
+                            search: true
+                        };
+                        const editor = new JSONEditor(container, options);
+                        editor.set(jsonObject);
+                        jsonEditors[uniqueId] = editor;
+                    }
+                }, 0);
+            }
+
+            eventCount++;
+            eventCountSpan.textContent = eventCount;
+            if (eventCount > 0) {
+                clearButton.style.display = 'inline-block'; // Show clear button when event count > 0
+            }
+        }
+
+        function switchTab(id, tabName) {
+            // Get all tabs and contents for this event
+            const tabs = document.querySelectorAll(`[data-event-id="${id}"] .tab`);
+            const contents = document.querySelectorAll(`[data-event-id="${id}"] .tab-content`);
+
+            // Remove active class from all tabs and contents
+            tabs.forEach(tab => tab.classList.remove('active'));
+            contents.forEach(content => content.classList.remove('active'));
+
+            // Add active class to selected tab and content
+            const selectedTab = document.querySelector(`[data-event-id="${id}"] .tab:nth-child(${tabName === 'tree' ? 1 : 2})`);
+            const selectedContent = document.getElementById(`${tabName}-${id}`);
+
+            if (selectedTab) selectedTab.classList.add('active');
+            if (selectedContent) selectedContent.classList.add('active');
+
+            // If tree view is selected, resize the editor to fit container
+            if (tabName === 'tree' && jsonEditors[id]) {
+                setTimeout(() => jsonEditors[id].resize(), 10);
+            }
+        }
+
+        function escapeHtml(unsafe) {
+            if (!unsafe) return '';
+            return unsafe
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        clearButton.addEventListener('click', () => {
+            // Destroy JSON editors to prevent memory leaks
+            for (const id in jsonEditors) {
+                if (jsonEditors[id]) {
+                    jsonEditors[id].destroy();
+                }
+            }
+
+            eventsList.innerHTML = ''; // Clear the list
+            eventCount = 0;
+            eventCountSpan.textContent = eventCount;
+
+            // Reset editors object
+            Object.keys(jsonEditors).forEach(key => delete jsonEditors[key]);
+
+            // Re-add placeholder if needed
+            if (placeholder) {
+                eventsList.appendChild(placeholder);
+                placeholder.style.display = 'block';
+            }
+            // Return to instructions view when all events are cleared
+            showInstructions();
+            isFirstEvent = true; // Reset first event flag
+            clearButton.style.display = 'none'; // Hide clear button when event count is 0
+        });
+
+        // Global function to switch tabs (needs to be accessible from HTML)
+        window.switchTab = switchTab;
+
+        // Function to copy payload data
+        window.copyPayload = function (id, event) {
+            event.preventDefault();
+            event.stopPropagation();
+            const btn = event.currentTarget; // Capture button here
+
+            // Get the payload content (preferably from raw view for better compatibility)
+            const rawContent = document.getElementById(`raw-content-${id}`);
+            if (rawContent) {
+                navigator.clipboard.writeText(rawContent.textContent).then(() => {
+                    // Show feedback
+                    const originalText = btn.textContent;
+                    btn.textContent = 'Copied!';
+                    setTimeout(() => {
+                        btn.textContent = originalText;
+                    }, 2000);
+                }).catch(err => {
+                    console.error('Failed to copy payload:', err);
+                    alert('Failed to copy payload to clipboard');
+                });
+            }
+        }
+
+        // Function to copy headers data
+        window.copyHeaders = function (id, event) {
+            event.preventDefault();
+            event.stopPropagation();
+            const btn = event.currentTarget; // Capture button here
+
+            // Get the headers table content
+            const headersTable = document.getElementById(`headers-table-${id}`);
+            if (headersTable) {
+                const headers = [];
+                headersTable.querySelectorAll('tbody tr').forEach(row => {
+                    const cells = row.querySelectorAll('td');
+                    if (cells.length === 2) {
+                        headers.push(`${cells[0].textContent}: ${cells[1].textContent}`);
+                    }
+                });
+                const headersText = headers.join('\n');
+                navigator.clipboard.writeText(headersText).then(() => {
+                    // Show feedback
+                    const originalText = btn.textContent;
+                    btn.textContent = 'Copied!';
+                    setTimeout(() => {
+                        btn.textContent = originalText;
+                    }, 2000);
+                }).catch(err => {
+                    console.error('Failed to copy headers:', err);
+                    alert('Failed to copy headers to clipboard');
+                });
+            }
+        }
+
+        // Function to replay an event
+        window.replayEvent = function (id, event) {
+            event.preventDefault();
+            event.stopPropagation();
+            const btn = event.currentTarget;
+
+            // Disable button and show loading
+            btn.disabled = true;
+            btn.classList.add('disabled');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Replaying...';
+
+            // Get the raw content of the event
+            const rawContent = document.getElementById(`raw-content-${id}`);
+            if (!rawContent) {
+                alert('Could not find event data to replay');
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+                btn.classList.remove('disabled');
+                return;
+            }
+
+            // Get headers from the headers table
+            const headers = {};
+            const headersTable = document.getElementById(`headers-table-${id}`);
+            if (headersTable) {
+                headersTable.querySelectorAll('tbody tr').forEach(row => {
+                    const cells = row.querySelectorAll('td');
+                    if (cells.length === 2) {
+                        headers[cells[0].textContent] = cells[1].textContent;
+                    }
+                });
+            }
+
+            // Get channel from URL
+            const channel = window.location.pathname.split('/').pop();
+            const payload = JSON.parse(rawContent.textContent);
+
+            // Send replay request
+            fetch(`/replay/${channel}`, {
+                method: 'POST',
+                headers: headers,
+                credentials: 'omit',
+                body: JSON.stringify(payload)
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Replay failed: ${response.status} ${response.statusText}`);
+                    }
+                    return response.text();
+                })
+                .then(() => {
+                    // Success feedback
+                    btn.innerHTML = '<i class="fas fa-check"></i> Replayed!';
+                    setTimeout(() => {
+                        btn.innerHTML = originalText;
+                        btn.disabled = false;
+                        btn.classList.remove('disabled');
+                    }, 2000);
+                })
+                .catch(error => {
+                    console.error('Error replaying event:', error);
+                    btn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Failed';
+                    setTimeout(() => {
+                        btn.innerHTML = originalText;
+                        btn.disabled = false;
+                        btn.classList.remove('disabled');
+                    }, 2000);
+                });
+        }
+
+        // Initial connection and setup
+        document.addEventListener('DOMContentLoaded', (event) => {
+            // Initialize highlight.js
+            hljs.configure({
+                languages: ['json'],
+                cssSelector: 'code.json'
+            });
+
+            // Start with instructions visible, event feed hidden
+            showInstructions();
+            connectSSE(); // Start SSE connection after DOM is ready
+        });
+
     </script>
 </body>
 

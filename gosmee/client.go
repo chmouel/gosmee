@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"text/template"
@@ -33,13 +34,12 @@ var shellScriptTmpl []byte
 
 var pmEventRe = regexp.MustCompile(`(\w+|\d+|_|-|:)`)
 
-const defaultTimeout = 5
-
-const smeeChannel = "messages"
-
-const defaultLocalDebugURL = "http://localhost:8080"
-
-const tsFormat = "2006-01-02T15.04.01.000"
+const (
+	defaultTimeout       = 5
+	smeeChannel          = "messages"
+	defaultLocalDebugURL = "http://localhost:8080"
+	tsFormat             = "2006-01-02T15.04.01.000"
+)
 
 type goSmee struct {
 	replayDataOpts *replayDataOpts
@@ -73,62 +73,39 @@ func (c goSmee) parse(now time.Time, data []byte) (payloadMsg, error) {
 		headers: make(map[string]string),
 	}
 	pm.eventID = ""
-	var message interface{}
+	var message any
 	_ = json.Unmarshal(data, &message)
-	var payload map[string]interface{}
+	var payload map[string]any
 	err := mapstructure.Decode(message, &payload)
 	if err != nil {
 		return pm, err
 	}
+
+	// Debug: Log the raw payload keys we received
+	keys := make([]string, 0, len(payload)) // pre-allocate for performance (prealloc)
+	for k := range payload {
+		keys = append(keys, k)
+	}
+	c.logger.Debug(fmt.Sprintf("Received payload with keys: %v", keys))
+
 	for payloadKey, payloadValue := range payload {
-		if payloadKey == "x-github-event" || payloadKey == "x-gitlab-event" || payloadKey == "x-event-key" {
+		switch payloadKey {
+		case "x-github-event", "x-gitlab-event", "x-event-key":
 			if pv, ok := payloadValue.(string); ok {
 				pm.headers[title(payloadKey)] = pv
-				// github action don't like it
 				replace := strings.NewReplacer(":", "-", " ", "_", "/", "_")
 				pv = replace.Replace(strings.ToLower(pv))
-				// remove all non-alphanumeric characters and don't let directory straversal
 				pv = pmEventRe.FindString(pv)
 				pm.eventType = pv
 			}
-			continue
-		}
-		if payloadKey == "x-github-delivery" {
+		case "x-github-delivery":
 			if pv, ok := payloadValue.(string); ok {
 				pm.headers[title(payloadKey)] = pv
 				pm.eventID = pv
 			}
-			continue
-		}
-		if strings.HasPrefix(payloadKey, "x-") || payloadKey == "user-agent" {
-			if pv, ok := payloadValue.(string); ok {
-				/* Remove port number from x-forwarded-for header
-					X-Forwarded-For header is added to the outgoing request as
-					expected, but it includes the port number, for example:
-
-					X-Forwarded-For: 127.0.0.1:1234
-
-					This is incorrect according to the specification:
-					developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Forwarded-For
-
-					and since this header is critical for security and spoofing many endpoints
-					reject any invalid x-forwarded-for header in the request with "400 bad request"
-					as expected.
-
-				  https://github.com/chmouel/gosmee/issues/135
-				*/
-				if strings.ToLower(payloadKey) == "x-forwarded-for" {
-					pv = strings.Split(pv, ":")[0]
-				}
-				pm.headers[title(payloadKey)] = pv
-			}
-			continue
-		}
-		switch payloadKey {
 		case "bodyB":
 			mb := &messageBody{}
-			err := json.NewDecoder(strings.NewReader(string(data))).Decode(mb)
-			if err != nil {
+			if err := json.NewDecoder(strings.NewReader(string(data))).Decode(mb); err != nil {
 				return pm, err
 			}
 			decoded, err := base64.StdEncoding.DecodeString(string(mb.BodyB))
@@ -138,18 +115,20 @@ func (c goSmee) parse(now time.Time, data []byte) (payloadMsg, error) {
 			pm.body = decoded
 		case "body":
 			mb := &messageBody{}
-			err := json.NewDecoder(strings.NewReader(string(data))).Decode(mb)
-			if err != nil {
+			if err := json.NewDecoder(strings.NewReader(string(data))).Decode(mb); err != nil {
 				return pm, err
 			}
 			pm.body = mb.Body
 		case "content-type":
 			if pv, ok := payloadValue.(string); ok {
 				pm.contentType = pv
+				// Also add content-type as a header if it wasn't added already
+				if _, exists := pm.headers["Content-Type"]; !exists {
+					pm.headers["Content-Type"] = pv
+				}
 			}
 		case "timestamp":
 			if pv, ok := payloadValue.(string); ok {
-				// timestamp payload value is in milliseconds since the Epoch
 				tsInt, err := strconv.ParseInt(pv, 10, 64)
 				if err != nil {
 					s := fmt.Sprintf("%s cannot convert timestamp to int64, %s", ansi.Color("ERROR", "red+b"), err.Error())
@@ -158,19 +137,38 @@ func (c goSmee) parse(now time.Time, data []byte) (payloadMsg, error) {
 					dt = time.Unix(tsInt/int64(1000), (tsInt%int64(1000))*int64(1000000)).UTC()
 				}
 			}
+		default:
+			// Handle headers with prefix "x-" or specific keys
+			if strings.HasPrefix(payloadKey, "x-") || payloadKey == "user-agent" {
+				if pv, ok := payloadValue.(string); ok {
+					if strings.ToLower(payloadKey) == "x-forwarded-for" {
+						pv = strings.Split(pv, ":")[0]
+					}
+					pm.headers[title(payloadKey)] = pv
+				}
+			} else if payloadKey != "bodyB" && payloadKey != "body" && payloadValue != nil {
+				// For any other field that's not already handled and has a value,
+				// consider it as a potential header
+				if pv, ok := payloadValue.(string); ok {
+					pm.headers[title(payloadKey)] = pv
+				}
+			}
 		}
 	}
 
 	pm.timestamp = dt.Format(tsFormat)
 
-	if len(c.replayDataOpts.ignoreEvents) > 0 && pm.eventType != "" {
-		for _, v := range c.replayDataOpts.ignoreEvents {
-			if v == pm.eventType {
-				s := fmt.Sprintf("%sskipping event %s as requested", emoji("!", "blue+b", c.replayDataOpts.decorate), pm.eventType)
-				c.logger.Error(s)
-				return payloadMsg{}, nil
-			}
-		}
+	// If there are no headers but we have content-type, ensure at least that header exists
+	if len(pm.headers) == 0 && pm.contentType != "" {
+		pm.headers["Content-Type"] = pm.contentType
+	}
+
+	if len(c.replayDataOpts.ignoreEvents) > 0 &&
+		pm.eventType != "" &&
+		slices.Contains(c.replayDataOpts.ignoreEvents, pm.eventType) {
+		s := fmt.Sprintf("%sskipping event %s as requested", emoji("!", "blue+b", c.replayDataOpts.decorate), pm.eventType)
+		c.logger.Info(s) // Changed to Info since this is not an error
+		return payloadMsg{}, nil
 	}
 
 	return pm, nil
@@ -183,19 +181,32 @@ func emoji(emoji, color string, decorate bool) string {
 	return ansi.Color(emoji, color) + " "
 }
 
+func buildHeaders(headers map[string]string) string {
+	var b strings.Builder
+	for k, v := range headers {
+		b.WriteString(fmt.Sprintf("%s=%s ", k, v))
+	}
+	return b.String()
+}
+
+func buildCurlHeaders(headers map[string]string) string {
+	var b strings.Builder
+	for k, v := range headers {
+		b.WriteString(fmt.Sprintf("-H '%s: %s' ", k, v))
+	}
+	return b.String()
+}
+
 func saveData(rd *replayDataOpts, logger *slog.Logger, pm payloadMsg) error {
-	// check if saveDir is created
 	if _, err := os.Stat(rd.saveDir); os.IsNotExist(err) {
 		if err := os.MkdirAll(rd.saveDir, 0o755); err != nil {
 			return err
 		}
 	}
 
-	var fbasepath string
+	fbasepath := pm.timestamp
 	if pm.eventType != "" {
 		fbasepath = fmt.Sprintf("%s-%s", pm.eventType, pm.timestamp)
-	} else {
-		fbasepath = pm.timestamp
 	}
 
 	jsonfile := fmt.Sprintf("%s/%s.json", rd.saveDir, fbasepath)
@@ -204,26 +215,18 @@ func saveData(rd *replayDataOpts, logger *slog.Logger, pm payloadMsg) error {
 		return err
 	}
 	defer f.Close()
-	// write data
-	_, err = f.Write(pm.body)
-	if err != nil {
+	if _, err = f.Write(pm.body); err != nil {
 		return err
 	}
 
 	shscript := fmt.Sprintf("%s/%s.sh", rd.saveDir, fbasepath)
-
 	logger.Info(fmt.Sprintf("%s%s and %s has been saved", emoji("⌁", "yellow+b", rd.decorate), shscript, jsonfile))
 	s, err := os.Create(shscript)
 	if err != nil {
 		return err
 	}
 	defer s.Close()
-	headers := ""
-	for k, v := range pm.headers {
-		headers += fmt.Sprintf("-H '%s: %s' ", k, v)
-	}
-
-	// parse shellScriptTmpl as template with arguments
+	headers := buildCurlHeaders(pm.headers)
 	t := template.Must(template.New("shellScriptTmpl").Parse(string(shellScriptTmpl)))
 	if err := t.Execute(s, struct {
 		Headers       string
@@ -240,8 +243,6 @@ func saveData(rd *replayDataOpts, logger *slog.Logger, pm payloadMsg) error {
 	}); err != nil {
 		return err
 	}
-
-	// set permission
 	return os.Chmod(shscript, 0o755)
 }
 
@@ -257,7 +258,7 @@ type replayDataOpts struct {
 func replayData(ropts *replayDataOpts, logger *slog.Logger, pm payloadMsg) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(ropts.targetCnxTimeout)*time.Second)
 	defer cancel()
-	//nolint: gosec
+	//nolint:gosec // InsecureSkipVerify is controlled by user input for testing/self-signed certs
 	client := http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: !ropts.insecureTLSVerify}}}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, ropts.targetURL, strings.NewReader(string(pm.body)))
 	if err != nil {
@@ -266,7 +267,6 @@ func replayData(ropts *replayDataOpts, logger *slog.Logger, pm payloadMsg) error
 	for k, v := range pm.headers {
 		req.Header.Add(k, v)
 	}
-	// add content-type if it's not already set
 	if _, ok := pm.headers["Content-Type"]; !ok {
 		req.Header.Add("Content-Type", pm.contentType)
 	}
@@ -274,19 +274,15 @@ func replayData(ropts *replayDataOpts, logger *slog.Logger, pm payloadMsg) error
 	if err != nil {
 		return err
 	}
-	// read resp.Body
 	defer resp.Body.Close()
 
-	var msg string
+	msg := "request"
 	if pm.eventType != "" {
 		msg = fmt.Sprintf("%s event", pm.eventType)
-	} else {
-		msg = "request"
 	}
 	if pm.eventID != "" {
 		msg = fmt.Sprintf("%s %s", pm.eventID, msg)
 	}
-
 	msg = fmt.Sprintf("%s %s replayed to %s, status: %s", pm.timestamp, msg, ansi.Color(ropts.targetURL, "green+ub"), ansi.Color(fmt.Sprintf("%d", resp.StatusCode), "blue+b"))
 	if resp.StatusCode > 299 {
 		msg = fmt.Sprintf("%s, error: %s", msg, resp.Status)
@@ -300,74 +296,98 @@ func (c goSmee) clientSetup() error {
 	version := strings.TrimSpace(string(Version))
 	s := fmt.Sprintf("%sStarting gosmee version: %s\n", emoji("⇉", "green+b", c.replayDataOpts.decorate), version)
 	c.logger.Info(s)
-	client := sse.NewClient(c.replayDataOpts.smeeURL, sse.ClientMaxBufferSize(1<<20))
-	client.Headers["User-Agent"] = fmt.Sprintf("gosmee/%s", version)
-	// this is to get nginx to work
-	client.Headers["X-Accel-Buffering"] = "no"
+
+	// Extract the base URL and channel from the smeeURL
 	channel := filepath.Base(c.replayDataOpts.smeeURL)
+	baseURL := strings.TrimSuffix(c.replayDataOpts.smeeURL, "/"+channel)
+
+	// Special case for smee.io
+	var sseURL string
 	if strings.HasPrefix(c.replayDataOpts.smeeURL, "https://smee.io") {
 		channel = smeeChannel
+		sseURL = c.replayDataOpts.smeeURL
+	} else {
+		// For our own server, connect to the /events/{channel} endpoint
+		sseURL = fmt.Sprintf("%s/events/%s", baseURL, channel)
 	}
-	err := client.Subscribe(channel, func(msg *sse.Event) {
+
+	client := sse.NewClient(sseURL, sse.ClientMaxBufferSize(1<<20))
+	client.Headers["User-Agent"] = fmt.Sprintf("gosmee/%s", version)
+	client.Headers["X-Accel-Buffering"] = "no"
+
+	return client.Subscribe(channel, func(msg *sse.Event) {
 		now := time.Now().UTC()
 		nowStr := now.Format(tsFormat)
 
+		// Check for explicit ready messages from SSE events
 		if string(msg.Event) == "ready" || string(msg.Data) == "ready" {
 			s := fmt.Sprintf("%s %sForwarding %s to %s", nowStr, emoji("✓", "yellow+b", c.replayDataOpts.decorate), ansi.Color(c.replayDataOpts.smeeURL, "green+u"), ansi.Color(c.replayDataOpts.targetURL, "green+u"))
 			c.logger.Info(s)
 			return
 		}
 
+		// Skip ping events
 		if string(msg.Event) == "ping" {
+			return
+		}
+
+		// Check for empty data
+		if len(msg.Data) == 0 || string(msg.Data) == "{}" {
+			return
+		}
+
+		// Check if the message data contains a ready indicator or connected message
+		if strings.Contains(strings.ToLower(string(msg.Data)), "ready") ||
+			strings.Contains(strings.ToLower(string(msg.Data)), "\"message\"") &&
+				strings.Contains(strings.ToLower(string(msg.Data)), "\"connected\"") {
+			c.logger.Debug(fmt.Sprintf("%s Skipping connection message", nowStr))
 			return
 		}
 
 		pm, err := c.parse(now, msg.Data)
 		if err != nil {
-			s := fmt.Sprintf("%s %s parsing message %s",
-				nowStr,
-				ansi.Color("ERROR", "red+b"),
-				err.Error())
+			s := fmt.Sprintf("%s %s parsing message %s", nowStr, ansi.Color("ERROR", "red+b"), err.Error())
 			c.logger.Error(s)
 			return
-		}
-		if len(pm.headers) == 0 {
-			s := fmt.Sprintf("%s %s no headers found in message",
-				nowStr,
-				ansi.Color("ERROR", "red+b"))
-			c.logger.Error(s)
-			return
-		}
-		headers := ""
-		for k, v := range pm.headers {
-			headers += fmt.Sprintf("%s=%s ", k, v)
 		}
 
-		if string(msg.Data) != "{}" {
-			if c.replayDataOpts.saveDir != "" {
-				err := saveData(c.replayDataOpts, c.logger, pm)
-				if err != nil {
-					s := fmt.Sprintf("%s %s saving message with headers '%s' - %s",
-						nowStr,
-						ansi.Color("ERROR", "red+b"),
-						headers,
-						err.Error())
-					c.logger.Error(s)
+		// Check if this looks like a ready message or connected message based on specific patterns
+		if pm.eventType == "ready" || (len(pm.body) > 0 && strings.Contains(strings.ToLower(string(pm.body)), "ready")) {
+			c.logger.Debug(fmt.Sprintf("%s Skipping message with 'ready' in event type or body", nowStr))
+			return
+		}
+
+		// Check for empty body messages with "Message: connected" header
+		if len(pm.body) == 0 {
+			for k, v := range pm.headers {
+				if strings.EqualFold(k, "Message") && strings.EqualFold(v, "connected") {
+					c.logger.Debug(fmt.Sprintf("%s Skipping empty message with Message: connected header", nowStr))
 					return
 				}
 			}
-			if !c.replayDataOpts.noReplay {
-				if err := replayData(c.replayDataOpts, c.logger, pm); err != nil {
-					s := fmt.Sprintf("%s %s forwarding message with headers '%s' - %s",
-						nowStr,
-						ansi.Color("ERROR", "red+b"),
-						headers,
-						err.Error())
-					c.logger.Error(s)
-					return
-				}
+		}
+
+		if len(pm.headers) == 0 {
+			s := fmt.Sprintf("%s %s no headers found in message", nowStr, ansi.Color("ERROR", "red+b"))
+			c.logger.Error(s)
+			return
+		}
+
+		headers := buildHeaders(pm.headers)
+		if c.replayDataOpts.saveDir != "" {
+			if err := saveData(c.replayDataOpts, c.logger, pm); err != nil {
+				s := fmt.Sprintf("%s %s saving message with headers '%s' - %s", nowStr, ansi.Color("ERROR", "red+b"), headers, err.Error())
+				c.logger.Error(s)
+				return
+			}
+		}
+
+		if !c.replayDataOpts.noReplay {
+			if err := replayData(c.replayDataOpts, c.logger, pm); err != nil {
+				s := fmt.Sprintf("%s %s forwarding message with headers '%s' - %s", nowStr, ansi.Color("ERROR", "red+b"), headers, err.Error())
+				c.logger.Error(s)
+				return
 			}
 		}
 	})
-	return err
 }

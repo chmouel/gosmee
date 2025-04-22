@@ -48,8 +48,8 @@ lint-md: ${MD_FILES} ## runs markdownlint and vale on all markdown files
 	@echo "Grammar check with vale of documentation..."
 	@vale docs/content --minAlertLevel=error --output=line
 
-dev:
-	reflex -r 'gosmee.go' -s go run gosmee.go -- --saveDir /tmp/save2 $(SMEE_URL) $(TARGET_URL)
+dev-server:
+	reflex -r '.*\.(tmpl|go)' -s go run main.go -- server --footer "Contact: <a href=\"https://twitter.com/me\">Me</a> - use it at your own risk"
 
 fmt:
 	@go fmt `go list ./... | grep -v /vendor/`

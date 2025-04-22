@@ -28,8 +28,7 @@ This creates a seamless bridge between GitHub webhooks and your local
 development environment!
 
 🔄 Alternatively, if you prefer not to use a relay server, you can use the
-GitHub API to [replay webhook
-deliveries](#replay-webhook-deliveries-via-the-github-api) directly.
+GitHub API to replay webhook deliveries.
 
 ### 📊 Diagram
 
@@ -67,6 +66,24 @@ post: <https://blog.chmouel.com/posts/gosmee-webhook-forwarder-relayer>
 ## 🖼️ Screenshot
 
 ![Screenshot](./.github/screenshot.png)
+
+### 🌐 Live Event Feed
+
+The web interface of the gosmee server features a live event feed that shows webhook events in real-time:
+
+- 🔴 Live status indicator showing connection state
+- 📊 Event counter showing number of received events
+- 🔍 JSON tree viewer for easy payload inspection
+- 📋 Copy buttons for headers and payloads
+- 🔄 Replay functionality to resend events to your endpoint
+- 🧹 Clear button to remove all events from the feed
+
+Each event in the feed shows:
+
+- Event ID and timestamp
+- Headers with copy functionality
+- Payload in both tree view and raw JSON formats
+- Option to replay individual events
 
 ## 📥 Install
 
