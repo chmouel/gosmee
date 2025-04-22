@@ -21,9 +21,11 @@ import (
 	"golang.org/x/crypto/acme/autocert"
 )
 
+// Version header constant.
 const (
-	timeFormat  = "2006-01-02T15.04.01.000"
-	contentType = "application/json"
+	timeFormat        = "2006-01-02T15.04.01.000"
+	contentType       = "application/json"
+	versionHeaderName = "X-Gosmee-Version"
 )
 
 var (
@@ -149,11 +151,15 @@ func handleWebhookPost(events *sse.Server, eventBroker *EventBroker) http.Handle
 		// Publish to our custom event broker for the web UI
 		eventBroker.Publish(channel, reencoded)
 
+		// Add server version to response headers
+		w.Header().Set(versionHeaderName, strings.TrimSpace(string(Version)))
+
 		w.WriteHeader(http.StatusAccepted)
 		resp := map[string]any{
 			"status":  http.StatusAccepted,
 			"channel": channel,
 			"message": "ok",
+			"version": strings.TrimSpace(string(Version)),
 		}
 		_ = json.NewEncoder(w).Encode(resp)
 		fmt.Fprintf(os.Stdout, "%s Published %s%s on channel %s\n",
@@ -192,6 +198,13 @@ func serve(c *cli.Context) error {
 	// Initialize our custom event broker for the web UI
 	eventBroker := NewEventBroker()
 
+	showNewURL := func(w http.ResponseWriter, _ *http.Request) {
+		channel := randomString(12)
+		url := fmt.Sprintf("%s/%s", publicURL, channel)
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintf(w, "%s\n", url)
+	}
 	// Serve the main UI page
 	serveIndex := func(w http.ResponseWriter, r *http.Request) {
 		channel := chi.URLParam(r, "channel")
@@ -230,7 +243,7 @@ func serve(c *cli.Context) error {
 		_, _ = w.Write(faviconSVG)
 	})
 	router.Get("/", serveIndex)
-	router.Get("/new", serveIndex) // Redirects to /random_channel via serveIndex
+	router.Get("/new", showNewURL) // Redirects to /random_channel via serveIndex
 	router.Get("/{channel:[a-zA-Z0-9-_]{12,}}", serveIndex)
 
 	// Dedicated endpoint for SSE events
@@ -299,6 +312,16 @@ func serve(c *cli.Context) error {
 	})
 
 	router.Post("/{channel:[a-zA-Z0-9-_]{12,}}", handleWebhookPost(events, eventBroker))
+
+	// Add version endpoint to allow version checking
+	router.Get("/version", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set(versionHeaderName, strings.TrimSpace(string(Version)))
+		resp := map[string]string{
+			"version": strings.TrimSpace(string(Version)),
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+	})
 
 	// Add a replay endpoint to allow replaying events from the UI
 	router.Post("/replay/{channel:[a-zA-Z0-9-_]{12,}}", func(w http.ResponseWriter, r *http.Request) {
