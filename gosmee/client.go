@@ -292,10 +292,72 @@ func replayData(ropts *replayDataOpts, logger *slog.Logger, pm payloadMsg) error
 	return nil
 }
 
+// checkServerVersion verifies that the client version is compatible with the server version.
+func checkServerVersion(serverURL string, clientVersion string, logger *slog.Logger, decorate bool) error {
+	// Extract base URL from the smeeURL (removing the channel part)
+	baseURL := serverURL
+	if parts := strings.Split(serverURL, "/"); len(parts) > 3 {
+		// Reconstruct the base URL (scheme + host)
+		baseURL = strings.Join(parts[0:3], "/")
+	}
+
+	// Create a request to the version endpoint
+	versionURL := fmt.Sprintf("%s/version", baseURL)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(defaultTimeout)*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, versionURL, nil)
+	if err != nil {
+		// If we can't create the request, don't fail - just warn
+		logger.Warn(fmt.Sprintf("%sCould not create version check request: %s", emoji("⚠", "yellow+b", decorate), err.Error()))
+		return nil
+	}
+
+	client := http.Client{Timeout: time.Duration(defaultTimeout) * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		// If we can't reach the server, don't fail - just warn
+		logger.Warn(fmt.Sprintf("%sCould not check server version: %s", emoji("⚠", "yellow+b", decorate), err.Error()))
+		return nil
+	}
+	defer resp.Body.Close()
+
+	// Check for version in header first
+	serverVersion := resp.Header.Get("X-Gosmee-Version")
+
+	// If no header, try to parse from body
+	if serverVersion == "" {
+		var versionResp struct {
+			Version string `json:"version"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&versionResp); err != nil {
+			logger.Warn(fmt.Sprintf("%sCould not parse server version: %s", emoji("⚠", "yellow+b", decorate), err.Error()))
+			return nil
+		}
+		serverVersion = versionResp.Version
+	}
+
+	// Compare versions
+	if serverVersion != "" && serverVersion != clientVersion {
+		logger.Warn(fmt.Sprintf("%sVersion mismatch: client %s, server %s", emoji("⚠", "yellow+b", decorate),
+			ansi.Color(clientVersion, "blue+b"), ansi.Color(serverVersion, "blue+b")))
+	} else if serverVersion != "" {
+		logger.Debug(fmt.Sprintf("Version match: client and server both at version %s", serverVersion))
+	}
+
+	logger.Info(fmt.Sprintf("%sServer version: %s", emoji("✓", "green+b", decorate), serverVersion))
+	return nil
+}
+
 func (c goSmee) clientSetup() error {
 	version := strings.TrimSpace(string(Version))
-	s := fmt.Sprintf("%sStarting gosmee version: %s\n", emoji("⇉", "green+b", c.replayDataOpts.decorate), version)
+	s := fmt.Sprintf("%sStarting gosmee client version: %s", emoji("⇉", "green+b", c.replayDataOpts.decorate), version)
 	c.logger.Info(s)
+
+	// Check server version compatibility
+	if err := checkServerVersion(c.replayDataOpts.smeeURL, version, c.logger, c.replayDataOpts.decorate); err != nil {
+		c.logger.Warn(fmt.Sprintf("%sCould not get server version: %s", emoji("⚠", "yellow+b", c.replayDataOpts.decorate), err.Error()))
+	}
 
 	// Extract the base URL and channel from the smeeURL
 	channel := filepath.Base(c.replayDataOpts.smeeURL)

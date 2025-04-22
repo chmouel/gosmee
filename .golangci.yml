@@ -91,7 +91,7 @@ linters:
       - tint
 formatters:
   enable:
-    - gofumpt
+    - gofmt
     - goimports
   settings:
     gofumpt:
