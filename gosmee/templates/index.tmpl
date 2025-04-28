@@ -32,6 +32,7 @@
             --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
             --glow: 0 0 15px rgba(79, 70, 229, 0.5);
             --pop-transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            --waiting: rgb(208, 24, 11);
         }
 
         * {
@@ -178,7 +179,6 @@
             position: absolute;
             top: 0.5rem;
             right: 0.5rem;
-            /* background: rgba(79, 70, 229, 0.8); */
             color: white;
             border: none;
             padding: 0.25rem 0.5rem;
@@ -366,7 +366,7 @@
         }
 
         .event-payload details summary:hover {
-            color: var (--accent);
+            color: var(--accent);
         }
 
         .event-payload details[open] summary {
@@ -435,7 +435,6 @@
         }
 
         @media (max-width: 767px) {
-
             /* Stack columns on smaller screens */
             .main-content {
                 grid-template-columns: 1fr;
@@ -572,39 +571,6 @@
             background-color: var(--primary);
             color: white;
             border: none;
-            padding: 0.25rem 0.75rem;
-            border-radius: 0.25rem;
-            cursor: pointer;
-            font-size: 0.75rem;
-            margin-right: 1rem;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.25rem;
-            transition: var(--pop-transition);
-            box-shadow: var(--shadow-sm);
-        }
-
-        .replay-btn:hover {
-            background-color: var(--accent);
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-md);
-        }
-
-        .replay-btn:active {
-            transform: translateY(0);
-        }
-
-        .replay-btn.disabled {
-            background-color: var(--border-color);
-            color: var(--text-muted);
-            cursor: not-allowed;
-        }
-
-        /* Replay button */
-        .replay-btn {
-            background-color: rgba(79, 70, 229, 0.8);
-            color: white;
-            border: none;
             border-radius: 0.25rem;
             padding: 0.25rem 0.5rem;
             font-size: 0.75rem;
@@ -612,6 +578,9 @@
             margin-right: 0.75rem;
             transition: var(--pop-transition);
             box-shadow: var(--shadow-sm);
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
         }
 
         .replay-btn:hover {
@@ -626,6 +595,12 @@
 
         .replay-btn i {
             margin-right: 0.25rem;
+        }
+
+        .replay-btn.disabled {
+            background-color: var(--border-color);
+            color: var(--text-muted);
+            cursor: not-allowed;
         }
 
         /* Added styles for section visibility control */
@@ -709,6 +684,26 @@
             background-color: rgba(255, 255, 255, 0.7) !important;
         }
 
+        /* Simplified waiting styling */
+        .waiting-container {
+            text-align: center;
+            padding: 2rem 1rem;
+            background: rgba(255, 255, 255, 0.7);
+            border-radius: 0.75rem;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .waiting-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--primary);
+        }
+
+        .waiting-text {
+            color: var(--text-muted);
+        }
+
         @media (min-width: 1200px) {
             .container {
                 max-width: 1400px;
@@ -728,7 +723,7 @@
         </div>
 
         <div class="main-content" id="main-content">
-            <!-- Event feed now at the top with an ID -->
+            <!-- Event feed container -->
             <div class="event-feed" id="event-feed-container">
                 <h2>
                     <span id="status-light" class="status-indicator status-disconnected"></span>
@@ -737,12 +732,16 @@
                         style="float: right; font-size: 0.8rem; padding: 2px 5px; display: none;">Clear</button>
                 </h2>
                 <ul id="events-list">
-                    <li id="placeholder" style="text-align: center; color: var(--text-muted); margin-top: 2rem;">Waiting
-                        for events...</li>
+                    <li id="placeholder" class="waiting-container">
+                        <div class="waiting-title">Listening for Webhook Events</div>
+                        <p class="waiting-text">
+                            This page will automatically update when webhook events arrive.
+                        </p>
+                    </li>
                 </ul>
             </div>
 
-            <!-- Instructions now at the bottom in a horizontal layout -->
+            <!-- Instructions container with steps -->
             <div class="steps" id="instructions-container">
                 <div class="step">
                     <div class="step-number">1</div>
@@ -785,6 +784,17 @@
                     </div>
                     <em>Replace <b>http://localhost:8080</b> with your actual local service URL.</em>
                 </div>
+                
+                <!-- Section 4 - simplified without live indicator -->
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <h2><i class="fas fa-eye"></i> Or: Watch Live Instead</h2>
+                    <p><strong>Alternative to Step 3:</strong> Instead of running the client, you can simply watch webhook payloads arrive on this page.</p>
+                    <p>No need to refresh the page — webhook payloads will be shown in real-time as they arrive.</p>
+                    <p class="note" style="margin-top: 0.75rem; color: #64748B; font-style: italic;">
+                        <i class="fas fa-info-circle"></i> Note: When only watching events here, you cannot forward them to your local service. Use the client in Step 3 if you need to process webhooks locally.
+                    </p>
+                </div>
             </div>
         </div>
 
@@ -798,7 +808,7 @@
 
     <script>
         function copyText(text) {
-            const btn = event.currentTarget; // Capture button here
+            const btn = event.currentTarget;
             navigator.clipboard.writeText(text).then(() => {
                 // Show feedback
                 const originalText = btn.textContent;
@@ -816,10 +826,10 @@
         const eventCountSpan = document.getElementById('event-count');
         const clearButton = document.getElementById('clear-events');
         const placeholder = document.getElementById('placeholder');
-        const eventFeedContainer = document.getElementById('event-feed-container'); // Get the container
+        const eventFeedContainer = document.getElementById('event-feed-container');
         const instructionsContainer = document.getElementById('instructions-container');
         const mainContent = document.getElementById('main-content');
-        const eventsUrl = '{{ .EventsURL }}'; // Get SSE URL from Go template
+        const eventsUrl = '{{ .EventsURL }}';
         let eventCount = 0;
         let eventSource;
         // Store JSON editors for each event
@@ -838,13 +848,11 @@
             eventSource.onopen = function () {
                 console.log('SSE connection established.');
                 statusLight.className = 'status-indicator status-connected';
-                if (placeholder) placeholder.style.display = 'none'; // Hide placeholder on connect
             };
 
             eventSource.onerror = function (err) {
                 console.error('SSE connection error:', err);
                 statusLight.className = 'status-indicator status-disconnected';
-                // Optional: Implement retry logic here
                 eventSource.close();
                 // Reconnect after a delay
                 setTimeout(connectSSE, 5000);
@@ -972,6 +980,7 @@
                     <div>
                         <button class="replay-btn" onclick="replayEvent('${uniqueId}', event)">
                             <i class="fas fa-redo-alt"></i> 
+                            Replay
                         </button>
                         <span class="event-id">Event ID: ${eventId}</span>
                     </div>
@@ -1128,7 +1137,7 @@
         window.copyPayload = function (id, event) {
             event.preventDefault();
             event.stopPropagation();
-            const btn = event.currentTarget; // Capture button here
+            const btn = event.currentTarget;
 
             // Get the payload content (preferably from raw view for better compatibility)
             const rawContent = document.getElementById(`raw-content-${id}`);
@@ -1151,7 +1160,7 @@
         window.copyHeaders = function (id, event) {
             event.preventDefault();
             event.stopPropagation();
-            const btn = event.currentTarget; // Capture button here
+            const btn = event.currentTarget;
 
             // Get the headers table content
             const headersTable = document.getElementById(`headers-table-${id}`);
@@ -1261,7 +1270,6 @@
             showInstructions();
             connectSSE(); // Start SSE connection after DOM is ready
         });
-
     </script>
 </body>
 
