@@ -327,7 +327,7 @@ func checkServerVersion(serverURL string, clientVersion string, logger *slog.Log
 		errMsg := fmt.Sprintf("%sThe server appears to be too old and doesn't support version checking. Please upgrade the server or use an older client version.",
 			emoji("⛔", "red+b", decorate))
 		logger.Error(errMsg)
-		return fmt.Errorf(errMsg)
+		return fmt.Errorf("%s", errMsg)
 	}
 
 	// Check for other non-200 status codes
@@ -377,14 +377,13 @@ func checkServerVersion(serverURL string, clientVersion string, logger *slog.Log
 						ansi.Color(clientVersion, "blue+b"),
 						ansi.Color(serverVersion, "blue+b"))
 					logger.Error(errMsg)
-					return fmt.Errorf(errMsg)
-				} else {
-					// Client is same or newer, just warn
-					logger.Warn(fmt.Sprintf("%sVersion mismatch: client %s, server %s",
-						emoji("⚠", "yellow+b", decorate),
-						ansi.Color(clientVersion, "blue+b"),
-						ansi.Color(serverVersion, "blue+b")))
+					return fmt.Errorf("%s", errMsg)
 				}
+				// Client is same or newer, just warn
+				logger.Warn(fmt.Sprintf("%sVersion mismatch: client %s, server %s",
+					emoji("⚠", "yellow+b", decorate),
+					ansi.Color(clientVersion, "blue+b"),
+					ansi.Color(serverVersion, "blue+b")))
 			}
 		}
 	}
@@ -393,7 +392,7 @@ func checkServerVersion(serverURL string, clientVersion string, logger *slog.Log
 	return nil
 }
 
-// parseVersion splits a version string like "1.2.3" into []int{1, 2, 3}
+// parseVersion splits a version string like "1.2.3" into []int{1, 2, 3}.
 func parseVersion(version string) []int {
 	version = strings.TrimPrefix(version, "v")
 	parts := strings.Split(version, ".")
@@ -423,12 +422,9 @@ func parseVersion(version string) []int {
 	return result
 }
 
-// isOlderVersion returns true if v1 is older than v2
+// isOlderVersion returns true if v1 is older than v2.
 func isOlderVersion(v1, v2 []int) bool {
-	minLen := len(v1)
-	if len(v2) < minLen {
-		minLen = len(v2)
-	}
+	minLen := min(len(v1), len(v2))
 
 	for i := 0; i < minLen; i++ {
 		if v1[i] < v2[i] {

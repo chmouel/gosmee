@@ -18,13 +18,13 @@ vendor:
 	@go mod tidy && go mod vendor
 
 $(OUTPUT_DIR)/$(NAME): main.go FORCE
-	go build -mod=vendor $(FLAGS)  -v -o $@ ./$<
+	go build -mod=vendor $(FLAGS)  -o $@ ./$<
 
 $(OUTPUT_DIR)/$(NAME)-aarch64-linux: main.go FORCE
-	env GOARCH=arm64 GOOS=linux	go build -mod=vendor $(FLAGS)  -v -o $@ ./$<
+	env GOARCH=arm64 GOOS=linux	go build -mod=vendor $(FLAGS)   -o $@ ./$<
 
 test:
-	@go test ./... -v
+	@go test ./... 
 
 clean:
 	@rm -rf $(OUTPUT_DIR)/gosmee
@@ -32,7 +32,7 @@ clean:
 build: clean
 	@echo "building."
 	@mkdir -p $(OUTPUT_DIR)/
-	@go build  -v $(FLAGS)  -o $(OUTPUT_DIR)/gosmee main.go
+	@go build  $(FLAGS)  -o $(OUTPUT_DIR)/gosmee main.go
 
 lint: lint-go lint-md
 
