@@ -322,6 +322,21 @@ func checkServerVersion(serverURL string, clientVersion string, logger *slog.Log
 	}
 	defer resp.Body.Close()
 
+	// Check if the server returned a 404 Not Found status for the version endpoint
+	if resp.StatusCode == http.StatusNotFound {
+		errMsg := fmt.Sprintf("%sThe server appears to be too old and doesn't support version checking. Please upgrade the server or use an older client version.",
+			emoji("⛔", "red+b", decorate))
+		logger.Error(errMsg)
+		return fmt.Errorf(errMsg)
+	}
+
+	// Check for other non-200 status codes
+	if resp.StatusCode != http.StatusOK {
+		logger.Warn(fmt.Sprintf("%sServer returned unexpected status code %d when checking version",
+			emoji("⚠", "yellow+b", decorate), resp.StatusCode))
+		return nil
+	}
+
 	// Check for version in header first
 	serverVersion := resp.Header.Get("X-Gosmee-Version")
 
@@ -338,15 +353,93 @@ func checkServerVersion(serverURL string, clientVersion string, logger *slog.Log
 	}
 
 	// Compare versions
-	if serverVersion != "" && serverVersion != clientVersion {
-		logger.Warn(fmt.Sprintf("%sVersion mismatch: client %s, server %s", emoji("⚠", "yellow+b", decorate),
-			ansi.Color(clientVersion, "blue+b"), ansi.Color(serverVersion, "blue+b")))
-	} else if serverVersion != "" {
-		logger.Debug(fmt.Sprintf("Version match: client and server both at version %s", serverVersion))
+	if serverVersion != "" {
+		if serverVersion == clientVersion {
+			logger.Debug(fmt.Sprintf("Version match: client and server both at version %s", serverVersion))
+		} else {
+			// Check for development versions - only warn, don't fail
+			if serverVersion == "dev" || clientVersion == "dev" {
+				logger.Warn(fmt.Sprintf("%sVersion mismatch with development version: client %s, server %s",
+					emoji("⚠", "yellow+b", decorate),
+					ansi.Color(clientVersion, "blue+b"),
+					ansi.Color(serverVersion, "blue+b")))
+			} else {
+				// Parse server and client versions for comparison
+				serverParts := parseVersion(serverVersion)
+				clientParts := parseVersion(clientVersion)
+
+				// Compare major and minor version parts
+				isClientOutdated := isOlderVersion(clientParts, serverParts)
+
+				if isClientOutdated {
+					errMsg := fmt.Sprintf("%sClient version %s is too old. Server version is %s. Please upgrade your gosmee client.",
+						emoji("⛔", "red+b", decorate),
+						ansi.Color(clientVersion, "blue+b"),
+						ansi.Color(serverVersion, "blue+b"))
+					logger.Error(errMsg)
+					return fmt.Errorf(errMsg)
+				} else {
+					// Client is same or newer, just warn
+					logger.Warn(fmt.Sprintf("%sVersion mismatch: client %s, server %s",
+						emoji("⚠", "yellow+b", decorate),
+						ansi.Color(clientVersion, "blue+b"),
+						ansi.Color(serverVersion, "blue+b")))
+				}
+			}
+		}
 	}
 
 	logger.Info(fmt.Sprintf("%sServer version: %s", emoji("✓", "green+b", decorate), serverVersion))
 	return nil
+}
+
+// parseVersion splits a version string like "1.2.3" into []int{1, 2, 3}
+func parseVersion(version string) []int {
+	version = strings.TrimPrefix(version, "v")
+	parts := strings.Split(version, ".")
+	result := make([]int, 0, len(parts))
+
+	for _, part := range parts {
+		// Remove any non-numeric suffixes like "-alpha", "-beta", etc.
+		for i, c := range part {
+			if c < '0' || c > '9' {
+				part = part[:i]
+				break
+			}
+		}
+
+		num, err := strconv.Atoi(part)
+		if err != nil {
+			num = 0
+		}
+		result = append(result, num)
+	}
+
+	// Ensure we have at least 3 elements (major, minor, patch)
+	for len(result) < 3 {
+		result = append(result, 0)
+	}
+
+	return result
+}
+
+// isOlderVersion returns true if v1 is older than v2
+func isOlderVersion(v1, v2 []int) bool {
+	minLen := len(v1)
+	if len(v2) < minLen {
+		minLen = len(v2)
+	}
+
+	for i := 0; i < minLen; i++ {
+		if v1[i] < v2[i] {
+			return true
+		} else if v1[i] > v2[i] {
+			return false
+		}
+	}
+
+	// If all compared parts are equal, check if v2 has more specific version
+	return len(v1) < len(v2)
 }
 
 func (c goSmee) clientSetup() error {
