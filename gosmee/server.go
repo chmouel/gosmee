@@ -26,6 +26,7 @@ const (
 	timeFormat        = "2006-01-02T15.04.01.000"
 	contentType       = "application/json"
 	versionHeaderName = "X-Gosmee-Version"
+	maxChannelLength  = 64 // Set maximum channel length to prevent DoS attacks
 )
 
 var (
@@ -244,13 +245,19 @@ func serve(c *cli.Context) error {
 	})
 	router.Get("/", serveIndex)
 	router.Get("/new", showNewURL) // Redirects to /random_channel via serveIndex
-	router.Get("/{channel:[a-zA-Z0-9-_]{12,}}", serveIndex)
+	router.Get("/{channel:[a-zA-Z0-9-_]{12,64}}", serveIndex)
 
 	// Dedicated endpoint for SSE events
-	router.Get("/events/{channel:[a-zA-Z0-9-_]{12,}}", func(w http.ResponseWriter, r *http.Request) {
+	router.Get("/events/{channel:[a-zA-Z0-9-_]{12,64}}", func(w http.ResponseWriter, r *http.Request) {
 		channel := chi.URLParam(r, "channel")
 		if channel == "" {
 			http.Error(w, "Channel name missing in URL", http.StatusBadRequest)
+			return
+		}
+
+		// Validate channel length
+		if len(channel) > maxChannelLength {
+			http.Error(w, "Channel name exceeds maximum length", http.StatusBadRequest)
 			return
 		}
 
@@ -311,7 +318,17 @@ func serve(c *cli.Context) error {
 		}
 	})
 
-	router.Post("/{channel:[a-zA-Z0-9-_]{12,}}", handleWebhookPost(events, eventBroker))
+	router.Post("/{channel:[a-zA-Z0-9-_]{12,64}}", func(w http.ResponseWriter, r *http.Request) {
+		channel := chi.URLParam(r, "channel")
+
+		// Validate channel length
+		if len(channel) > maxChannelLength {
+			http.Error(w, "Channel name exceeds maximum length", http.StatusBadRequest)
+			return
+		}
+
+		handleWebhookPost(events, eventBroker)(w, r)
+	})
 
 	// Add version endpoint to allow version checking
 	router.Get("/version", func(w http.ResponseWriter, _ *http.Request) {
@@ -324,10 +341,16 @@ func serve(c *cli.Context) error {
 	})
 
 	// Add a replay endpoint to allow replaying events from the UI
-	router.Post("/replay/{channel:[a-zA-Z0-9-_]{12,}}", func(w http.ResponseWriter, r *http.Request) {
+	router.Post("/replay/{channel:[a-zA-Z0-9-_]{12,64}}", func(w http.ResponseWriter, r *http.Request) {
 		channel := chi.URLParam(r, "channel")
 		if channel == "" {
 			http.Error(w, "Channel name missing in URL", http.StatusBadRequest)
+			return
+		}
+
+		// Validate channel length
+		if len(channel) > maxChannelLength {
+			http.Error(w, "Channel name exceeds maximum length", http.StatusBadRequest)
 			return
 		}
 
