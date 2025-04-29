@@ -327,6 +327,12 @@ include [go-http-tunnel](https://github.com/mmatczuk/go-http-tunnel) or
 It hasn't undergone thorough security and performance reviews and
 should not be deployed in production systems.
 
+# 🛡️ Security
+
+## Payload Size Limit on
+
+To prevent memory exhaustion, request payloads are limited to 25 MB, matching GitHub’s payload cap. Requests exceeding this size will receive a 413 Request Entity Too Large response. See: <https://docs.github.com/en/webhooks/webhook-events-and-payloads#payload-cap>
+
 ## 🙏 Thanks
 
 - Most of the work is powered by the [go-sse](https://github.com/r3labs/sse) library.

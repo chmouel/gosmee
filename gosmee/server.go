@@ -26,7 +26,8 @@ const (
 	timeFormat        = "2006-01-02T15.04.01.000"
 	contentType       = "application/json"
 	versionHeaderName = "X-Gosmee-Version"
-	maxChannelLength  = 64 // Set maximum channel length to prevent DoS attacks
+	maxChannelLength  = 64               // Set maximum channel length to prevent DoS attacks
+	maxBodySize       = 25 * 1024 * 1024 // 25 MB maximum request body size (we use [GitHub's](https://docs.github.com/en/webhooks/webhook-events-and-payloads#payload-cap) limit)
 )
 
 var (
@@ -121,11 +122,19 @@ func handleWebhookPost(events *sse.Server, eventBroker *EventBroker) http.Handle
 		}
 		channel := chi.URLParam(r, "channel")
 		defer r.Body.Close()
+
+		// Limit request body size to prevent memory exhaustion attacks
+		r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
+			if strings.Contains(err.Error(), "http: request body too large") {
+				http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
+				return
+			}
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+
 		var d any
 		if err := json.Unmarshal(body, &d); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -355,8 +364,14 @@ func serve(c *cli.Context) error {
 		}
 
 		now := time.Now().UTC()
+		// Limit request body size to prevent memory exhaustion attacks
+		r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
+			if strings.Contains(err.Error(), "http: request body too large") {
+				http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
+				return
+			}
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
