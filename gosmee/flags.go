@@ -124,4 +124,9 @@ var serverFlags = []cli.Flag{
 		Usage:   "TLS key file",
 		EnvVars: []string{"GOSMEE_TLS_KEY"},
 	},
+	&cli.StringSliceFlag{
+		Name:    "webhook-signature",
+		Usage:   "Secret tokens to validate webhook signatures (GitHub, GitLab and many others). Can be specified multiple times",
+		EnvVars: []string{"GOSMEE_WEBHOOK_SIGNATURE"},
+	},
 }

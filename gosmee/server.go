@@ -1,8 +1,12 @@
 package gosmee
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"crypto/subtle"
 	_ "embed"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -112,8 +116,94 @@ func errorIt(w http.ResponseWriter, _ *http.Request, status int, err error) {
 	_, _ = w.Write([]byte(err.Error()))
 }
 
+// validateGitHubWebhookSignature validates the GitHub webhook signature.
+func validateGitHubWebhookSignature(secret string, payload []byte, signatureHeader string) bool {
+	if !strings.HasPrefix(signatureHeader, "sha256=") {
+		return false
+	}
+
+	signature := strings.TrimPrefix(signatureHeader, "sha256=")
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write(payload)
+	expectedMAC := hex.EncodeToString(mac.Sum(nil))
+
+	return hmac.Equal([]byte(signature), []byte(expectedMAC))
+}
+
+// validateBitbucketHMAC validates Bitbucket Cloud/Server webhook HMAC signature.
+func validateBitbucketHMAC(secret string, payload []byte, signatureHeader string) bool {
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write(payload)
+	expectedMAC := hex.EncodeToString(mac.Sum(nil))
+
+	return hmac.Equal([]byte(signatureHeader), []byte(expectedMAC))
+}
+
+// validateGiteaSignature validates Gitea/Forge webhook signature.
+func validateGiteaSignature(secret string, payload []byte, signatureHeader string) bool {
+	if !strings.HasPrefix(signatureHeader, "sha256=") {
+		return false
+	}
+
+	signature := strings.TrimPrefix(signatureHeader, "sha256=")
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write(payload)
+	expectedMAC := hex.EncodeToString(mac.Sum(nil))
+
+	return hmac.Equal([]byte(signature), []byte(expectedMAC))
+}
+
+// validateWebhookSignature validates webhook signatures for different providers by trying multiple secrets.
+func validateWebhookSignature(secrets []string, payload []byte, r *http.Request) bool {
+	if len(secrets) == 0 {
+		return true // No validation needed if no secrets configured
+	}
+
+	// Check for GitLab token
+	if gitlabToken := r.Header.Get("X-Gitlab-Token"); gitlabToken != "" {
+		for _, secret := range secrets {
+			if subtle.ConstantTimeCompare([]byte(gitlabToken), []byte(secret)) == 1 {
+				return true
+			}
+		}
+		return false
+	}
+
+	// Check for GitHub signature
+	if githubSignature := r.Header.Get("X-Hub-Signature-256"); githubSignature != "" {
+		for _, secret := range secrets {
+			if validateGitHubWebhookSignature(secret, payload, githubSignature) {
+				return true
+			}
+		}
+		return false
+	}
+
+	// Check for Bitbucket Cloud/Server signature
+	if bitbucketSignature := r.Header.Get("X-Hub-Signature"); bitbucketSignature != "" {
+		for _, secret := range secrets {
+			if validateBitbucketHMAC(secret, payload, bitbucketSignature) {
+				return true
+			}
+		}
+		return false
+	}
+
+	// Check for Gitea/Forge signature
+	if giteaSignature := r.Header.Get("X-Gitea-Signature"); giteaSignature != "" {
+		for _, secret := range secrets {
+			if validateGiteaSignature(secret, payload, giteaSignature) {
+				return true
+			}
+		}
+		return false
+	}
+
+	return false
+}
+
 // handleWebhookPost handles POST requests to the webhook endpoint.
-func handleWebhookPost(events *sse.Server, eventBroker *EventBroker) http.HandlerFunc {
+func handleWebhookPost(events *sse.Server, eventBroker *EventBroker, webhookSecrets []string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		now := time.Now().UTC()
 		if !strings.Contains(r.Header.Get("Content-Type"), contentType) {
@@ -133,6 +223,14 @@ func handleWebhookPost(events *sse.Server, eventBroker *EventBroker) http.Handle
 			}
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
+		}
+
+		// Validate webhook signature if secrets are configured
+		if len(webhookSecrets) > 0 {
+			if !validateWebhookSignature(webhookSecrets, body, r) {
+				http.Error(w, "invalid signature", http.StatusUnauthorized)
+				return
+			}
 		}
 
 		var d any
@@ -336,7 +434,7 @@ func serve(c *cli.Context) error {
 			return
 		}
 
-		handleWebhookPost(events, eventBroker)(w, r)
+		handleWebhookPost(events, eventBroker, c.StringSlice("webhook-signature"))(w, r)
 	})
 
 	// Add version endpoint to allow version checking

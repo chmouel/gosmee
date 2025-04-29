@@ -280,6 +280,27 @@ To prevent potential DoS attacks and ensure system stability:
 - ✅ Built-in validation for all endpoints that handle channel names
 - 🛡️ Protects against resource exhaustion attacks that could be caused by excessive channel name lengths
 
+##### 🔐 Webhook Signature Validation
+
+When running gosmee server, you can enable webhook signature validation for multiple providers with multiple secrets:
+
+```shell
+gosmee server --webhook-signature=SECRET1 --webhook-signature=SECRET2
+```
+
+When enabled:
+
+- 🔒 For GitHub: Validates X-Hub-Signature-256 header using HMAC SHA-256
+- 🔑 For GitLab: Validates X-Gitlab-Token header using secure token comparison
+- 🔵 For Bitbucket Cloud/Server: Validates X-Hub-Signature header using HMAC SHA-256
+- ⚡ For Gitea/Forge: Validates X-Gitea-Signature header using HMAC SHA-256
+- ✨ Supports multiple secrets - useful when receiving webhooks from different sources
+- 🚫 Rejects requests with missing or invalid signatures with HTTP 401 Unauthorized
+- 💡 Each secret is tried for validation, webhook is accepted if any secret matches
+- ⚡ Performance impact is minimal: ~2μs per validation with negligible memory usage
+
+You can also set multiple secrets via the `GOSMEE_WEBHOOK_SIGNATURE` environment variable by separating them with commas.
+
 ## 🔁 Replay webhook deliveries via the GitHub API (beta)
 
 🔄 If you prefer not to use a relay server with GitHub, you can replay webhook deliveries directly via the GitHub API.
