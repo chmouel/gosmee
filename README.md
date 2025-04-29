@@ -9,28 +9,28 @@
 
 ## 📝 Description
 
-🌉 Gosmee enables you to relay webhooks from itself (as a server) or from
+Gosmee enables you to relay webhooks from itself (as a server) or from
 <https://smee.io> to your local laptop or infrastructure hidden from the public
 internet.
 
-🔌 It makes exposing services on your local network (like localhost) or behind
-a VPN super simple! This allows public services, such as GitHub, to push
+It makes exposing services on your local network (like localhost) or behind
+a VPN simple and secure. This allows public services, such as GitHub, to push
 webhooks directly to your local environment.
 
 Here's how it works:
 
-1. 🎯 Configure your Webhook to send events to a <https://smee.io/> URL or to
+1. Configure your Webhook to send events to a <https://smee.io/> URL or to
    your publicly accessible Gosmee server.
-2. 🚀 Run the Gosmee client on your local machine to fetch these events and
+2. Run the Gosmee client on your local machine to fetch these events and
    forward them to your local service.
 
 This creates a seamless bridge between GitHub webhooks and your local
 development environment!
 
-🔄 Alternatively, if you prefer not to use a relay server, you can use the
+Alternatively, if you prefer not to use a relay server, you can use the
 GitHub API to replay webhook deliveries.
 
-### 📊 Diagram
+### Diagram
 
 For those who prefer a visual explanation of how gosmee works:
 
@@ -58,25 +58,25 @@ sequenceDiagram
     GS-->>-SP: 6. (Optional) HTTP Response (e.g., 200 OK)
 ```
 
-## 📰 Blog Post
+## Blog Post
 
-✍️ Learn more about the background and features of this project in this blog
+Learn more about the background and features of this project in this blog
 post: <https://blog.chmouel.com/posts/gosmee-webhook-forwarder-relayer>
 
-## 🖼️ Screenshot
+## 🖥️ Screenshot
 
 ![Screenshot](./.github/screenshot.png)
 
-### 🌐 Live Event Feed
+### Live Event Feed
 
 The web interface of the gosmee server features a live event feed that shows webhook events in real-time:
 
 - 🔴 Live status indicator showing connection state
-- 📊 Event counter showing number of received events
-- 🔍 JSON tree viewer for easy payload inspection
-- 📋 Copy buttons for headers and payloads
+- Event counter showing number of received events
+- JSON tree viewer for easy payload inspection
+- Copy buttons for headers and payloads
 - 🔄 Replay functionality to resend events to your endpoint
-- 🧹 Clear button to remove all events from the feed
+- Clear button to remove all events from the feed
 
 Each event in the feed shows:
 
@@ -87,9 +87,9 @@ Each event in the feed shows:
 
 ## 📥 Install
 
-### 📦 Release
+### Release
 
-🔽 Go to the [release](https://github.com/chmouel/gosmee/releases) page and
+Go to the [release](https://github.com/chmouel/gosmee/releases) page and
 choose the appropriate archive or package for your platform.
 
 ## 🍺 Homebrew
@@ -99,13 +99,13 @@ brew tap chmouel/gosmee https://github.com/chmouel/gosmee
 brew install gosmee
 ```
 
-## 🏹 [Arch](https://aur.archlinux.org/packages/gosmee-bin)
+## [Arch](https://aur.archlinux.org/packages/gosmee-bin)
 
 ```shell
 yay -S gosmee-bin
 ```
 
-### 🐳 [Docker](https://github.com/users/chmouel/packages/container/package/gosmee)
+### 🐳 Docker
 
 #### Gosmee client with Docker
 
@@ -119,7 +119,7 @@ docker run ghcr.io/chmouel/gosmee:latest
 docker run -d -p 3026:3026 --restart always --name example.org ghcr.io/chmouel/gosmee:latest server --port 3026 --address 0.0.0.0 --public-url https://example.org
 ```
 
-### 🔧 GO
+### GO
 
 ```shell
 go install -v github.com/chmouel/gosmee@latest
@@ -143,7 +143,7 @@ nix-env -iA gosmee
 nix run nixpkgs#gosmee -- --help # your args are here
 ```
 
-### ⚙️ System Services
+### System Services
 
 System Service example files for macOS and Linux are available in the
 [misc](./misc) directory.
@@ -159,7 +159,7 @@ internal URL of your deployment running on your cluster, for example:
 
    <http://service.namespace:8080>
 
-### 🔤 Shell completion
+### Shell completion
 
 Shell completions are available for gosmee:
 
@@ -187,7 +187,7 @@ gosmee client https://smee.io/aBcDeF https://localhost:8080
 This command will relay all payloads received at the smee URL to a service
 running on <http://localhost:8080>.
 
-✨ You can also save all relays as shell scripts for easy replay:
+You can also save all relays as shell scripts for easy replay:
 
 ```shell
 gosmee client --saveDir /tmp/savedreplay https://smee.io/aBcDeF https://localhost:8080
@@ -198,13 +198,13 @@ This command saves the JSON data of new payloads to
 at `/tmp/savedreplay/timestamp.sh`. Replay webhooks easily by running these
 scripts!
 
-🙈 You can ignore certain events (identified by GitLab/GitHub/Bitbucket) with one or more `--ignore-event` flags.
+You can ignore certain events (identified by GitLab/GitHub/Bitbucket) with one or more `--ignore-event` flags.
 
 If you only want to save payloads without replaying them, use `--noReplay`.
 
-🎨 By default, you'll get colorful emoji output unless you specify `--nocolor`.
+By default, you'll get colorful output unless you specify `--nocolor`.
 
-📊 Output logs as JSON with `--output json` (which implies `--nocolor`).
+Output logs as JSON with `--output json` (which implies `--nocolor`).
 
 ### 🖥️ Server
 
@@ -215,7 +215,7 @@ By default, `gosmee server` binds to `localhost` on port `3333`. For practical
 use, you'll want to expose it to your public IP or behind a proxy using the
 `--address` and `--port` flags.
 
-🔒 For security, you can use Let's Encrypt certificates with the `--tls-cert`
+For security, you can use Let's Encrypt certificates with the `--tls-cert`
 and `--tls-key` flags.
 
 There are many customization options available - check them with `gosmee server
@@ -227,14 +227,14 @@ To use your server, access it with a URL format like:
 
 The random ID must be 12 characters long with characters from `a-zA-Z0-9_-`.
 
-🆕 Generate a random ID easily with the `/new` endpoint:
+Generate a random ID easily with the `/new` endpoint:
 
 ```shell
 % curl http://localhost:3333/new
 http://localhost:3333/NqybHcEi
 ```
 
-#### 🟢 Caddy
+#### Caddy
 
 [Caddy](https://caddyserver.com/) is the ideal way to run gosmee server:
 
@@ -249,7 +249,7 @@ https://webhook.mydomain {
 
 It automatically configures Let's Encrypt certificates for you!
 
-#### 🔵 Nginx
+#### Nginx
 
 Running gosmee server behind nginx requires some configuration:
 
@@ -268,17 +268,17 @@ Running gosmee server behind nginx requires some configuration:
 ⚠️ Long-running connections may occasionally cause errors with nginx.
 Contributions to debug this are welcome!
 
-#### 🛡️ Security
+#### 🔒 Security
 
-##### 🌐 Webhook IP Restrictions
+##### Webhook IP Restrictions
 
 To enhance security, gosmee server supports IP address restrictions for webhook POST requests. This feature allows you to:
 
-- 🔒 Restrict webhook POST requests to specific IP addresses or CIDR ranges
-- 🌍 Support both IPv4 and IPv6 addresses
-- 🔍 Trust X-Forwarded-For and X-Real-IP headers when behind a proxy
-- 📝 Log rejected IP addresses for monitoring
-- 🚦 Only affects POST requests - UI access remains unrestricted
+- Restrict webhook POST requests to specific IP addresses or CIDR ranges
+- Support both IPv4 and IPv6 addresses
+- Trust X-Forwarded-For and X-Real-IP headers when behind a proxy
+- Log rejected IP addresses for monitoring
+- Only affects POST requests - UI access remains unrestricted
 
 Example usage with Git hosting providers' IP ranges:
 
@@ -309,9 +309,9 @@ Environment variables:
 
 The server logs will show:
 
-- 🚫 Rejected POST requests with the client's IP address
-- ℹ️ Whether the IP was obtained from proxy headers (when --trust-proxy is enabled)
-- 📊 Standard request logging including status code 403 for rejected IPs
+- Rejected POST requests with the client's IP address
+- Whether the IP was obtained from proxy headers (when --trust-proxy is enabled)
+- Standard request logging including status code 403 for rejected IPs
 
 Note: If no IP restrictions are configured, all POST requests will be allowed.
 
@@ -319,16 +319,16 @@ Note: If no IP restrictions are configured, all POST requests will be allowed.
 
 To protect server resources and match GitHub's standards, gosmee enforces a 25 MB payload size limit. Any request exceeding this limit will receive a 413 Request Entity Too Large response.
 
-🔗 See GitHub's documentation: <https://docs.github.com/en/webhooks/webhook-events-and-payloads#payload-cap>
+See GitHub's documentation: <https://docs.github.com/en/webhooks/webhook-events-and-payloads#payload-cap>
 
-##### 🔒 Channel Name Protection
+##### Channel Name Protection
 
 To prevent potential DoS attacks and ensure system stability:
 
-- 📏 Channel names are limited to 64 characters maximum
-- 🛣️ All route handlers (`/`, `/events/{channel}`, `/replay/{channel}`, POST `/{channel}`) enforce this limit
-- ✅ Built-in validation for all endpoints that handle channel names
-- 🛡️ Protects against resource exhaustion attacks that could be caused by excessive channel name lengths
+- Channel names are limited to 64 characters maximum
+- All route handlers (`/`, `/events/{channel}`, `/replay/{channel}`, POST `/{channel}`) enforce this limit
+- Built-in validation for all endpoints that handle channel names
+- Protects against resource exhaustion attacks that could be caused by excessive channel name lengths
 
 ##### 🔐 Webhook Signature Validation
 
@@ -340,20 +340,20 @@ gosmee server --webhook-signature=SECRET1 --webhook-signature=SECRET2
 
 When enabled:
 
-- 🔒 For GitHub: Validates X-Hub-Signature-256 header using HMAC SHA-256
-- 🔑 For GitLab: Validates X-Gitlab-Token header using secure token comparison
-- 🔵 For Bitbucket Cloud/Server: Validates X-Hub-Signature header using HMAC SHA-256
-- ⚡ For Gitea/Forge: Validates X-Gitea-Signature header using HMAC SHA-256
-- ✨ Supports multiple secrets - useful when receiving webhooks from different sources
-- 🚫 Rejects requests with missing or invalid signatures with HTTP 401 Unauthorized
-- 💡 Each secret is tried for validation, webhook is accepted if any secret matches
-- ⚡ Performance impact is minimal: ~2μs per validation with negligible memory usage
+- For GitHub: Validates X-Hub-Signature-256 header using HMAC SHA-256
+- For GitLab: Validates X-Gitlab-Token header using secure token comparison
+- For Bitbucket Cloud/Server: Validates X-Hub-Signature header using HMAC SHA-256
+- For Gitea/Forge: Validates X-Gitea-Signature header using HMAC SHA-256
+- Supports multiple secrets - useful when receiving webhooks from different sources
+- Rejects requests with missing or invalid signatures with HTTP 401 Unauthorized
+- Each secret is tried for validation, webhook is accepted if any secret matches
+- Performance impact is minimal: ~2μs per validation with negligible memory usage
 
 You can also set multiple secrets via the `GOSMEE_WEBHOOK_SIGNATURE` environment variable by separating them with commas.
 
 ## 🔁 Replay webhook deliveries via the GitHub API (beta)
 
-🔄 If you prefer not to use a relay server with GitHub, you can replay webhook deliveries directly via the GitHub API.
+If you prefer not to use a relay server with GitHub, you can replay webhook deliveries directly via the GitHub API.
 
 This method is more reliable as you don't depend on relay server availability.
 You'll need a GitHub token with appropriate scopes:
@@ -383,7 +383,7 @@ gosmee replay --github-token=$GITHUB_TOKEN org/repo HOOK_ID http://localhost:808
 
 This will listen to all **new** events and replay them to <http://localhost:8080>.
 
-⏱️ Replay all events received since a specific time (UTC format `2023-12-19T12:31:12`):
+Replay all events received since a specific time (UTC format `2023-12-19T12:31:12`):
 
 ```shell
 gosmee replay --time-since=2023-12-19T09:00:00 --github-token=$GITHUB_TOKEN org/repo HOOK_ID http://localhost:8080
@@ -402,16 +402,16 @@ gosmee replay --github-token=$GITHUB_TOKEN --list-deliveries org/repo HOOK_ID
 >
 >When rate limited, gosmee will fail without recovery mechanisms.
 
-## 🔄 Beyond Webhook
+## 🌐 Beyond Webhook
 
 Gosmee is webhook-specific. For other tunneling solutions, check
 <https://github.com/anderspitman/awesome-tunneling>. Recommended alternatives
 include [go-http-tunnel](https://github.com/mmatczuk/go-http-tunnel) or
 [tailscale](https://tailscale.com/).
 
-## ⚠️ Caveats ⚠️
+## ⚠️ Caveats
 
-⚠️ This tool is intended for local development and testing environments only!
+This tool is intended for local development and testing environments only!
 It hasn't undergone thorough security and performance reviews and
 should not be deployed in production systems.
 
@@ -427,7 +427,7 @@ SSE library had issues with chunked transfers.
 
 ## 👥 Authors
 
-### 👨‍💻 Chmouel Boudjnah
+### Chmouel Boudjnah
 
 - 🐘 Fediverse - <[@chmouel@chmouel.com](https://fosstodon.org/@chmouel)>
 - 🐦 Twitter - <[@chmouel](https://twitter.com/chmouel)>
