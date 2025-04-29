@@ -56,7 +56,7 @@ sequenceDiagram
     GC->>+LS: 4. Forwards Webhook Payload (HTTP POST)
     LS-->>-GC: 5. (Optional) HTTP Response
     GS-->>-SP: 6. (Optional) HTTP Response (e.g., 200 OK)
-````
+```
 
 ## 📰 Blog Post
 
@@ -263,6 +263,23 @@ Running gosmee server behind nginx requires some configuration:
 ⚠️ Long-running connections may occasionally cause errors with nginx.
 Contributions to debug this are welcome!
 
+#### 🛡️ Security
+
+##### 📦 Payload Size Protection
+
+To protect server resources and match GitHub's standards, gosmee enforces a 25 MB payload size limit. Any request exceeding this limit will receive a 413 Request Entity Too Large response.
+
+🔗 See GitHub's documentation: <https://docs.github.com/en/webhooks/webhook-events-and-payloads#payload-cap>
+
+##### 🔒 Channel Name Protection
+
+To prevent potential DoS attacks and ensure system stability:
+
+- 📏 Channel names are limited to 64 characters maximum
+- 🛣️ All route handlers (`/`, `/events/{channel}`, `/replay/{channel}`, POST `/{channel}`) enforce this limit
+- ✅ Built-in validation for all endpoints that handle channel names
+- 🛡️ Protects against resource exhaustion attacks that could be caused by excessive channel name lengths
+
 ## 🔁 Replay webhook deliveries via the GitHub API (beta)
 
 🔄 If you prefer not to use a relay server with GitHub, you can replay webhook deliveries directly via the GitHub API.
@@ -326,12 +343,6 @@ include [go-http-tunnel](https://github.com/mmatczuk/go-http-tunnel) or
 ⚠️ This tool is intended for local development and testing environments only!
 It hasn't undergone thorough security and performance reviews and
 should not be deployed in production systems.
-
-# 🛡️ Security
-
-## Payload Size Limit on
-
-To prevent memory exhaustion, request payloads are limited to 25 MB, matching GitHub’s payload cap. Requests exceeding this size will receive a 413 Request Entity Too Large response. See: <https://docs.github.com/en/webhooks/webhook-events-and-payloads#payload-cap>
 
 ## 🙏 Thanks
 
