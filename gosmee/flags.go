@@ -95,6 +95,17 @@ var serverFlags = []cli.Flag{
 		Value:   defaultServerPort,
 		Usage:   "Port to listen on",
 	},
+	&cli.StringSliceFlag{
+		Name:    "allowed-ips",
+		Usage:   "CIDR ranges or IP addresses to allow webhook requests from. Can be specified multiple times. If not specified, all IPs are allowed",
+		EnvVars: []string{"GOSMEE_ALLOWED_IPS"},
+	},
+	&cli.BoolFlag{
+		Name:    "trust-proxy",
+		Usage:   "Trust X-Forwarded-For and X-Real-IP headers for client IP",
+		Value:   false,
+		EnvVars: []string{"GOSMEE_TRUST_PROXY"},
+	},
 	&cli.BoolFlag{
 		Name:  "auto-cert",
 		Value: false,

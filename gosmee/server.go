@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"slices"
@@ -171,6 +172,7 @@ func validateWebhookSignature(secrets []string, payload []byte, r *http.Request)
 
 	// Check for GitHub signature
 	if githubSignature := r.Header.Get("X-Hub-Signature-256"); githubSignature != "" {
+		fmt.Fprintf(os.Stdout, "Received request %s %s\n", r.Method, r.URL.Path)
 		for _, secret := range secrets {
 			if validateGitHubWebhookSignature(secret, payload, githubSignature) {
 				return true
@@ -278,6 +280,180 @@ func handleWebhookPost(events *sse.Server, eventBroker *EventBroker, webhookSecr
 	}
 }
 
+// handleReplayPost handles POST requests to the replay endpoint.
+func handleReplayPost(events *sse.Server, eventBroker *EventBroker) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		channel := chi.URLParam(r, "channel")
+		if channel == "" {
+			http.Error(w, "Channel name missing in URL", http.StatusBadRequest)
+			return
+		}
+
+		// Validate channel length
+		if len(channel) > maxChannelLength {
+			http.Error(w, "Channel name exceeds maximum length", http.StatusBadRequest)
+			return
+		}
+
+		now := time.Now().UTC()
+		// Limit request body size to prevent memory exhaustion attacks
+		r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			if strings.Contains(err.Error(), "http: request body too large") {
+				http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
+				return
+			}
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Create a payload with the same format as the original webhook handler
+		payload := make(map[string]any)
+		// Add basic headers from the replay request
+		for k, v := range r.Header {
+			payload[strings.ToLower(k)] = v[0]
+		}
+		// Add timestamp and encode the body
+		payload["timestamp"] = fmt.Sprintf("%d", now.UnixMilli())
+		payload["bodyB"] = base64.StdEncoding.EncodeToString(body)
+		payload["content-type"] = contentType // Ensure content-type is set for replay
+
+		// Re-encode the payload to match the expected format
+		reencoded, err := json.Marshal(payload)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Publish to both systems (for UI and legacy clients)
+		events.CreateStream(channel)
+		events.Publish(channel, &sse.Event{Data: reencoded})
+		eventBroker.Publish(channel, reencoded)
+
+		w.WriteHeader(http.StatusAccepted)
+		_, _ = w.Write([]byte("replayed"))
+	}
+}
+
+// ipRanges represents a collection of IP networks for access control.
+type ipRanges struct {
+	networks []*net.IPNet
+	ips      []net.IP
+}
+
+// parseIPRanges parses a list of IP addresses or CIDR ranges.
+func parseIPRanges(ranges []string) (*ipRanges, error) {
+	result := &ipRanges{}
+	for _, r := range ranges {
+		if strings.Contains(r, "/") {
+			_, ipnet, err := net.ParseCIDR(r)
+			if err != nil {
+				return nil, fmt.Errorf("invalid CIDR range %q: %w", r, err)
+			}
+			result.networks = append(result.networks, ipnet)
+		} else {
+			ip := net.ParseIP(r)
+			if ip == nil {
+				return nil, fmt.Errorf("invalid IP address %q", r)
+			}
+			result.ips = append(result.ips, ip)
+		}
+	}
+	return result, nil
+}
+
+// contains checks if an IP is in any of the allowed ranges.
+func (r *ipRanges) contains(ip net.IP) bool {
+	// Check exact IP matches
+	if slices.ContainsFunc(r.ips, func(allowedIP net.IP) bool {
+		return ip.Equal(allowedIP)
+	}) {
+		return true
+	}
+
+	// Check CIDR ranges
+	for _, network := range r.networks {
+		if network.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
+
+// getRealIP gets the real client IP considering X-Forwarded-For and X-Real-IP headers if trusted.
+func getRealIP(r *http.Request, trustProxy bool) (net.IP, error) {
+	if trustProxy {
+		// Try X-Forwarded-For first
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			ips := strings.Split(xff, ",")
+			// Get the original client IP (first one)
+			clientIP := strings.TrimSpace(ips[0])
+			ip := net.ParseIP(clientIP)
+			if ip != nil {
+				return ip, nil
+			}
+		}
+
+		// Try X-Real-IP
+		if xrip := r.Header.Get("X-Real-IP"); xrip != "" {
+			ip := net.ParseIP(strings.TrimSpace(xrip))
+			if ip != nil {
+				return ip, nil
+			}
+		}
+	}
+
+	// Fall back to RemoteAddr
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		// Try RemoteAddr as-is in case it's just an IP
+		ip := net.ParseIP(r.RemoteAddr)
+		if ip != nil {
+			return ip, nil
+		}
+		return nil, fmt.Errorf("invalid RemoteAddr %q: %w", r.RemoteAddr, err)
+	}
+
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return nil, fmt.Errorf("invalid IP address %q", host)
+	}
+	return ip, nil
+}
+
+// ipRestrictMiddleware creates middleware that restricts access based on IP address for POST requests.
+func ipRestrictMiddleware(allowedRanges *ipRanges, trustProxy bool) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Only check IP for POST requests
+			if r.Method != http.MethodPost {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			// Skip IP validation if no ranges configured
+			if allowedRanges == nil || (len(allowedRanges.networks) == 0 && len(allowedRanges.ips) == 0) {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			clientIP, err := getRealIP(r, trustProxy)
+			if err != nil {
+				http.Error(w, "Failed to determine client IP", http.StatusBadRequest)
+				return
+			}
+
+			if !allowedRanges.contains(clientIP) {
+				http.Error(w, fmt.Sprintf("IP address %s not allowed", clientIP), http.StatusForbidden)
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 func serve(c *cli.Context) error {
 	publicURL := c.String("public-url")
 	footer := c.String("footer")
@@ -292,20 +468,42 @@ func serve(c *cli.Context) error {
 		}
 		footer = string(b)
 	}
-	router := chi.NewRouter()
-	router.Use(middleware.RequestID)
-	router.Use(middleware.RealIP)
-	router.Use(middleware.Logger)
-	router.Use(middleware.Recoverer)
 
-	// Initialize the SSE server (for backward compatibility)
+	// Parse IP restrictions if configured
+	var allowedRanges *ipRanges
+	if ips := c.StringSlice("allowed-ips"); len(ips) > 0 {
+		var err error
+		allowedRanges, err = parseIPRanges(ips)
+		if err != nil {
+			return fmt.Errorf("failed to parse allowed IPs: %w", err)
+		}
+	}
+
+	// Initialize the SSE server and event broker
 	events := sse.New()
 	events.AutoReplay = false
 	events.AutoStream = true
-
-	// Initialize our custom event broker for the web UI
 	eventBroker := NewEventBroker()
 
+	// Create two separate routers
+	mainRouter := chi.NewRouter()       // For unrestricted GET requests
+	restrictedRouter := chi.NewRouter() // For restricted POST requests
+
+	// Apply middleware to both routers (but NOT RealIP middleware which would interfere with our custom IP handling)
+	mainRouter.Use(middleware.RequestID)
+	// Do NOT use middleware.RealIP - it would override our trust-proxy setting
+	mainRouter.Use(middleware.Logger)
+	mainRouter.Use(middleware.Recoverer)
+
+	restrictedRouter.Use(middleware.RequestID)
+	// Do NOT use middleware.RealIP - it would override our trust-proxy setting
+	restrictedRouter.Use(middleware.Logger)
+	restrictedRouter.Use(middleware.Recoverer)
+
+	// Apply IP restriction middleware ONLY to restricted router
+	restrictedRouter.Use(ipRestrictMiddleware(allowedRanges, c.Bool("trust-proxy")))
+
+	// Define handlers
 	showNewURL := func(w http.ResponseWriter, _ *http.Request) {
 		channel := randomString(12)
 		url := fmt.Sprintf("%s/%s", publicURL, channel)
@@ -313,7 +511,7 @@ func serve(c *cli.Context) error {
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintf(w, "%s\n", url)
 	}
-	// Serve the main UI page
+
 	serveIndex := func(w http.ResponseWriter, r *http.Request) {
 		channel := chi.URLParam(r, "channel")
 		if channel == "" {
@@ -345,17 +543,25 @@ func serve(c *cli.Context) error {
 		}
 	}
 
-	// Serve favicon
-	router.Get("/favicon.ico", func(w http.ResponseWriter, _ *http.Request) {
+	// Register all GET routes on the main router
+	mainRouter.Get("/favicon.ico", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "image/svg+xml")
 		_, _ = w.Write(faviconSVG)
 	})
-	router.Get("/", serveIndex)
-	router.Get("/new", showNewURL) // Redirects to /random_channel via serveIndex
-	router.Get("/{channel:[a-zA-Z0-9-_]{12,64}}", serveIndex)
+	mainRouter.Get("/", serveIndex)
+	mainRouter.Get("/new", showNewURL)
+	mainRouter.Get("/{channel:[a-zA-Z0-9-_]{12,64}}", serveIndex)
+	mainRouter.Get("/version", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set(versionHeaderName, strings.TrimSpace(string(Version)))
+		resp := map[string]string{
+			"version": strings.TrimSpace(string(Version)),
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+	})
 
-	// Dedicated endpoint for SSE events
-	router.Get("/events/{channel:[a-zA-Z0-9-_]{12,64}}", func(w http.ResponseWriter, r *http.Request) {
+	// SSE endpoint for event streaming
+	mainRouter.Get("/events/{channel:[a-zA-Z0-9-_]{12,64}}", func(w http.ResponseWriter, r *http.Request) {
 		channel := chi.URLParam(r, "channel")
 		if channel == "" {
 			http.Error(w, "Channel name missing in URL", http.StatusBadRequest)
@@ -425,82 +631,23 @@ func serve(c *cli.Context) error {
 		}
 	})
 
-	router.Post("/{channel:[a-zA-Z0-9-_]{12,64}}", func(w http.ResponseWriter, r *http.Request) {
-		channel := chi.URLParam(r, "channel")
+	// Register POST routes on the restricted router
+	restrictedRouter.Post("/{channel:[a-zA-Z0-9-_]{12,64}}", handleWebhookPost(events, eventBroker, c.StringSlice("webhook-signature")))
+	restrictedRouter.Post("/replay/{channel:[a-zA-Z0-9-_]{12,64}}", handleReplayPost(events, eventBroker))
 
-		// Validate channel length
-		if len(channel) > maxChannelLength {
-			http.Error(w, "Channel name exceeds maximum length", http.StatusBadRequest)
-			return
+	// Create a final router which will route to the appropriate sub-router
+	finalRouter := chi.NewRouter()
+
+	// First mount the restrictedRouter to handle POST requests
+	finalRouter.Mount("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			restrictedRouter.ServeHTTP(w, r)
+		} else {
+			mainRouter.ServeHTTP(w, r)
 		}
+	}))
 
-		handleWebhookPost(events, eventBroker, c.StringSlice("webhook-signature"))(w, r)
-	})
-
-	// Add version endpoint to allow version checking
-	router.Get("/version", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set(versionHeaderName, strings.TrimSpace(string(Version)))
-		resp := map[string]string{
-			"version": strings.TrimSpace(string(Version)),
-		}
-		_ = json.NewEncoder(w).Encode(resp)
-	})
-
-	// Add a replay endpoint to allow replaying events from the UI
-	router.Post("/replay/{channel:[a-zA-Z0-9-_]{12,64}}", func(w http.ResponseWriter, r *http.Request) {
-		channel := chi.URLParam(r, "channel")
-		if channel == "" {
-			http.Error(w, "Channel name missing in URL", http.StatusBadRequest)
-			return
-		}
-
-		// Validate channel length
-		if len(channel) > maxChannelLength {
-			http.Error(w, "Channel name exceeds maximum length", http.StatusBadRequest)
-			return
-		}
-
-		now := time.Now().UTC()
-		// Limit request body size to prevent memory exhaustion attacks
-		r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
-		body, err := io.ReadAll(r.Body)
-		if err != nil {
-			if strings.Contains(err.Error(), "http: request body too large") {
-				http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
-				return
-			}
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		// Create a payload with the same format as the original webhook handler
-		payload := make(map[string]any)
-		// Add basic headers from the replay request
-		for k, v := range r.Header {
-			payload[strings.ToLower(k)] = v[0]
-		}
-		// Add timestamp and encode the body
-		payload["timestamp"] = fmt.Sprintf("%d", now.UnixMilli())
-		payload["bodyB"] = base64.StdEncoding.EncodeToString(body)
-		payload["content-type"] = contentType
-
-		// Re-encode the payload to match the expected format
-		reencoded, err := json.Marshal(payload)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		// Publish to both systems (for UI and legacy clients)
-		events.CreateStream(channel)
-		events.Publish(channel, &sse.Event{Data: reencoded})
-		eventBroker.Publish(channel, reencoded)
-
-		w.WriteHeader(http.StatusAccepted)
-		_, _ = w.Write([]byte("replayed"))
-	})
-
+	// Server setup
 	autoCert := c.Bool("auto-cert")
 	certFile := c.String("tls-cert")
 	certKey := c.String("tls-key")
@@ -518,11 +665,11 @@ func serve(c *cli.Context) error {
 
 	if sslEnabled {
 		//nolint:gosec
-		return http.ListenAndServeTLS(portAddr, certFile, certKey, router)
+		return http.ListenAndServeTLS(portAddr, certFile, certKey, finalRouter)
 	} else if autoCert {
 		//nolint: gosec
-		return http.Serve(autocert.NewListener(publicURL), router)
+		return http.Serve(autocert.NewListener(publicURL), finalRouter)
 	}
 	//nolint:gosec
-	return http.ListenAndServe(portAddr, router)
+	return http.ListenAndServe(portAddr, finalRouter)
 }
