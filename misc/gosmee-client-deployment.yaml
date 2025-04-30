@@ -1,0 +1,103 @@
+# Gosmee Client Kubernetes Deployment
+#
+# This manifest deploys the gosmee client component that connects to a gosmee server
+# (either your own or smee.io) and forwards webhook events to an internal service
+# within your Kubernetes cluster.
+#
+# Configuration:
+# - Specify the gosmee server URL as the first argument (https://yourserver.example.com/your-channel)
+# - Specify the internal service URL as the second argument (http://your-internal-service.namespace:8080)
+# - The --saveDir flag enables saving webhook payloads to /tmp/save for later inspection
+# - The --health-port flag exposes a health endpoint for Kubernetes probes
+# - The --output json flag formats logs as JSON for better integration with log aggregation systems
+#
+# Security:
+# - Container runs with a secure context (non-root, read-only filesystem, etc.)
+# - An emptyDir volume is mounted at /tmp to allow for saving webhook payloads
+#
+# Usage:
+# kubectl apply -f gosmee-client-deployment.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gosmee-client
+  labels:
+    app: gosmee-client
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gosmee-client
+  template:
+    metadata:
+      labels:
+        app: gosmee-client
+    spec:
+      containers:
+        - image: ghcr.io/chmouel/gosmee:main
+          imagePullPolicy: Always
+          name: gosmee-client
+          args:
+            [
+              "client",
+              "--output",
+              "json",
+              "--saveDir",
+              "/tmp/save",
+              "--health-port",
+              "8081",
+              "https://yourserver.example.com/your-channel",
+              "http://your-internal-service.namespace:8080",
+            ]
+          ports:
+            - containerPort: 8081
+              name: health
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8081
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 3
+          resources:
+            limits:
+              cpu: 100m
+              memory: 128Mi
+            requests:
+              cpu: 50m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - "ALL"
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+            seccompProfile:
+              type: RuntimeDefault
+          volumeMounts:
+            - mountPath: /tmp
+              name: tmp-volume
+      volumes:
+        - name: tmp-volume
+          emptyDir: {}
+#
+# Optional: Service to expose health endpoint
+# ---
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: gosmee-client-health
+# spec:
+#   ports:
+#     - name: health
+#       port: 8081
+#       protocol: TCP
+#       targetPort: 8081
+#   selector:
+#     app: gosmee-client
+#   type: ClusterIP

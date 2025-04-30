@@ -150,14 +150,42 @@ System Service example files for macOS and Linux are available in the
 
 ### ☸️ Kubernetes
 
-You can expose an internal kubernetes deployment or service with gosmee by
-using [this file](./misc/kubernetes-deployment.yaml).
+You can deploy gosmee on Kubernetes to relay webhooks to your internal services.
 
-Adjust the `SMEE_URL` to your endpoint and the
-`http://deployment.name.namespace.name:PORT_OF_SERVICE` URL is the Kubernetes
-internal URL of your deployment running on your cluster, for example:
+Two deployment yaml are available:
 
-   <http://service.namespace:8080>
+- [gosmee-server-deployment.yaml](./misc/gosmee-server-deployment.yaml) - For deploying the public-facing server component
+- [gosmee-client-deployment.yaml](./misc/gosmee-client-deployment.yaml) - For deploying the client component that forwards to internal services
+
+#### Server Deployment
+
+The server deployment exposes a public webhook endpoint to receive incoming webhook events:
+
+```shell
+kubectl apply -f misc/gosmee-server-deployment.yaml
+```
+
+Key configuration:
+
+- Set `--public-url` to your actual domain where the service will be exposed
+- Configure an Ingress with TLS or use a service mesh for production use
+- For security, consider using `--webhook-signature` and `--allowed-ips` options
+
+#### Client Deployment
+
+The client deployment connects to a gosmee server (either your own or smee.io) and forwards webhook events to internal services:
+
+```shell
+kubectl apply -f misc/gosmee-client-deployment.yaml
+```
+
+Key configuration:
+
+- Adjust the first argument to your gosmee server URL or smee.io channel
+- Change the second argument to your internal service URL (e.g., `http://service.namespace:8080`)
+- The `--saveDir` flag enables saving webhook payloads to `/tmp/save` for later inspection
+
+For detailed configuration options, refer to the documentation comments in each deployment file.
 
 ### Shell completion
 

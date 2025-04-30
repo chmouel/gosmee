@@ -20,11 +20,3 @@ curl -L https://raw.githubusercontent.com/chmouel/gosmee/main/misc/gosmee.servic
 $EDITOR  $HOME/.config/systemd/user/gosmee.service
 systemctl --user enable --now gosmee
 ```
-
-## Kubernetes
-
-```shell
-curl -LO https://raw.githubusercontent.com/chmouel/gosmee/main/misc/kubernetes-deployment.yaml
-$EDITOR kubernetes-deployment.yaml
-kubectl apply -f kubernetes-deployment.yaml
-```

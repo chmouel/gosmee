@@ -1,0 +1,110 @@
+# Gosmee Server Kubernetes Deployment
+#
+# This manifest deploys the gosmee server component that receives webhooks from external sources
+# and relays them to gosmee clients. Use this when you need to expose a public endpoint for
+# receiving webhooks in your Kubernetes cluster.
+#
+# Configuration:
+# - Adjust --public-url to your actual domain where the service will be exposed
+# - Configure appropriate resource limits based on expected traffic
+# - For production use, consider setting up an Ingress with TLS or use a service mesh
+# - To enable webhook signature validation, add --webhook-signature=SECRET arg
+# - For IP restrictions, add --allowed-ips args with appropriate CIDR ranges
+#
+# Usage:
+# kubectl apply -f gosmee-server-deployment.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gosmee-server
+  labels:
+    app: gosmee-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gosmee-server
+  template:
+    metadata:
+      labels:
+        app: gosmee-server
+    spec:
+      containers:
+        - image: ghcr.io/chmouel/gosmee:main
+          imagePullPolicy: Always
+          name: gosmee-server
+          args:
+            [
+              "server",
+              "--port",
+              "3333",
+              "--address",
+              "0.0.0.0",
+              "--public-url",
+              "https://yourserver.example.com",
+            ]
+          ports:
+            - containerPort: 3333
+              name: http
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3333
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3333
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            limits:
+              cpu: 200m
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - "ALL"
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+            seccompProfile:
+              type: RuntimeDefault
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gosmee-server
+spec:
+  ports:
+    - name: http
+      port: 80
+      protocol: TCP
+      targetPort: 3333
+  selector:
+    app: gosmee-server
+  type: ClusterIP
+# Optional: Uncomment for external access via LoadBalancer
+# ---
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: gosmee-server-public
+# spec:
+#   ports:
+#     - name: http
+#       port: 80
+#       protocol: TCP
+#       targetPort: 3333
+#   selector:
+#     app: gosmee-server
+#   type: LoadBalancer

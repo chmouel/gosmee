@@ -454,6 +454,17 @@ func ipRestrictMiddleware(allowedRanges *ipRanges, trustProxy bool) func(http.Ha
 	}
 }
 
+func retVersion(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set(versionHeaderName, strings.TrimSpace(string(Version)))
+	resp := map[string]string{
+		"version": strings.TrimSpace(string(Version)),
+	}
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		errorIt(w, nil, http.StatusInternalServerError, err)
+	}
+}
+
 func serve(c *cli.Context) error {
 	publicURL := c.String("public-url")
 	footer := c.String("footer")
@@ -551,14 +562,10 @@ func serve(c *cli.Context) error {
 	mainRouter.Get("/", serveIndex)
 	mainRouter.Get("/new", showNewURL)
 	mainRouter.Get("/{channel:[a-zA-Z0-9-_]{12,64}}", serveIndex)
-	mainRouter.Get("/version", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set(versionHeaderName, strings.TrimSpace(string(Version)))
-		resp := map[string]string{
-			"version": strings.TrimSpace(string(Version)),
-		}
-		_ = json.NewEncoder(w).Encode(resp)
-	})
+
+	mainRouter.Get("/version", retVersion)
+	mainRouter.Get("/health", retVersion)
+	mainRouter.Get("/livez", retVersion)
 
 	// SSE endpoint for event streaming
 	mainRouter.Get("/events/{channel:[a-zA-Z0-9-_]{12,64}}", func(w http.ResponseWriter, r *http.Request) {
