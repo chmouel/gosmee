@@ -542,3 +542,28 @@ func (c goSmee) clientSetup() error {
 		}
 	})
 }
+
+func serveHealthEndpoint(port int, logger *slog.Logger, decorate bool) {
+	if port <= 0 {
+		return // Health server disabled
+	}
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/health", retVersion)
+
+	addr := fmt.Sprintf(":%d", port)
+	server := &http.Server{
+		Addr:              addr,
+		Handler:           mux,
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+
+	logger.Info(fmt.Sprintf("%sStarting health server on %s", emoji("✓", "green+b", decorate), addr))
+
+	// Run the health server in a separate goroutine
+	go func() {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			logger.Error(fmt.Sprintf("%sHealth server error: %s", emoji("⛔", "red+b", decorate), err.Error()))
+		}
+	}()
+}

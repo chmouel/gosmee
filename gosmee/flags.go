@@ -82,6 +82,12 @@ var clientFlags = []cli.Flag{
 		Usage: "Local URL when debugging the payloads",
 		Value: defaultLocalDebugURL,
 	},
+	&cli.IntFlag{
+		Name:    "health-port",
+		Usage:   "Port to expose health endpoint for Kubernetes liveness/readiness probes",
+		Value:   0,
+		EnvVars: []string{"GOSMEE_HEALTH_PORT"},
+	},
 }
 
 var serverFlags = []cli.Flag{

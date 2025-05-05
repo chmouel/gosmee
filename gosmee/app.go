@@ -109,6 +109,13 @@ non-publicly accessible endpoint, forward those requests to your local service.`
 					if localDebugURL == "" {
 						localDebugURL = defaultLocalDebugURL
 					}
+
+					// Start health server if health-port is provided
+					healthPort := c.Int("health-port")
+					if healthPort > 0 {
+						serveHealthEndpoint(healthPort, logger, decorate)
+					}
+
 					cfg := goSmee{
 						replayDataOpts: &replayDataOpts{
 							smeeURL:           smeeURL,
