@@ -5,11 +5,11 @@
 class Gosmee < Formula
   desc "gosmee - A webhook and https://smee.io forwarder"
   homepage "https://github.com/chmouel/gosmee"
-  version "0.25.0"
+  version "0.26.0"
 
   on_macos do
-    url "https://github.com/chmouel/gosmee/releases/download/v0.25.0/gosmee_0.25.0_darwin_all.tar.gz"
-    sha256 "4d17394031e82aaffc6502812190dfd680a721a849fd375825b91edd0fa70682"
+    url "https://github.com/chmouel/gosmee/releases/download/v0.26.0/gosmee_0.26.0_darwin_all.tar.gz"
+    sha256 "c0d05cea0c34bf2cdbe7fcd46144b7f12368aa9da657a1dc456c88d76217c8b6"
 
     def install
       bin.install "gosmee" => "gosmee"
@@ -24,38 +24,32 @@ class Gosmee < Formula
   end
 
   on_linux do
-    if Hardware::CPU.intel?
-      if Hardware::CPU.is_64_bit?
-        url "https://github.com/chmouel/gosmee/releases/download/v0.25.0/gosmee_0.25.0_linux_x86_64.tar.gz"
-        sha256 "eb198d3a518d0a36d3a41a9e695d23a151f35076523f9d05deae63f4bbf71445"
-
-        def install
-          bin.install "gosmee" => "gosmee"
-          output = Utils.popen_read("SHELL=bash #{bin}/gosmee completion bash")
-          (bash_completion/"gosmee").write output
-          output = Utils.popen_read("SHELL=zsh #{bin}/gosmee completion zsh")
-          (zsh_completion/"_gosmee").write output
-          output = Utils.popen_read("SHELL=zsh #{bin}/gosmee completion fish")
-          (fish_completion/"gosmee.fish").write output
-          prefix.install_metafiles
-        end
+    if Hardware::CPU.intel? and Hardware::CPU.is_64_bit?
+      url "https://github.com/chmouel/gosmee/releases/download/v0.26.0/gosmee_0.26.0_linux_x86_64.tar.gz"
+      sha256 "14b6834aadc462920ac829a967ec982e528f6f47019adf79118cf0c6c2af901d"
+      def install
+        bin.install "gosmee" => "gosmee"
+        output = Utils.popen_read("SHELL=bash #{bin}/gosmee completion bash")
+        (bash_completion/"gosmee").write output
+        output = Utils.popen_read("SHELL=zsh #{bin}/gosmee completion zsh")
+        (zsh_completion/"_gosmee").write output
+        output = Utils.popen_read("SHELL=zsh #{bin}/gosmee completion fish")
+        (fish_completion/"gosmee.fish").write output
+        prefix.install_metafiles
       end
     end
-    if Hardware::CPU.arm?
-      if Hardware::CPU.is_64_bit?
-        url "https://github.com/chmouel/gosmee/releases/download/v0.25.0/gosmee_0.25.0_linux_arm64.tar.gz"
-        sha256 "64831e0a74d2ebadba90c3044bbb3496501dabe1538639908f45684e548a85bd"
-
-        def install
-          bin.install "gosmee" => "gosmee"
-          output = Utils.popen_read("SHELL=bash #{bin}/gosmee completion bash")
-          (bash_completion/"gosmee").write output
-          output = Utils.popen_read("SHELL=zsh #{bin}/gosmee completion zsh")
-          (zsh_completion/"_gosmee").write output
-          output = Utils.popen_read("SHELL=zsh #{bin}/gosmee completion fish")
-          (fish_completion/"gosmee.fish").write output
-          prefix.install_metafiles
-        end
+    if Hardware::CPU.arm? and Hardware::CPU.is_64_bit?
+      url "https://github.com/chmouel/gosmee/releases/download/v0.26.0/gosmee_0.26.0_linux_arm64.tar.gz"
+      sha256 "fabd726d8f01bf207d33e89d6b8bc1f0056b2dbde41fd3e1a7421a9ee7bf79cb"
+      def install
+        bin.install "gosmee" => "gosmee"
+        output = Utils.popen_read("SHELL=bash #{bin}/gosmee completion bash")
+        (bash_completion/"gosmee").write output
+        output = Utils.popen_read("SHELL=zsh #{bin}/gosmee completion zsh")
+        (zsh_completion/"_gosmee").write output
+        output = Utils.popen_read("SHELL=zsh #{bin}/gosmee completion fish")
+        (fish_completion/"gosmee.fish").write output
+        prefix.install_metafiles
       end
     end
   end
