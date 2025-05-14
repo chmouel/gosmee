@@ -24,6 +24,7 @@ import (
 	"golang.org/x/exp/slog"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
+	"gopkg.in/cenkalti/backoff.v1"
 )
 
 //go:embed templates/version
@@ -463,6 +464,13 @@ func (c goSmee) clientSetup() error {
 	}
 
 	client := sse.NewClient(sseURL, sse.ClientMaxBufferSize(1<<20))
+	// Set up a custom exponential backoff strategy that never stops retrying
+	// By default, ExponentialBackOff gives up after 15 minutes, which can cause
+	// the client to get stuck. Setting MaxElapsedTime to 0 makes it retry forever.
+	expBackoff := backoff.NewExponentialBackOff()
+	expBackoff.MaxElapsedTime = 0 // Setting this to 0 means it will retry forever
+	client.ReconnectStrategy = expBackoff
+	c.logger.Info(fmt.Sprintf("%sConfigured reconnection strategy to retry indefinitely", emoji("⇉", "blue+b", c.replayDataOpts.decorate)))
 	client.Headers["User-Agent"] = fmt.Sprintf("gosmee/%s", version)
 	client.Headers["X-Accel-Buffering"] = "no"
 
