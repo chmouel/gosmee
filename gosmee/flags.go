@@ -71,6 +71,12 @@ var replayFlags = []cli.Flag{
 }
 
 var clientFlags = []cli.Flag{
+	&cli.BoolFlag{
+		Name:    "new-url",
+		Aliases: []string{"u"},
+		Usage:   "Generate a new URL from https://hook.pipelinesascode.com",
+		Value:   false,
+	},
 	&cli.StringFlag{
 		Name:    "channel",
 		Aliases: []string{"c"},
