@@ -7,9 +7,10 @@ MD_FILES := $(shell find . -type f -regex ".*md"  -not -regex '^./vendor/.*' -no
 LDFLAGS := -s -w
 FLAGS += -ldflags "$(LDFLAGS)" -buildvcs=true
 OUTPUT_DIR = bin
+TEST_FLAGS = -v 
+COVERAGE_FLAGS = -coverprofile=coverage.out -covermode=atomic 
 
 all: test lint build
-
 FORCE:
 
 .PHONY: vendor
@@ -24,7 +25,12 @@ $(OUTPUT_DIR)/$(NAME)-aarch64-linux: main.go FORCE
 	env GOARCH=arm64 GOOS=linux	go build -mod=vendor $(FLAGS)   -o $@ ./$<
 
 test:
-	@go test ./... 
+	@go test $(TEST_FLAGS) ./... 
+
+.PHONY: html-coverage
+html-coverage: ## generate html coverage
+	@mkdir -p tmp
+	@go test $(COVERAGE_FLAGS) -coverprofile=tmp/c.out ./.../ && go tool cover -html=tmp/c.out
 
 clean:
 	@rm -rf $(OUTPUT_DIR)/gosmee
