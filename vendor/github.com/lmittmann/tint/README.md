@@ -18,7 +18,7 @@ that writes tinted (colorized) logs. Its output format is inspired by the `zerol
 The output format can be customized using [`Options`](https://pkg.go.dev/github.com/lmittmann/tint#Options)
 which is a drop-in replacement for [`slog.HandlerOptions`](https://pkg.go.dev/log/slog#HandlerOptions).
 
-```shell
+```
 go get github.com/lmittmann/tint
 ```
 
@@ -27,10 +27,10 @@ go get github.com/lmittmann/tint
 ```go
 w := os.Stderr
 
-// create a new logger
+// Create a new logger
 logger := slog.New(tint.NewHandler(w, nil))
 
-// set global logger with custom options
+// Set global logger with custom options
 slog.SetDefault(slog.New(
     tint.NewHandler(w, &tint.Options{
         Level:      slog.LevelDebug,
@@ -46,7 +46,26 @@ each non-group attribute before it is logged. See [`slog.HandlerOptions`](https:
 for details.
 
 ```go
-// create a new logger that doesn't write the time
+// Create a new logger with a custom TRACE level:
+const LevelTrace = slog.LevelDebug - 4
+
+w := os.Stderr
+logger := slog.New(tint.NewHandler(w, &tint.Options{
+    Level: LevelTrace,
+    ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+        if a.Key == slog.LevelKey && len(groups) == 0 {
+            level, ok := a.Value.Any().(slog.Level)
+            if ok && level <= LevelTrace {
+                return tint.Attr(13, slog.String(a.Key, "TRC"))
+            }
+        }
+        return a
+    },
+}))
+```
+
+```go
+// Create a new logger that doesn't write the time
 w := os.Stderr
 logger := slog.New(
     tint.NewHandler(w, &tint.Options{
@@ -60,11 +79,28 @@ logger := slog.New(
 )
 ```
 
+```go
+// Create a new logger that writes all errors in red
+w := os.Stderr
+logger := slog.New(
+    tint.NewHandler(w, &tint.Options{
+        ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+            if a.Value.Kind() == slog.KindAny {
+                if _, ok := a.Value.Any().(error); ok {
+                    return tint.Attr(9, a)
+                }
+            }
+            return a
+        },
+    }),
+)
+```
+
 ### Automatically Enable Colors
 
-Colors are enabled by default and can be disabled using the `Options.NoColor`
-attribute. To automatically enable colors based on the terminal capabilities,
-use e.g. the [`go-isatty`](https://github.com/mattn/go-isatty) package.
+Colors are enabled by default. Use the `Options.NoColor` field to disable
+color output. To automatically enable colors based on terminal capabilities, use
+e.g., the [`go-isatty`](https://github.com/mattn/go-isatty) package:
 
 ```go
 w := os.Stderr
@@ -77,8 +113,8 @@ logger := slog.New(
 
 ### Windows Support
 
-Color support on Windows can be added by using e.g. the
-[`go-colorable`](https://github.com/mattn/go-colorable) package.
+Color support on Windows can be added by using e.g., the
+[`go-colorable`](https://github.com/mattn/go-colorable) package:
 
 ```go
 w := os.Stderr

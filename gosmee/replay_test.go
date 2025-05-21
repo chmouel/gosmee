@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/google/go-github/v57/github"
-	"golang.org/x/exp/slog"
 	"gotest.tools/v3/assert"
 )
 
@@ -179,7 +178,7 @@ func (r *replayOpts) replayHooksForTest(ctx context.Context, hookid int64) error
 }
 
 func TestReplayHooks(t *testing.T) {
-	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	logger := slog.New(slog.DiscardHandler)
 
 	// Create a simple mock delivery response
 	deliveryTime := time.Now()

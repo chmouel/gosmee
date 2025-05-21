@@ -4,8 +4,9 @@ import (
 	"context" // For context.DeadlineExceeded
 	"fmt"     // For fmt.Sprintf in subtest names
 	"io"
-	"net/http"          // For http.MethodPost, etc.
-	"net/http/httptest" // For httptest.NewServer
+	"log/slog" // For http.MethodPost, etc.
+	"net/http" // For httptest.NewServer
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,7 +15,6 @@ import (
 	"time"
 
 	"golang.org/x/exp/slices" // For ignoreEvents check
-	"golang.org/x/exp/slog"
 	"gotest.tools/v3/assert"
 
 	// "gotest.tools/v3/assert/cmp" // Removed as it's not strictly needed and was causing "imported and not used".
@@ -37,7 +37,7 @@ var simpleJSON = `{
 func TestGoSmeeGood(t *testing.T) {
 	p := goSmee{
 		replayDataOpts: &replayDataOpts{},
-		logger:         slog.New(slog.NewTextHandler(io.Discard, nil)),
+		logger:         slog.New(slog.DiscardHandler),
 	}
 	m, err := p.parse(time.Now().UTC(), []byte(simpleJSON))
 	assert.NilError(t, err)
@@ -54,7 +54,7 @@ func TestGoSmeeGood(t *testing.T) {
 func TestGoSmeeBad(t *testing.T) {
 	p := goSmee{
 		replayDataOpts: &replayDataOpts{},
-		logger:         slog.New(slog.NewTextHandler(io.Discard, nil)),
+		logger:         slog.New(slog.DiscardHandler),
 	}
 	pm, _ := p.parse(time.Now().UTC(), []byte(`xxxXXXxx`))
 	assert.Equal(t, string(pm.body), "")
@@ -63,7 +63,7 @@ func TestGoSmeeBad(t *testing.T) {
 func TestGoSmeeBodyB(t *testing.T) {
 	p := goSmee{
 		replayDataOpts: &replayDataOpts{},
-		logger:         slog.New(slog.NewTextHandler(io.Discard, nil)),
+		logger:         slog.New(slog.DiscardHandler),
 	}
 	body := `{"bodyB": "eyJoZWxsbyI6ICJ3b3JsZCJ9", "content-type": "application/json"}`
 	m, err := p.parse(time.Now().UTC(), []byte(body))
@@ -74,7 +74,7 @@ func TestGoSmeeBodyB(t *testing.T) {
 func TestGoSmeeBadTimestamp(t *testing.T) {
 	p := goSmee{
 		replayDataOpts: &replayDataOpts{},
-		logger:         slog.New(slog.NewTextHandler(io.Discard, nil)),
+		logger:         slog.New(slog.DiscardHandler),
 	}
 	json := `{"timestamp": "notanumber", "content-type": "application/json", "body": {}}`
 	_, err := p.parse(time.Now().UTC(), []byte(json))
@@ -84,7 +84,7 @@ func TestGoSmeeBadTimestamp(t *testing.T) {
 func TestGoSmeeMissingHeaders(t *testing.T) {
 	p := goSmee{
 		replayDataOpts: &replayDataOpts{},
-		logger:         slog.New(slog.NewTextHandler(io.Discard, nil)),
+		logger:         slog.New(slog.DiscardHandler),
 	}
 	json := `{"body": {}}`
 	m, err := p.parse(time.Now().UTC(), []byte(json))
@@ -95,7 +95,7 @@ func TestGoSmeeMissingHeaders(t *testing.T) {
 func TestGoSmeeEventID(t *testing.T) {
 	p := goSmee{
 		replayDataOpts: &replayDataOpts{},
-		logger:         slog.New(slog.NewTextHandler(io.Discard, nil)),
+		logger:         slog.New(slog.DiscardHandler),
 	}
 	json := `{"x-github-delivery": "12345", "content-type": "application/json", "body": {}}`
 	m, err := p.parse(time.Now().UTC(), []byte(json))
@@ -180,7 +180,7 @@ curl -sSi -H "Content-Type: {{.ContentType}}" {{ .Headers }} -X POST -d @./{{ .F
 `
 
 func TestSaveData(t *testing.T) {
-	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	logger := slog.New(slog.DiscardHandler)
 
 	basePayload := payloadMsg{
 		body:        []byte(`{"key":"value"}`),
@@ -423,7 +423,7 @@ func TestBuildHeaders(t *testing.T) {
 }
 
 func TestReplayData(t *testing.T) {
-	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	logger := slog.New(slog.DiscardHandler)
 	basePayload := payloadMsg{
 		body:        []byte(`{"key":"value"}`),
 		contentType: "application/json",
@@ -632,7 +632,7 @@ func TestReplayData(t *testing.T) {
 }
 
 func TestServeHealthEndpoint(t *testing.T) {
-	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	logger := slog.New(slog.DiscardHandler)
 	decorate := false
 
 	// Helper to get an ephemeral port
@@ -739,8 +739,8 @@ func TestServeHealthEndpoint(t *testing.T) {
 }
 
 func TestCheckServerVersion(t *testing.T) {
-	logger := slog.New(slog.NewTextHandler(io.Discard, nil)) // Discard logs for cleaner test output
-	decorate := false                                        // No need for decorated logs in tests
+	logger := slog.New(slog.DiscardHandler) // Using a discard logger for tests
+	decorate := false                       // No need for decorated logs in tests
 
 	defaultClientVersion := "1.0.0"
 
@@ -1031,7 +1031,7 @@ func processTestEvent(t *testing.T, gs *goSmee, now time.Time, msg *sse.Event, t
 }
 
 func TestClientSetupEventCallback(t *testing.T) {
-	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	logger := slog.New(slog.DiscardHandler)
 	baseTime := time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC)
 
 	// Default opts for many tests
