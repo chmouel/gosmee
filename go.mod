@@ -1,8 +1,6 @@
 module github.com/chmouel/gosmee
 
-go 1.23.8
-
-toolchain go1.24.3
+go 1.24.3
 
 require (
 	github.com/go-chi/chi/v5 v5.2.1
@@ -13,21 +11,21 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/r3labs/sse/v2 v2.10.0
 	github.com/urfave/cli/v2 v2.27.6
-	golang.org/x/crypto v0.37.0
+	golang.org/x/crypto v0.38.0
 	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0
-	golang.org/x/text v0.24.0
+	golang.org/x/text v0.25.0
 	gopkg.in/cenkalti/backoff.v1 v1.1.0
 	gotest.tools/v3 v3.5.2
 )
 
 require (
-	github.com/cpuguy83/go-md2man/v2 v2.0.6 // indirect
+	github.com/cpuguy83/go-md2man/v2 v2.0.7 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
-	golang.org/x/net v0.39.0 // indirect
-	golang.org/x/sys v0.32.0 // indirect
+	golang.org/x/net v0.40.0 // indirect
+	golang.org/x/sys v0.33.0 // indirect
 )
