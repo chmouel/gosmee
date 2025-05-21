@@ -2,7 +2,7 @@ NAME  := gosmee
 TARGET_URL ?= http://localhost:8080
 SMEE_URL ?= https://smee.io/new
 IMAGE_VERSION ?= latest
-MD_FILES := $(shell find . -type f -regex ".*md"  -not -regex '^./vendor/.*' -not -regex '^./tint/.*' -not -regex '^./.vale/.*' -not -regex "^./.git/.*" -print)
+MD_FILES := $(shell find . -type f -regex ".*md"  -not -regex '^./vendor/.*' -not -regex '^./.vale/.*' -not -regex "^./.git/.*" -print)
 
 LDFLAGS := -s -w
 FLAGS += -ldflags "$(LDFLAGS)" -buildvcs=true

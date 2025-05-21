@@ -3,12 +3,11 @@ package gosmee
 import (
 	"context"
 	"errors"
-	"io"
+	"log/slog"
 	"testing"
 	"time"
 
 	"github.com/google/go-github/v57/github"
-	"golang.org/x/exp/slog"
 	"gotest.tools/v3/assert"
 )
 
@@ -47,7 +46,7 @@ func (m *mockGHOp) GetHookDelivery(_ context.Context, _, _ string, _, _ int64) (
 }
 
 func TestListHooks(t *testing.T) {
-	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	logger := slog.New(slog.DiscardHandler)
 
 	t.Run("Success", func(t *testing.T) {
 		// Create test hooks
@@ -107,7 +106,7 @@ func TestListHooks(t *testing.T) {
 }
 
 func TestListDeliveries(t *testing.T) {
-	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	logger := slog.New(slog.DiscardHandler)
 
 	t.Run("Success", func(t *testing.T) {
 		// Create test deliveries

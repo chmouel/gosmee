@@ -20,6 +20,9 @@ github.com/google/go-github/v57/github
 # github.com/google/go-querystring v1.1.0
 ## explicit; go 1.10
 github.com/google/go-querystring/query
+# github.com/lmittmann/tint v1.1.0
+## explicit; go 1.21
+github.com/lmittmann/tint
 # github.com/mattn/go-colorable v0.1.14
 ## explicit; go 1.18
 github.com/mattn/go-colorable
@@ -51,9 +54,6 @@ golang.org/x/crypto/acme/autocert
 # golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0
 ## explicit; go 1.23.0
 golang.org/x/exp/slices
-golang.org/x/exp/slog
-golang.org/x/exp/slog/internal
-golang.org/x/exp/slog/internal/buffer
 # golang.org/x/net v0.39.0
 ## explicit; go 1.23.0
 golang.org/x/net/context

@@ -3,6 +3,7 @@ package gosmee
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -14,7 +15,6 @@ import (
 	"github.com/mattn/go-isatty"
 	"github.com/mgutz/ansi"
 	"github.com/urfave/cli/v2"
-	"golang.org/x/exp/slog"
 )
 
 const userTSFormat = "2006-01-02T15:04:05"

@@ -2,9 +2,9 @@ package gosmee
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/google/go-github/v57/github"
-	"golang.org/x/exp/slog"
 )
 
 type GHOp interface {

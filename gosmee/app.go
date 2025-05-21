@@ -5,17 +5,17 @@ import (
 	_ "embed"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
 	"time"
 
-	"github.com/chmouel/gosmee/tint"
+	"github.com/lmittmann/tint"
 	"github.com/mattn/go-isatty"
 	"github.com/mgutz/ansi"
 	"github.com/urfave/cli/v2"
-	"golang.org/x/exp/slog"
 )
 
 //go:embed templates/zsh_completion.zsh
