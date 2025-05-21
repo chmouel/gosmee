@@ -206,13 +206,16 @@ source <(gosmee completion zsh)
 If you plan to use <https://smee.io>, you can generate your own smee URL by
 visiting <https://smee.io/new>.
 
+If you want to use <https://hook.pipelinesascode.com> then you can directly
+generate a URL with  the `-u / --new-url` flag to generate one.
+
 Once you have it, the basic usage is:
 
 ```shell
 gosmee client https://smee.io/aBcDeF https://localhost:8080
 ```
 
-This command will relay all payloads received at the smee URL to a service
+This command will relay all payloads received by the smee URL to a service
 running on <http://localhost:8080>.
 
 You can also save all relays as shell scripts for easy replay:

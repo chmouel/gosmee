@@ -1,8 +1,11 @@
 package gosmee
 
 import (
+	"context"
 	_ "embed"
 	"fmt"
+	"io"
+	"net/http"
 	"net/url"
 	"os"
 	"strings"
@@ -20,6 +23,8 @@ var zshCompletion []byte
 
 //go:embed templates/bash_completion.bash
 var bashCompletion []byte
+
+const DefaultPublicHookURL = "https://hook.pipelinesascode.com/new"
 
 func getLogger(c *cli.Context) (*slog.Logger, bool, error) {
 	nocolor := c.Bool("nocolor")
@@ -40,6 +45,28 @@ func getLogger(c *cli.Context) (*slog.Logger, bool, error) {
 	return logger, nocolor, nil
 }
 
+// getNewHookURL connects to the provided targetURL and prints the output.
+func getNewHookURL(targetURL string) (string, error) {
+	client := &http.Client{}
+
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, targetURL, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create GET request: %w", err)
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to make GET request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
+		return "", fmt.Errorf("unexpected status code %d", resp.StatusCode)
+	}
+
+	b, err := io.ReadAll(resp.Body)
+	return string(b), err
+}
+
 func makeapp() *cli.App {
 	app := &cli.App{
 		Name:  "gosmee",
@@ -49,6 +76,7 @@ Where the server is the source of the webhook, and the client, which you run on 
 non-publicly accessible endpoint, forward those requests to your local service.`,
 		EnableBashCompletion: true,
 		Version:              strings.TrimSpace(string(Version)),
+		Flags:                commonFlags, // Add commonFlags here so --new-url is a global flag
 		Commands: []*cli.Command{
 			{
 				Name:  "replay",
@@ -77,6 +105,17 @@ non-publicly accessible endpoint, forward those requests to your local service.`
 					logger, nocolor, err := getLogger(c)
 					if err != nil {
 						return err
+					}
+
+					if c.Bool("new-url") {
+						url, err := getNewHookURL(DefaultPublicHookURL)
+						if err != nil {
+							// Let's print the error to stderr for better UX
+							fmt.Fprintln(os.Stderr, "Error:", err)
+							return cli.Exit("", 1) // Exit with error code 1
+						}
+						fmt.Fprintln(os.Stdout, strings.TrimSpace(url))
+						return cli.Exit("", 0) // Exit successfully after printing URL
 					}
 
 					var smeeURL, targetURL string
