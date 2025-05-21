@@ -79,7 +79,7 @@ func (c goSmee) parse(now time.Time, data []byte) (payloadMsg, error) {
 	var payload map[string]any
 	err := mapstructure.Decode(message, &payload)
 	if err != nil {
-		return pm, err
+		return payloadMsg{}, err
 	}
 
 	// Debug: Log the raw payload keys we received
@@ -168,8 +168,12 @@ func (c goSmee) parse(now time.Time, data []byte) (payloadMsg, error) {
 		pm.eventType != "" &&
 		slices.Contains(c.replayDataOpts.ignoreEvents, pm.eventType) {
 		s := fmt.Sprintf("%sskipping event %s as requested", emoji("!", "blue+b", c.replayDataOpts.decorate), pm.eventType)
-		c.logger.Info(s) // Changed to Info since this is not an error
-		return payloadMsg{}, nil
+		c.logger.Info(s)
+		return pm, nil
+	}
+
+	if len(pm.headers) == 0 && len(pm.body) == 0 {
+		return pm, fmt.Errorf("parsed message has no headers")
 	}
 
 	return pm, nil
