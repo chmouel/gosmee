@@ -17,6 +17,7 @@ yank=
 launch=
 directToController=
 dir=/tmp/save
+targetlink=/tmp/run.sh
 
 echo_magenta() {
   echo -e "\033[35m$*\033[0m"
@@ -51,9 +52,12 @@ Typical workflow:
   2. Use the preview window to inspect event details and headers.
   3. Choose actions like copying the file path, creating a symlink, running the
      replay, or viewing JSON interactively.
+  4. By default the script will be saved to ${targetlink}. Use this to script
+     to replay the event at will.
 
 Options:
   -P <file>    Show a preview of the json and file for fzf
+  -t <file>    The target link to use (default: /tmp/run.sh)
   -l <name>    Make a symlink
   -d <dir>     Use a different directory than /tmp/replay
   -y           Copy to clipboard the chosen one
@@ -110,23 +114,26 @@ function replayview() {
   }
   arg="\${1:--l}"
   [[ -n $directToController ]] && arg='"${@}"'
-  cat <<EOF >/tmp/run.sh
+  cat <<EOF >${targetlink}
 #!/usr/bin/env bash
 set -eufo pipefail
 arg="$arg"
 [[ \${arg} == "-d" ]] && arg=""
 $output \$arg
 EOF
-  chmod +x /tmp/run.sh
-  echo $output
+  chmod +x ${targetlink}
+  echo "Linked $output to ${targetlink}"
   if [[ -n $launch ]]; then
     bash ${output}
   fi
 }
 
-while getopts "il:rnyhcd:P:" opt; do
+while getopts "t:il:rnyhcd:P:" opt; do
   case $opt in
-  P) ## Show a previuew of the json and file for fzf
+  t) ## Target link
+    targetlink=$OPTARG
+    ;;
+  P) ## Show a preview of the json and file for fzf
     arg=$OPTARG
     j="${arg%.sh}.json"
     [[ -e ${j} ]] || exit
@@ -175,7 +182,7 @@ while getopts "il:rnyhcd:P:" opt; do
     directToController=yes ;;
   i) ## Interactive mode
     type -p fx >/dev/null 2>/dev/null || {
-      echo "need fx in path for interactiveness" >&2
+      echo "need fx (https://fx.wtf/) in path for interactiveness" >&2
       exit 1
     }
     interactive=true

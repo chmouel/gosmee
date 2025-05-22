@@ -87,7 +87,7 @@ Each event in the feed shows:
 
 ## 🛠️ Replay Viewer Utility
 
-https://github.com/user-attachments/assets/dbd0978a-a8ef-4e77-b498-672497567b39
+<https://github.com/user-attachments/assets/dbd0978a-a8ef-4e77-b498-672497567b39>
 
 Gosmee includes a helper script [`misc/replayview`](./misc/replayview) for
 interactively browsing, previewing, and replaying webhook events saved by the
@@ -108,6 +108,10 @@ client (`--saveDir`). This tool lets you:
 
 By default, it looks for replay files in `/tmp/save` or `/tmp/replay`. Use `-d
 <dir>` to specify a different directory.
+
+It will make a symlink of the chosen replay event to the file `/tmp/run.sh`,
+this redirect the event to the local service where to replay the payload
+easily.
 
 **Requirements:** `fzf`, `jq`, `fd`, and optionally [fx](https://fx.wtf/) for interactive JSON
 viewing.
