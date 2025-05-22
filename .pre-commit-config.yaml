@@ -10,7 +10,7 @@ repos:
   - id: check-json
   - id: check-vcs-permalinks
 - repo: https://github.com/adrienverge/yamllint.git
-  rev: v1.37.0
+  rev: v1.37.1
   hooks:
     - id: yamllint
 - repo: local
