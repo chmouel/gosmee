@@ -87,7 +87,7 @@ Each event in the feed shows:
 
 ## 🛠️ Replay Viewer Utility
 
-https://github.com/user-attachments/assets/dffac3ec-ee23-4f94-88f5-ff2e194a5516
+https://github.com/user-attachments/assets/dbd0978a-a8ef-4e77-b498-672497567b39
 
 Gosmee includes a helper script [`misc/replayview`](./misc/replayview) for
 interactively browsing, previewing, and replaying webhook events saved by the
