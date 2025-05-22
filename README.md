@@ -85,6 +85,33 @@ Each event in the feed shows:
 - Payload in both tree view and raw JSON formats
 - Option to replay individual events
 
+## 🛠️ Replay Viewer Utility
+
+Gosmee includes a helper script [`misc/replayview`](./misc/replayview) for
+interactively browsing, previewing, and replaying webhook events saved by the
+client (`--saveDir`). This tool lets you:
+
+- Fuzzy-find replay shell scripts and their JSON payloads
+- Preview event metadata, headers, and payloads
+- Copy replay script paths to clipboard
+- Create symlinks for quick access
+- Run replay scripts directly
+- Interactively inspect JSON payloads (requires [`fx`](https://github.com/antonmedv/fx))
+
+**Usage:**
+
+```sh
+./misc/replayview -h
+```
+
+By default, it looks for replay files in `/tmp/save` or `/tmp/replay`. Use `-d
+<dir>` to specify a different directory.
+
+**Requirements:** `fzf`, `jq`, `fd`, and optionally `fx` for interactive JSON
+viewing.
+
+See the script header or run with `-h` for full options and details.
+
 ## 📥 Install
 
 ### Release
