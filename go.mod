@@ -5,7 +5,7 @@ go 1.24.3
 require (
 	github.com/go-chi/chi/v5 v5.2.1
 	github.com/google/go-github/v57 v57.0.0
-	github.com/lmittmann/tint v1.1.0
+	github.com/lmittmann/tint v1.1.1
 	github.com/mattn/go-isatty v0.0.20
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d
 	github.com/mitchellh/mapstructure v1.5.0
