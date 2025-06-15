@@ -13,7 +13,7 @@ require (
 	github.com/urfave/cli/v2 v2.27.6
 	golang.org/x/crypto v0.38.0
 	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0
-	golang.org/x/text v0.25.0
+	golang.org/x/text v0.26.0
 	gopkg.in/cenkalti/backoff.v1 v1.1.0
 	gotest.tools/v3 v3.5.2
 )
