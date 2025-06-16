@@ -515,7 +515,7 @@ func (c goSmee) clientSetup() error {
 		}
 
 		// Check if this looks like a ready message or connected message based on specific patterns
-		if pm.eventType == "ready" || (len(pm.body) > 0 && strings.Contains(strings.ToLower(string(pm.body)), "ready")) {
+		if pm.eventType == "ready" || ((len(pm.body) > 0) && strings.ToLower(string(pm.body)) == "ready") {
 			c.logger.Debug(fmt.Sprintf("%s Skipping message with 'ready' in event type or body", nowStr))
 			return
 		}
