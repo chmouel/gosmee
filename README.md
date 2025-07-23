@@ -521,6 +521,10 @@ This tool is intended for local development and testing environments only!
 It hasn't undergone thorough security and performance reviews and
 should not be deployed in production systems.
 
+[smee-sidecar](https://github.com/konflux-ci/smee-sidecar) is a service intended for
+monitoring gosmee deployments. It provides active health checks to verify that gosmee
+is serving requests.
+
 ## 🙏 Thanks
 
 - Most of the work is powered by the [go-sse](https://github.com/r3labs/sse) library.
