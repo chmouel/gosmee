@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Copyright 2023 Chmouel Boudjnah <chmouel@chmouel.com>
-# Replay script with headers and JSON payload to the target controller.
+# Replay script using httpie
 #
 # Usage: ./script.sh [OPTIONS] [TARGET_URL]
 # Options:
@@ -41,7 +40,7 @@ while true; do
             ;;
         '-h'|'--help')
             echo "Usage: $(basename "$0") [OPTIONS] [TARGET_URL]"
-            echo "Replay webhook payload to target URL using curl"
+            echo "Replay webhook payload to target URL using httpie"
             echo ""
             echo "Options:"
             echo "  -l, --local     Use local debug URL ({{ .LocalDebugURL }})"
@@ -57,6 +56,8 @@ while true; do
             echo "  $(basename "$0") -l                        # Use local debug URL"
             echo "  $(basename "$0") -t http://example.com:8080 # Use specific target URL"
             echo "  $(basename "$0") http://example.com:8080   # Use custom URL"
+            echo ""
+            echo "Note: This script requires httpie to be installed"
             exit 0
             ;;
         '-v'|'--verbose')
@@ -91,12 +92,12 @@ elif [[ -n "${GOSMEE_DEBUG_SERVICE:-}" ]]; then
     targetURL="${GOSMEE_DEBUG_SERVICE}"
 fi
 
-# Set verbose flag for curl if requested
-curl_flags="-sSi"
+# Set verbose flag for httpie if requested
+http_flags="--print=HhBb"
 if [[ "$verbose" == "true" ]]; then
-    curl_flags="-sSiv"
+    http_flags="--print=HhBb --verbose"
     set -x
 fi
 
 echo "Replaying webhook to: $targetURL"
-curl $curl_flags -H "Content-Type: {{ .ContentType }}" {{ .Headers }} -X POST -d @./{{ .FileBase }}.json "${targetURL}"
+http $http_flags POST "${targetURL}" Content-Type:"{{ .ContentType }}" {{ .Headers }} < ./{{ .FileBase }}.json
