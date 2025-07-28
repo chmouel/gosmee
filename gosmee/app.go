@@ -166,6 +166,7 @@ non-publicly accessible endpoint, forward those requests to your local service.`
 							ignoreEvents:      c.StringSlice("ignore-event"),
 							targetCnxTimeout:  c.Int("target-connection-timeout"),
 							insecureTLSVerify: c.Bool("insecure-skip-tls-verify"),
+							useHttpie:         c.Bool("httpie"),
 						},
 						logger:  logger,
 						channel: c.String("channel"),

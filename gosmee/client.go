@@ -33,6 +33,9 @@ var Version []byte
 //go:embed templates/replay_script.tmpl.bash
 var shellScriptTmpl []byte
 
+//go:embed templates/replay_script.tmpl.httpie.bash
+var shellScriptHttpieTmpl []byte
+
 var pmEventRe = regexp.MustCompile(`(\w+|\d+|_|-|:)`)
 
 const (
@@ -231,9 +234,18 @@ func saveData(rd *replayDataOpts, logger *slog.Logger, pm payloadMsg) error {
 		return err
 	}
 	defer s.Close()
-	headers := buildCurlHeaders(pm.headers)
-	t := template.Must(template.New("shellScriptTmpl").Parse(string(shellScriptTmpl)))
-	if err := t.Execute(s, struct {
+
+	var tmpl *template.Template
+	var headers string
+	if rd.useHttpie {
+		tmpl = template.Must(template.New("shellScriptTmplHttpie").Parse(string(shellScriptHttpieTmpl)))
+		headers = buildHttpieHeaders(pm.headers)
+	} else {
+		tmpl = template.Must(template.New("shellScriptTmpl").Parse(string(shellScriptTmpl)))
+		headers = buildCurlHeaders(pm.headers)
+	}
+
+	if err := tmpl.Execute(s, struct {
 		Headers       string
 		TargetURL     string
 		ContentType   string
@@ -251,6 +263,16 @@ func saveData(rd *replayDataOpts, logger *slog.Logger, pm payloadMsg) error {
 	return os.Chmod(shscript, 0o755)
 }
 
+// buildHttpieHeaders builds httpie header arguments from a map.
+func buildHttpieHeaders(headers map[string]string) string {
+	var b strings.Builder
+	for k, v := range headers {
+		// HTTPie expects headers in format 'Header-Name:value' and needs proper quoting
+		b.WriteString(fmt.Sprintf("'%s:%s' ", k, v))
+	}
+	return b.String()
+}
+
 type replayDataOpts struct {
 	insecureTLSVerify           bool
 	targetCnxTimeout            int
@@ -258,6 +280,7 @@ type replayDataOpts struct {
 	saveDir, smeeURL, targetURL string
 	localDebugURL               string
 	ignoreEvents                []string
+	useHttpie                   bool // Use httpie instead of curl
 }
 
 func replayData(ropts *replayDataOpts, logger *slog.Logger, pm payloadMsg) error {
