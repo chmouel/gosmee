@@ -262,13 +262,55 @@ This command saves the JSON data of new payloads to
 at `/tmp/savedreplay/timestamp.sh`. Replay webhooks easily by running these
 scripts!
 
+For those who prefer [HTTPie](https://httpie.io) over cURL, you can generate HTTPie-based replay scripts:
+
+```shell
+gosmee client --httpie --saveDir /tmp/savedreplay https://smee.io/aBcDeF https://localhost:8080
+```
+
+This will create replay scripts that use `http` command instead of `curl`. The
+generated scripts support the same features as cURL scripts the output will be
+a bit nicer and colorful to read.
+
 You can ignore certain events (identified by GitLab/GitHub/Bitbucket) with one or more `--ignore-event` flags.
+
+For HTTPie users, add the `--httpie` flag to generate HTTPie-based replay
+scripts instead of cURL scripts (requires [httpie](https://httpie.io) to be
+installed).
 
 If you only want to save payloads without replaying them, use `--noReplay`.
 
 By default, you'll get colorful output unless you specify `--nocolor`.
 
 Output logs as JSON with `--output json` (which implies `--nocolor`).
+
+#### Replay scripts
+
+Both cURL and HTTPie replay scripts include those command-line options:
+
+- `-l, --local`: Use local debug URL
+- `-t, --target URL`: Specify target URL directly  
+- `-h, --help`: Show help message
+- `-v, --verbose`: Enable verbose output
+
+**Examples:**
+
+```shell
+# Use local debug endpoint
+./timestamp.sh -l
+
+# Specify custom target URL
+./timestamp.sh -t http://custom-service:8080
+
+# Use verbose mode for debugging
+./timestamp.sh -v
+
+# Show help
+./timestamp.sh -h
+```
+
+Scripts also respect the `GOSMEE_DEBUG_SERVICE` environment variable for
+alternative target URLs.
 
 ### 🖥️ Server
 
