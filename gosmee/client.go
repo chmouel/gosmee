@@ -90,7 +90,7 @@ func (c goSmee) parse(now time.Time, data []byte) (payloadMsg, error) {
 	for k := range payload {
 		keys = append(keys, k)
 	}
-	c.logger.Debug(fmt.Sprintf("Received payload with keys: %v", keys))
+	c.logger.DebugContext(context.Background(), fmt.Sprintf("Received payload with keys: %v", keys))
 
 	for payloadKey, payloadValue := range payload {
 		switch payloadKey {
@@ -136,7 +136,7 @@ func (c goSmee) parse(now time.Time, data []byte) (payloadMsg, error) {
 				tsInt, err := strconv.ParseInt(pv, 10, 64)
 				if err != nil {
 					s := fmt.Sprintf("%s cannot convert timestamp to int64, %s", ansi.Color("ERROR", "red+b"), err.Error())
-					c.logger.Error(s)
+					c.logger.ErrorContext(context.Background(), s)
 				} else {
 					dt = time.Unix(tsInt/int64(1000), (tsInt%int64(1000))*int64(1000000)).UTC()
 				}
@@ -171,7 +171,7 @@ func (c goSmee) parse(now time.Time, data []byte) (payloadMsg, error) {
 		pm.eventType != "" &&
 		slices.Contains(c.replayDataOpts.ignoreEvents, pm.eventType) {
 		s := fmt.Sprintf("%sskipping event %s as requested", emoji("!", "blue+b", c.replayDataOpts.decorate), pm.eventType)
-		c.logger.Info(s)
+		c.logger.InfoContext(context.Background(), s)
 		return pm, nil
 	}
 
@@ -228,7 +228,7 @@ func saveData(rd *replayDataOpts, logger *slog.Logger, pm payloadMsg) error {
 	}
 
 	shscript := fmt.Sprintf("%s/%s.sh", rd.saveDir, fbasepath)
-	logger.Info(fmt.Sprintf("%s%s and %s has been saved", emoji("⌁", "yellow+b", rd.decorate), shscript, jsonfile))
+	logger.InfoContext(context.Background(), fmt.Sprintf("%s%s and %s has been saved", emoji("⌁", "yellow+b", rd.decorate), shscript, jsonfile))
 	s, err := os.Create(shscript)
 	if err != nil {
 		return err
@@ -316,7 +316,7 @@ func replayData(ropts *replayDataOpts, logger *slog.Logger, pm payloadMsg) error
 		msg = fmt.Sprintf("%s, error: %s", msg, resp.Status)
 	}
 	s := fmt.Sprintf("%s%s", emoji("•", "magenta+b", ropts.decorate), msg)
-	logger.Info(s)
+	logger.InfoContext(context.Background(), s)
 	return nil
 }
 
@@ -337,7 +337,7 @@ func checkServerVersion(serverURL string, clientVersion string, logger *slog.Log
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, versionURL, nil)
 	if err != nil {
 		// If we can't create the request, don't fail - just warn
-		logger.Warn(fmt.Sprintf("%sCould not create version check request: %s", emoji("⚠", "yellow+b", decorate), err.Error()))
+		logger.WarnContext(context.Background(), fmt.Sprintf("%sCould not create version check request: %s", emoji("⚠", "yellow+b", decorate), err.Error()))
 		return nil
 	}
 
@@ -345,7 +345,7 @@ func checkServerVersion(serverURL string, clientVersion string, logger *slog.Log
 	resp, err := client.Do(req)
 	if err != nil {
 		// If we can't reach the server, don't fail - just warn
-		logger.Warn(fmt.Sprintf("%sCould not check server version: %s", emoji("⚠", "yellow+b", decorate), err.Error()))
+		logger.WarnContext(context.Background(), fmt.Sprintf("%sCould not check server version: %s", emoji("⚠", "yellow+b", decorate), err.Error()))
 		return nil
 	}
 	defer resp.Body.Close()
@@ -354,13 +354,13 @@ func checkServerVersion(serverURL string, clientVersion string, logger *slog.Log
 	if resp.StatusCode == http.StatusNotFound {
 		errMsg := fmt.Sprintf("%sThe server appears to be too old and doesn't support version checking. Please upgrade the server or use an older client version.",
 			emoji("⛔", "red+b", decorate))
-		logger.Error(errMsg)
+		logger.ErrorContext(context.Background(), errMsg)
 		return fmt.Errorf("%s", errMsg)
 	}
 
 	// Check for other non-200 status codes
 	if resp.StatusCode != http.StatusOK {
-		logger.Warn(fmt.Sprintf("%sServer returned unexpected status code %d when checking version",
+		logger.WarnContext(context.Background(), fmt.Sprintf("%sServer returned unexpected status code %d when checking version",
 			emoji("⚠", "yellow+b", decorate), resp.StatusCode))
 		return nil
 	}
@@ -374,7 +374,7 @@ func checkServerVersion(serverURL string, clientVersion string, logger *slog.Log
 			Version string `json:"version"`
 		}
 		if err := json.NewDecoder(resp.Body).Decode(&versionResp); err != nil {
-			logger.Warn(fmt.Sprintf("%sCould not parse server version: %s", emoji("⚠", "yellow+b", decorate), err.Error()))
+			logger.WarnContext(context.Background(), fmt.Sprintf("%sCould not parse server version: %s", emoji("⚠", "yellow+b", decorate), err.Error()))
 			return nil
 		}
 		serverVersion = versionResp.Version
@@ -383,11 +383,11 @@ func checkServerVersion(serverURL string, clientVersion string, logger *slog.Log
 	// Compare versions
 	if serverVersion != "" {
 		if serverVersion == clientVersion {
-			logger.Debug(fmt.Sprintf("Version match: client and server both at version %s", serverVersion))
+			logger.DebugContext(context.Background(), fmt.Sprintf("Version match: client and server both at version %s", serverVersion))
 		} else {
 			// Check for development versions - only warn, don't fail
 			if serverVersion == "dev" || clientVersion == "dev" {
-				logger.Warn(fmt.Sprintf("%sVersion mismatch with development version: client %s, server %s",
+				logger.WarnContext(context.Background(), fmt.Sprintf("%sVersion mismatch with development version: client %s, server %s",
 					emoji("⚠", "yellow+b", decorate),
 					ansi.Color(clientVersion, "blue+b"),
 					ansi.Color(serverVersion, "blue+b")))
@@ -404,11 +404,11 @@ func checkServerVersion(serverURL string, clientVersion string, logger *slog.Log
 						emoji("⛔", "red+b", decorate),
 						ansi.Color(clientVersion, "blue+b"),
 						ansi.Color(serverVersion, "blue+b"))
-					logger.Error(errMsg)
+					logger.ErrorContext(context.Background(), errMsg)
 					return fmt.Errorf("%s", errMsg)
 				}
 				// Client is same or newer, just warn
-				logger.Warn(fmt.Sprintf("%sVersion mismatch: client %s, server %s",
+				logger.WarnContext(context.Background(), fmt.Sprintf("%sVersion mismatch: client %s, server %s",
 					emoji("⚠", "yellow+b", decorate),
 					ansi.Color(clientVersion, "blue+b"),
 					ansi.Color(serverVersion, "blue+b")))
@@ -416,7 +416,7 @@ func checkServerVersion(serverURL string, clientVersion string, logger *slog.Log
 		}
 	}
 
-	logger.Info(fmt.Sprintf("%sServer version: %s", emoji("✓", "green+b", decorate), serverVersion))
+	logger.InfoContext(context.Background(), fmt.Sprintf("%sServer version: %s", emoji("✓", "green+b", decorate), serverVersion))
 	return nil
 }
 
@@ -469,11 +469,11 @@ func isOlderVersion(v1, v2 []int) bool {
 func (c goSmee) clientSetup() error {
 	version := strings.TrimSpace(string(Version))
 	s := fmt.Sprintf("%sStarting gosmee client version: %s", emoji("⇉", "green+b", c.replayDataOpts.decorate), version)
-	c.logger.Info(s)
+	c.logger.InfoContext(context.Background(), s)
 
 	// Check server version compatibility
 	if err := checkServerVersion(c.replayDataOpts.smeeURL, version, c.logger, c.replayDataOpts.decorate); err != nil {
-		c.logger.Warn(fmt.Sprintf("%sCould not get server version: %s", emoji("⚠", "yellow+b", c.replayDataOpts.decorate), err.Error()))
+		c.logger.WarnContext(context.Background(), fmt.Sprintf("%sCould not get server version: %s", emoji("⚠", "yellow+b", c.replayDataOpts.decorate), err.Error()))
 	}
 
 	// Extract the base URL and channel from the smeeURL
@@ -497,7 +497,7 @@ func (c goSmee) clientSetup() error {
 	expBackoff := backoff.NewExponentialBackOff()
 	expBackoff.MaxElapsedTime = 0 // Setting this to 0 means it will retry forever
 	client.ReconnectStrategy = expBackoff
-	c.logger.Info(fmt.Sprintf("%sConfigured reconnection strategy to retry indefinitely", emoji("⇉", "blue+b", c.replayDataOpts.decorate)))
+	c.logger.InfoContext(context.Background(), fmt.Sprintf("%sConfigured reconnection strategy to retry indefinitely", emoji("⇉", "blue+b", c.replayDataOpts.decorate)))
 	client.Headers["User-Agent"] = fmt.Sprintf("gosmee/%s", version)
 	client.Headers["X-Accel-Buffering"] = "no"
 
@@ -508,7 +508,7 @@ func (c goSmee) clientSetup() error {
 		// Check for explicit ready messages from SSE events
 		if string(msg.Event) == "ready" || string(msg.Data) == "ready" {
 			s := fmt.Sprintf("%s %sForwarding %s to %s", nowStr, emoji("✓", "yellow+b", c.replayDataOpts.decorate), ansi.Color(c.replayDataOpts.smeeURL, "green+u"), ansi.Color(c.replayDataOpts.targetURL, "green+u"))
-			c.logger.Info(s)
+			c.logger.InfoContext(context.Background(), s)
 			return
 		}
 
@@ -526,20 +526,20 @@ func (c goSmee) clientSetup() error {
 		if strings.Contains(strings.ToLower(string(msg.Data)), "ready") ||
 			strings.Contains(strings.ToLower(string(msg.Data)), "\"message\"") &&
 				strings.Contains(strings.ToLower(string(msg.Data)), "\"connected\"") {
-			c.logger.Debug(fmt.Sprintf("%s Skipping connection message", nowStr))
+			c.logger.DebugContext(context.Background(), fmt.Sprintf("%s Skipping connection message", nowStr))
 			return
 		}
 
 		pm, err := c.parse(now, msg.Data)
 		if err != nil {
 			s := fmt.Sprintf("%s %s parsing message %s", nowStr, ansi.Color("ERROR", "red+b"), err.Error())
-			c.logger.Error(s)
+			c.logger.ErrorContext(context.Background(), s)
 			return
 		}
 
 		// Check if this looks like a ready message or connected message based on specific patterns
 		if pm.eventType == "ready" || ((len(pm.body) > 0) && strings.ToLower(string(pm.body)) == "ready") {
-			c.logger.Debug(fmt.Sprintf("%s Skipping message with 'ready' in event type or body", nowStr))
+			c.logger.DebugContext(context.Background(), fmt.Sprintf("%s Skipping message with 'ready' in event type or body", nowStr))
 			return
 		}
 
@@ -547,7 +547,7 @@ func (c goSmee) clientSetup() error {
 		if len(pm.body) == 0 {
 			for k, v := range pm.headers {
 				if strings.EqualFold(k, "Message") && strings.EqualFold(v, "connected") {
-					c.logger.Debug(fmt.Sprintf("%s Skipping empty message with Message: connected header", nowStr))
+					c.logger.DebugContext(context.Background(), fmt.Sprintf("%s Skipping empty message with Message: connected header", nowStr))
 					return
 				}
 			}
@@ -555,7 +555,7 @@ func (c goSmee) clientSetup() error {
 
 		if len(pm.headers) == 0 {
 			s := fmt.Sprintf("%s %s no headers found in message", nowStr, ansi.Color("ERROR", "red+b"))
-			c.logger.Error(s)
+			c.logger.ErrorContext(context.Background(), s)
 			return
 		}
 
@@ -563,7 +563,7 @@ func (c goSmee) clientSetup() error {
 		if c.replayDataOpts.saveDir != "" {
 			if err := saveData(c.replayDataOpts, c.logger, pm); err != nil {
 				s := fmt.Sprintf("%s %s saving message with headers '%s' - %s", nowStr, ansi.Color("ERROR", "red+b"), headers, err.Error())
-				c.logger.Error(s)
+				c.logger.ErrorContext(context.Background(), s)
 				return
 			}
 		}
@@ -571,7 +571,7 @@ func (c goSmee) clientSetup() error {
 		if !c.replayDataOpts.noReplay {
 			if err := replayData(c.replayDataOpts, c.logger, pm); err != nil {
 				s := fmt.Sprintf("%s %s forwarding message with headers '%s' - %s", nowStr, ansi.Color("ERROR", "red+b"), headers, err.Error())
-				c.logger.Error(s)
+				c.logger.ErrorContext(context.Background(), s)
 				return
 			}
 		}
@@ -593,12 +593,12 @@ func serveHealthEndpoint(port int, logger *slog.Logger, decorate bool) {
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
-	logger.Info(fmt.Sprintf("%sStarting health server on %s", emoji("✓", "green+b", decorate), addr))
+	logger.InfoContext(context.Background(), fmt.Sprintf("%sStarting health server on %s", emoji("✓", "green+b", decorate), addr))
 
 	// Run the health server in a separate goroutine
 	go func() {
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Error(fmt.Sprintf("%sHealth server error: %s", emoji("⛔", "red+b", decorate), err.Error()))
+			logger.ErrorContext(context.Background(), fmt.Sprintf("%sHealth server error: %s", emoji("⛔", "red+b", decorate), err.Error()))
 		}
 	}()
 }
