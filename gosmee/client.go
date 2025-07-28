@@ -268,7 +268,7 @@ func buildHttpieHeaders(headers map[string]string) string {
 	var b strings.Builder
 	for k, v := range headers {
 		// HTTPie expects headers in format 'Header-Name:value' and needs proper quoting
-		b.WriteString(fmt.Sprintf("'%s:%s' ", k, v))
+		b.WriteString(fmt.Sprintf("%s:%s ", strconv.Quote(k), strconv.Quote(v)))
 	}
 	return b.String()
 }
