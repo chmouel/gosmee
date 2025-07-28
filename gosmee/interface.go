@@ -30,7 +30,7 @@ func NewRepoLister(client *github.Client, logger *slog.Logger, org, repo string)
 }
 
 func (r *RepoOP) Starting() {
-	r.logger.Info("watching deliveries on", "org", r.org, "repo", r.repo)
+	r.logger.InfoContext(context.Background(), "watching deliveries on", "org", r.org, "repo", r.repo)
 }
 
 func (r *RepoOP) ListHooks(ctx context.Context, org, repo string, opt *github.ListOptions) ([]*github.Hook, *github.Response, error) {
@@ -70,5 +70,5 @@ func (r *OrgOP) GetHookDelivery(ctx context.Context, org, _ string, hookID, deli
 }
 
 func (r *OrgOP) Starting() {
-	r.logger.Info("watching deliveries on", "org", r.org)
+	r.logger.InfoContext(context.Background(), "watching deliveries on", "org", r.org)
 }

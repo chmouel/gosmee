@@ -101,7 +101,7 @@ func (r *replayOpts) replayHooks(ctx context.Context, hookid int64) error {
 					ansi.Color("ERROR", "red+b"),
 					pm.headers,
 					err.Error())
-				r.logger.Error(s)
+				r.logger.ErrorContext(context.Background(), s)
 				continue
 			}
 			if r.replayDataOpts.saveDir != "" {
@@ -111,7 +111,7 @@ func (r *replayOpts) replayHooks(ctx context.Context, hookid int64) error {
 						ansi.Color("ERROR", "red+b"),
 						r.replayDataOpts.saveDir,
 						err.Error())
-					r.logger.Error(s)
+					r.logger.ErrorContext(context.Background(), s)
 					continue
 				}
 			}

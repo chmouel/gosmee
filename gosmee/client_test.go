@@ -638,20 +638,18 @@ func TestServeHealthEndpoint(t *testing.T) {
 	// Helper to get an ephemeral port
 	getEphemeralPort := func(t *testing.T) int {
 		t.Helper()
-		listener, err := net.Listen("tcp", ":0")
+		lc := net.ListenConfig{}
+		listener, err := lc.Listen(context.Background(), "tcp", ":0")
 		if err != nil {
 			t.Fatalf("Failed to listen on ephemeral port: %v", err)
 		}
+		defer listener.Close() // Ensure the listener is closed even if a panic occurs
+
 		addr, ok := listener.Addr().(*net.TCPAddr)
 		if !ok {
 			t.Fatalf("listener.Addr() is not *net.TCPAddr, got %T", listener.Addr())
 		}
-		port := addr.Port
-		err = listener.Close()
-		if err != nil {
-			t.Fatalf("Failed to close listener: %v", err)
-		}
-		return port
+		return addr.Port // No need to close explicitly, defer handles it
 	}
 
 	t.Run("Server Starts and Responds on Ephemeral Port", func(t *testing.T) {
@@ -958,31 +956,31 @@ func processTestEvent(t *testing.T, gs *goSmee, now time.Time, msg *sse.Event, t
 	// Initial skip logic (from client.go)
 	if string(msg.Event) == "ready" || string(msg.Data) == "ready" ||
 		string(msg.Event) == "ping" || len(msg.Data) == 0 || string(msg.Data) == "{}" {
-		gs.logger.Debug(fmt.Sprintf("Skipping known connection/system message: Event=%s, Data=%s", msg.Event, msg.Data))
+		gs.logger.DebugContext(context.Background(), fmt.Sprintf("Skipping known connection/system message: Event=%s, Data=%s", msg.Event, msg.Data))
 		return false, false, nil
 	}
 	if strings.Contains(strings.ToLower(string(msg.Data)), "ready") ||
 		(strings.Contains(strings.ToLower(string(msg.Data)), "\"message\"") &&
 			strings.Contains(strings.ToLower(string(msg.Data)), "\"connected\"")) {
-		gs.logger.Debug(fmt.Sprintf("Skipping known connection/system message based on data content: Data=%s", msg.Data))
+		gs.logger.DebugContext(context.Background(), fmt.Sprintf("Skipping known connection/system message based on data content: Data=%s", msg.Data))
 		return false, false, nil
 	}
 
 	pm, err := gs.parse(now, msg.Data)
 	if err != nil {
-		gs.logger.Error(fmt.Sprintf("Error parsing message: %s", err.Error()))
+		gs.logger.ErrorContext(context.Background(), fmt.Sprintf("Error parsing message: %s", err.Error()))
 		return false, false, err // Propagate parse error
 	}
 
 	// Post-parse skip logic (from client.go)
 	if pm.eventType == "ready" || (len(pm.body) > 0 && strings.Contains(strings.ToLower(string(pm.body)), "ready")) {
-		gs.logger.Debug("Skipping message with 'ready' in parsed event type or body")
+		gs.logger.DebugContext(context.Background(), "Skipping message with 'ready' in parsed event type or body")
 		return false, false, nil
 	}
 	if len(pm.body) == 0 {
 		for k, v := range pm.headers {
 			if strings.EqualFold(k, "Message") && strings.EqualFold(v, "connected") {
-				gs.logger.Debug("Skipping empty message with Message: connected header")
+				gs.logger.DebugContext(context.Background(), "Skipping empty message with Message: connected header")
 				return false, false, nil
 			}
 		}
@@ -990,20 +988,20 @@ func processTestEvent(t *testing.T, gs *goSmee, now time.Time, msg *sse.Event, t
 
 	// ignoreEvents filtering (from client.go)
 	if len(gs.replayDataOpts.ignoreEvents) > 0 && pm.eventType != "" && slices.Contains(gs.replayDataOpts.ignoreEvents, pm.eventType) {
-		gs.logger.Info(fmt.Sprintf("Skipping event %s as per ignoreEvents list", pm.eventType))
+		gs.logger.InfoContext(context.Background(), fmt.Sprintf("Skipping event %s as per ignoreEvents list", pm.eventType))
 		return false, false, nil // This is a successful skip
 	}
 
 	// No headers check (from client.go - this leads to a return in original code)
 	if len(pm.headers) == 0 {
-		gs.logger.Error("No headers found in message")                   // Original logs and returns from callback
-		return false, false, fmt.Errorf("parsed message has no headers") // Test helper signals this
+		gs.logger.ErrorContext(context.Background(), "No headers found in message") // Original logs and returns from callback
+		return false, false, fmt.Errorf("parsed message has no headers")            // Test helper signals this
 	}
 
 	// If all checks pass, proceed to save/replay
 	if gs.replayDataOpts.saveDir != "" {
 		if errSave := saveData(gs.replayDataOpts, gs.logger, pm); errSave != nil {
-			gs.logger.Error(fmt.Sprintf("Error saving message: %s", errSave.Error()))
+			gs.logger.ErrorContext(context.Background(), fmt.Sprintf("Error saving message: %s", errSave.Error()))
 			return false, false, errSave // Propagate actual error from saveData
 		}
 		saveCalled = true
@@ -1016,7 +1014,7 @@ func processTestEvent(t *testing.T, gs *goSmee, now time.Time, msg *sse.Event, t
 		}
 
 		if errReplay := replayData(gs.replayDataOpts, gs.logger, pm); errReplay != nil {
-			gs.logger.Error(fmt.Sprintf("Error replaying message: %s", errReplay.Error()))
+			gs.logger.ErrorContext(context.Background(), fmt.Sprintf("Error replaying message: %s", errReplay.Error()))
 			if targetServer != nil {
 				gs.replayDataOpts.targetURL = originalTargetURL
 			}

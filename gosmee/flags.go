@@ -77,6 +77,11 @@ var clientFlags = []cli.Flag{
 		Usage:   "Generate a new URL from https://hook.pipelinesascode.com",
 		Value:   false,
 	},
+	&cli.BoolFlag{
+		Name:  "httpie",
+		Usage: "Use httpie instead of curl in replay scripts (requires httpie installed)",
+		Value: false,
+	},
 	&cli.StringFlag{
 		Name:    "channel",
 		Aliases: []string{"c"},
