@@ -31,8 +31,7 @@ const (
 	timeFormat        = "2006-01-02T15.04.01.000"
 	contentType       = "application/json"
 	versionHeaderName = "X-Gosmee-Version"
-	maxChannelLength  = 64               // Set maximum channel length to prevent DoS attacks
-	maxBodySize       = 25 * 1024 * 1024 // 25 MB maximum request body size (we use [GitHub's](https://docs.github.com/en/webhooks/webhook-events-and-payloads#payload-cap) limit)
+	maxChannelLength  = 64 // Set maximum channel length to prevent DoS attacks
 )
 
 var (
@@ -205,7 +204,7 @@ func validateWebhookSignature(secrets []string, payload []byte, r *http.Request)
 }
 
 // handleWebhookPost handles POST requests to the webhook endpoint.
-func handleWebhookPost(events *sse.Server, eventBroker *EventBroker, webhookSecrets []string) http.HandlerFunc {
+func handleWebhookPost(c *cli.Context, events *sse.Server, eventBroker *EventBroker, webhookSecrets []string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		now := time.Now().UTC()
 		if !strings.Contains(r.Header.Get("Content-Type"), contentType) {
@@ -216,7 +215,7 @@ func handleWebhookPost(events *sse.Server, eventBroker *EventBroker, webhookSecr
 		defer r.Body.Close()
 
 		// Limit request body size to prevent memory exhaustion attacks
-		r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
+		r.Body = http.MaxBytesReader(w, r.Body, int64(c.Int("max-body-size")))
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			if strings.Contains(err.Error(), "http: request body too large") {
@@ -281,7 +280,7 @@ func handleWebhookPost(events *sse.Server, eventBroker *EventBroker, webhookSecr
 }
 
 // handleReplayPost handles POST requests to the replay endpoint.
-func handleReplayPost(events *sse.Server, eventBroker *EventBroker) http.HandlerFunc {
+func handleReplayPost(c *cli.Context, events *sse.Server, eventBroker *EventBroker) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		channel := chi.URLParam(r, "channel")
 		if channel == "" {
@@ -297,7 +296,7 @@ func handleReplayPost(events *sse.Server, eventBroker *EventBroker) http.Handler
 
 		now := time.Now().UTC()
 		// Limit request body size to prevent memory exhaustion attacks
-		r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
+		r.Body = http.MaxBytesReader(w, r.Body, int64(c.Int("max-body-size")))
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			if strings.Contains(err.Error(), "http: request body too large") {
@@ -639,8 +638,8 @@ func serve(c *cli.Context) error {
 	})
 
 	// Register POST routes on the restricted router
-	restrictedRouter.Post("/{channel:[a-zA-Z0-9-_]{12,64}}", handleWebhookPost(events, eventBroker, c.StringSlice("webhook-signature")))
-	restrictedRouter.Post("/replay/{channel:[a-zA-Z0-9-_]{12,64}}", handleReplayPost(events, eventBroker))
+	restrictedRouter.Post("/{channel:[a-zA-Z0-9-_]{12,64}}", handleWebhookPost(c, events, eventBroker, c.StringSlice("webhook-signature")))
+	restrictedRouter.Post("/replay/{channel:[a-zA-Z0-9-_]{12,64}}", handleReplayPost(c, events, eventBroker))
 
 	// Create a final router which will route to the appropriate sub-router
 	finalRouter := chi.NewRouter()

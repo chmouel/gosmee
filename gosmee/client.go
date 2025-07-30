@@ -276,6 +276,7 @@ func buildHttpieHeaders(headers map[string]string) string {
 type replayDataOpts struct {
 	insecureTLSVerify           bool
 	targetCnxTimeout            int
+	sseBufferSize               int
 	decorate, noReplay          bool
 	saveDir, smeeURL, targetURL string
 	localDebugURL               string
@@ -490,7 +491,7 @@ func (c goSmee) clientSetup() error {
 		sseURL = fmt.Sprintf("%s/events/%s", baseURL, channel)
 	}
 
-	client := sse.NewClient(sseURL, sse.ClientMaxBufferSize(1<<20))
+	client := sse.NewClient(sseURL, sse.ClientMaxBufferSize(c.replayDataOpts.sseBufferSize))
 	// Set up a custom exponential backoff strategy that never stops retrying
 	// By default, ExponentialBackOff gives up after 15 minutes, which can cause
 	// the client to get stuck. Setting MaxElapsedTime to 0 makes it retry forever.

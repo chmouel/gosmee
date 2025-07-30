@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"flag"
 	"io"
 	"net"
 	"net/http"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/r3labs/sse/v2"
+	"github.com/urfave/cli/v2"
 	"gotest.tools/v3/assert"
 )
 
@@ -182,14 +184,22 @@ func TestWebhookSignatureValidation(t *testing.T) {
 	})
 }
 
+func newTestContext() *cli.Context {
+	app := cli.NewApp()
+	flagSet := flag.NewFlagSet("test", 0)
+	flagSet.Int("max-body-size", 26214400, "doc")
+	return cli.NewContext(app, flagSet, nil)
+}
+
 func TestHandleWebhookPost(t *testing.T) {
 	// Set up router, SSE server, and event broker
 	router := chi.NewRouter()
 	events := sse.New()
 	eventBroker := NewEventBroker()
+	ctx := newTestContext()
 
 	// Set up the webhook endpoint
-	router.Post("/webhook/{channel}", handleWebhookPost(events, eventBroker, []string{}))
+	router.Post("/webhook/{channel}", handleWebhookPost(ctx, events, eventBroker, []string{}))
 
 	t.Run("Valid Webhook", func(t *testing.T) {
 		// Create a subscriber to verify event was published
@@ -214,7 +224,7 @@ func TestHandleWebhookPost(t *testing.T) {
 		rctx.URLParams.Add("channel", "test-channel")
 		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
-		handler := handleWebhookPost(events, eventBroker, []string{})
+		handler := handleWebhookPost(ctx, events, eventBroker, []string{})
 		handler(w, req)
 
 		// Check response
@@ -258,7 +268,7 @@ func TestHandleWebhookPost(t *testing.T) {
 		rctx.URLParams.Add("channel", "test-channel")
 		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
-		handler := handleWebhookPost(events, eventBroker, []string{})
+		handler := handleWebhookPost(ctx, events, eventBroker, []string{})
 		handler(w, req)
 
 		resp := w.Result()
@@ -278,7 +288,7 @@ func TestHandleWebhookPost(t *testing.T) {
 		rctx.URLParams.Add("channel", "test-channel")
 		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
-		handler := handleWebhookPost(events, eventBroker, []string{})
+		handler := handleWebhookPost(ctx, events, eventBroker, []string{})
 		handler(w, req)
 
 		resp := w.Result()
@@ -300,7 +310,7 @@ func TestHandleWebhookPost(t *testing.T) {
 		rctx.URLParams.Add("channel", "test-channel")
 		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
-		handler := handleWebhookPost(events, eventBroker, secrets)
+		handler := handleWebhookPost(ctx, events, eventBroker, secrets)
 		handler(w, req)
 
 		resp := w.Result()
@@ -317,7 +327,7 @@ func TestHandleWebhookPost(t *testing.T) {
 		rctx.URLParams.Add("channel", "test-channel")
 		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
-		handler = handleWebhookPost(events, eventBroker, secrets)
+		handler = handleWebhookPost(ctx, events, eventBroker, secrets)
 		handler(w, req)
 
 		resp = w.Result()

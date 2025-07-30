@@ -262,6 +262,8 @@ This command saves the JSON data of new payloads to
 at `/tmp/savedreplay/timestamp.sh`. Replay webhooks easily by running these
 scripts!
 
+You can configure the SSE client buffer size (in bytes) with the `--sse-buffer-size` flag. The default is `1048576` (1MB).
+
 For those who prefer [HTTPie](https://httpie.io) over cURL, you can generate HTTPie-based replay scripts:
 
 ```shell
@@ -273,10 +275,6 @@ generated scripts support the same features as cURL scripts the output will be
 a bit nicer and colorful to read.
 
 You can ignore certain events (identified by GitLab/GitHub/Bitbucket) with one or more `--ignore-event` flags.
-
-For HTTPie users, add the `--httpie` flag to generate HTTPie-based replay
-scripts instead of cURL scripts (requires [httpie](https://httpie.io) to be
-installed).
 
 If you only want to save payloads without replaying them, use `--noReplay`.
 
@@ -421,11 +419,43 @@ The server logs will show:
 
 Note: If no IP restrictions are configured, all POST requests will be allowed.
 
-##### 📦 Payload Size Protection
+##### 📦 Payload Size and Memory Management
 
-To protect server resources and match GitHub's standards, gosmee enforces a 25 MB payload size limit. Any request exceeding this limit will receive a 413 Request Entity Too Large response.
+###### Server-Side
 
-See GitHub's documentation: <https://docs.github.com/en/webhooks/webhook-events-and-payloads#payload-cap>
+To protect server resources, `gosmee server` enforces a maximum payload size for incoming webhooks. By default, this limit is 25MB, matching GitHub's standard. You can configure this limit using the `--max-body-size` flag (value is in bytes).
+
+Example:
+
+```shell
+# Set a custom 10MB limit
+gosmee server --max-body-size 10485760
+```
+
+###### Client-Side
+
+The `gosmee client` also has a buffer for receiving messages from the server. If you are forwarding payloads larger than the default, you will need to increase this buffer.
+
+- **Flag**: `--sse-buffer-size`
+- **Default**: `1048576` (1MB)
+- **Description**: Sets the maximum buffer size in bytes for the client's connection.
+
+Example:
+
+```shell
+# Set a 5MB buffer for the client
+gosmee client --sse-buffer-size 5242880 <SMEE_URL> <TARGET_URL>
+```
+
+###### ⚠️ Important Caveats
+
+Increasing payload and buffer sizes has security and performance implications:
+
+- **Increased Memory Consumption**: Both the client and server will consume more memory when these limits are raised. A server handling many simultaneous large webhooks, or a client with a large buffer, can use a significant amount of RAM.
+- **Denial-of-Service (DoS) Risk**: Exposing a server with a very large `max-body-size` can make it a target for DoS attacks, where an attacker sends huge payloads to exhaust server memory.
+- **Kubernetes Deployments**: If you are running `gosmee` in Kubernetes and increase these limits, you **must** update the memory `requests` and `limits` in the `gosmee-server-deployment.yaml` and `gosmee-client-deployment.yaml` files. Failure to do so may cause your Pods to be OOMKilled (Out Of Memory) by Kubernetes.
+
+Always set these values to the lowest practical limit that still accommodates your expected webhook sizes.
 
 ##### Channel Name Protection
 

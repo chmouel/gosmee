@@ -99,6 +99,12 @@ var clientFlags = []cli.Flag{
 		Value:   0,
 		EnvVars: []string{"GOSMEE_HEALTH_PORT"},
 	},
+	&cli.IntFlag{
+		Name:    "sse-buffer-size",
+		Usage:   "SSE client buffer size in bytes",
+		Value:   1048576, // 1MB
+		EnvVars: []string{"GOSMEE_SSE_BUFFER_SIZE"},
+	},
 }
 
 var serverFlags = []cli.Flag{
@@ -156,5 +162,11 @@ var serverFlags = []cli.Flag{
 		Name:    "webhook-signature",
 		Usage:   "Secret tokens to validate webhook signatures (GitHub, GitLab and many others). Can be specified multiple times",
 		EnvVars: []string{"GOSMEE_WEBHOOK_SIGNATURE"},
+	},
+	&cli.IntFlag{
+		Name:    "max-body-size",
+		Usage:   "Maximum body size in bytes for incoming webhooks",
+		Value:   26214400, // 25MB
+		EnvVars: []string{"GOSMEE_MAX_BODY_SIZE"},
 	},
 }
