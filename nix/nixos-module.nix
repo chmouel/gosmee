@@ -236,7 +236,6 @@ in
 
       systemd.services = lib.mapAttrs' (name: icfg:
         let
-          enabled = icfg.enable or true;
           saveDirDefault = "/var/lib/gosmee/clients/${name}";
           saveDir = icfg.saveDir or saveDirDefault;
           stateDir = lib.optionalString (saveDir == saveDirDefault) "gosmee/clients/${name}";
@@ -279,7 +278,7 @@ in
               SystemCallFilter = [ "@system-service" ];
               ExecStart = lib.escapeShellArgs ([ "${cfg.package}/bin/gosmee" ] ++ args);
             };
-            enable = enabled;
+            enable = icfg.enable;
           }
       ) cfg.clients;
     })
