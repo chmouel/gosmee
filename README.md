@@ -176,6 +176,49 @@ nix-env -iA gosmee
 nix run nixpkgs#gosmee -- --help # your args are here
 ```
 
+NixOS module (via this repo’s flake) provides services for the server and multiple clients.
+
+Example NixOS configuration using the flake module:
+
+```nix
+{
+  inputs.gosmee.url = "github:chmouel/gosmee";
+  outputs = { self, nixpkgs, gosmee, ... }: {
+    nixosConfigurations.myhost = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        gosmee.nixosModules.gosmee
+        ({ config, pkgs, ... }: {
+          services.gosmee.server = {
+            enable = true;
+            address = "0.0.0.0";
+            port = 3333;
+            publicUrl = "https://hooks.example.org"; # behind reverse proxy
+            allowedIPs = [ "192.30.252.0/22" ]; # optional
+            trustProxy = true;                   # optional
+          };
+
+          # Multiple client instances
+          services.gosmee.clients.example = {
+            enable = true;
+            smeeUrl = "https://hooks.example.org/AbCdEf12"; # or smee.io URL
+            targetUrl = "http://127.0.0.1:8080";
+            # saveDir defaults to /var/lib/gosmee/clients/example
+            ignoreEvents = [ "push" ];
+          };
+        })
+      ];
+    };
+  };
+}
+```
+
+Notes:
+
+- The module defaults to the `gosmee` package from your `nixpkgs`, but you can override with `services.gosmee.package`.
+- `services.gosmee.clients.<name>.saveDir` defaults to `/var/lib/gosmee/clients/<name>` and is managed via `StateDirectory`.
+- Set `services.gosmee.server.openFirewall = true;` to open the TCP port.
+
 ### System Services
 
 System Service example files for macOS and Linux are available in the
