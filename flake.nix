@@ -47,6 +47,16 @@
               };
             in pkgs.writeText "gosmee-module-eval" "ok";
         };
+        nixosConfigurations.gosmee-test = nixpkgs.lib.nixosSystem {
+          system = "x86_64-linux";
+          modules = [
+            ./nix/test-configuration.nix
+            ({ pkgs, ... }: {
+              # a bit of a hack to get the gosmee package from the flake
+              services.gosmee.package = self.packages.${system}.gosmee;
+            })
+          ];
+        };
         nixosModules = {
           default = import ./nix/nixos-module.nix;
           gosmee = import ./nix/nixos-module.nix;

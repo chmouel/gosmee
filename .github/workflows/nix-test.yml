@@ -1,0 +1,22 @@
+name: "NixOS Module Test"
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  test-nixos-module:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+
+      - name: Build Docker image with test configuration
+        run: nix build .#nixosConfigurations.gosmee-test.config.system.build.dockerImage

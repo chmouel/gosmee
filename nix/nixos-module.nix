@@ -165,13 +165,28 @@ in
   };
 
   config = mkMerge [
-    (mkIf cfg.server.enable {
+    (mkIf (cfg.server.enable || cfg.clients != {}) {
       users.groups.gosmee = { };
       users.users.gosmee = {
         isSystemUser = true;
         group = "gosmee";
       };
-
+    })
+    (mkIf cfg.server.enable {
+      assertions = [
+        {
+          assertion = !(cfg.server.footer != null && cfg.server.footerFile != null);
+          message = "services.gosmee.server.footer and services.gosmee.server.footerFile are mutually exclusive.";
+        }
+        {
+          assertion = !(cfg.server.autoCert && (cfg.server.tlsCert != null || cfg.server.tlsKey != null));
+          message = "services.gosmee.server.autoCert is mutually exclusive with tlsCert/tlsKey.";
+        }
+        {
+          assertion = (cfg.server.tlsCert == null) == (cfg.server.tlsKey == null);
+          message = "services.gosmee.server.tlsCert and tlsKey must be used together.";
+        }
+      ];
       networking.firewall.allowedTCPPorts = mkIf cfg.server.openFirewall [ cfg.server.port ];
 
       systemd.services.gosmee-server = {
@@ -228,12 +243,6 @@ in
 
     # Clients
     (mkIf (cfg.clients != {}) {
-      users.groups.gosmee = { };
-      users.users.gosmee = {
-        isSystemUser = true;
-        group = "gosmee";
-      };
-
       systemd.services = lib.mapAttrs' (name: icfg:
         let
           saveDirDefault = "/var/lib/gosmee/clients/${name}";
