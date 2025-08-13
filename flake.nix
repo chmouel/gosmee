@@ -51,10 +51,7 @@
           system = "x86_64-linux";
           modules = [
             ./nix/test-configuration.nix
-            ({ pkgs, ... }: {
-              # a bit of a hack to get the gosmee package from the flake
-              services.gosmee.package = self.packages.${system}.gosmee;
-            })
+            (import "${nixpkgs}/nixos/modules/virtualisation/docker-image.nix")
           ];
         };
         nixosModules = {
@@ -68,10 +65,9 @@
           };
           default = self.apps.${system}.gosmee;
         };
-        # FIXME: fix the overlay and nix flake check
-        # overlays = {
-        #   default = final: prev: { gosmee = gosmee; };
-        # };
+        overlays = {
+          default = final: prev: { gosmee = gosmee; };
+        };
         devShell = pkgs.mkShell {
           nativeBuildInputs = [
             pkgs.go_1_24
