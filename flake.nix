@@ -9,18 +9,62 @@
     let
       # Generate a user-friendly version number.
       version = self.rev or (builtins.substring 0 8 self.lastModifiedDate);
-    in utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (system:
+      systems = [ "x86_64-linux" "aarch64-linux" ];
+      forAllSystems = nixpkgs.lib.genAttrs systems;
+    in {
+      nixosConfigurations.gosmee-test = nixpkgs.lib.nixosSystem {
+        system = "x86_64-linux";
+        modules = [
+          ./nix/test-configuration.nix
+          (import "${nixpkgs}/nixos/modules/virtualisation/docker-image.nix")
+          ({ pkgs, ... }: {
+            nixpkgs.overlays = [ self.overlays.default ];
+          })
+        ];
+      };
+      overlays.default = final: prev: {
+        gosmee =
+          (import ./default.nix { inherit (final) buildGo124Module; }) {
+            packageSrc = self;
+            version = version;
+          };
+      };
+    } // (utils.lib.eachSystem systems (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
-        gosmee = pkgs.callPackage ./default.nix {
-          packageSrc = self;
-          buildGoModule = pkgs.buildGo124Module;
-          version = version;
-        };
       in {
         packages = {
-          gosmee = gosmee;
+          gosmee = self.packages.${system}.gosmee;
           default = self.packages.${system}.gosmee;
+        };
+        checks = {
+          gosmee-module-eval =
+            let
+              _ = nixpkgs.lib.evalModules {
+                modules = [
+                  (import ./nix/nixos-module.nix)
+                  ({ ... }: {
+                    services.gosmee.server = {
+                      enable = true;
+                      address = "127.0.0.1";
+                      port = 3333;
+                      trustProxy = false;
+                    };
+                    services.gosmee.clients.example = {
+                      enable = true;
+                      smeeUrl = "https://smee.io/example";
+                      targetUrl = "http://127.0.0.1:8080";
+                      targetConnectionTimeout = 5;
+                    };
+                  })
+                ];
+                specialArgs = { inherit pkgs; lib = nixpkgs.lib; };
+              };
+            in pkgs.writeText "gosmee-module-eval" "ok";
+        };
+        nixosModules = {
+          default = import ./nix/nixos-module.nix;
+          gosmee = import ./nix/nixos-module.nix;
         };
         apps = {
           gosmee = utils.lib.mkApp {
@@ -29,10 +73,6 @@
           };
           default = self.apps.${system}.gosmee;
         };
-        # FIXME: fix the overlay and nix flake check
-        # overlays = {
-        #   default = final: prev: { gosmee = gosmee; };
-        # };
         devShell = pkgs.mkShell {
           nativeBuildInputs = [
             pkgs.go_1_24
@@ -45,5 +85,5 @@
             pre-commit install
           '';
         };
-      });
+      }));
 }
