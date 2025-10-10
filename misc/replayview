@@ -35,6 +35,59 @@ echo_white_bold() {
   echo -e "\033[1;37m$*\033[0m"
 }
 
+preview() {
+  arg=${1}
+  j="${arg%.sh}.json"
+  [[ -e ${j} ]] || exit
+  mapfile -t headers < <(grep -oE '(-H '\''[^'\'']*'\''|"[^"]*":"[^"]*")' "${arg}" | sed -e "s/-H '//" -e 's/^"//' -e 's/":"/: /' -e 's/"$//' | sort -n)
+
+  # Extract event header
+  event_left=""
+  event_right=""
+  for header in "${headers[@]}"; do
+    left=${header%%:*}
+    right=${header#*: }
+    if [[ ${left} == "X-Github-Event" || ${left} == "X-Gitlab-Event" || ${left} == "Event-Key" ]]; then
+      event_left=${left}
+      event_right=${right}
+      break
+    fi
+  done
+
+  icon="🔗"
+  action=
+  case ${event_left} in
+  *Github*)
+    icon="$(echo_magenta ) Github"
+    if [[ ${event_right} == "pull_request" ]]; then
+      action=":$(jq -r '.action' ${j})"
+    fi
+    ;;
+  *Gitlab*)
+    icon="$(echo_magenta ) Gitlab"
+    if [[ ${event_right} == "Merge Request Hook" ]]; then
+      action=":$(jq -r '.object_attributes.action' ${j})"
+    elif [[ ${event_right} == "Note Hook" ]]; then
+      action=":$(jq -r '.object_attributes.noteable_type' ${j})"
+    fi
+    ;;
+  *Event-Key*) icon="$(echo_magenta ) Bitbucket" ;;
+  *) icon="🔗 ${event_left}" ;;
+  esac
+
+  echo ${icon} $(echo_red ${event_right}${action})
+
+  for header in "${headers[@]}"; do
+    left=${header%%:*}
+    right=${header#*: }
+    echo " $(echo_yellow ${left}) $(echo_white_bold ${right})"
+  done
+
+  echo
+  jq -C . ${j}
+  grep -E "(curl|http)" ${arg}
+}
+
 show_help() {
   cat <<EOF
 $(basename $(readlink -f $0)) - view gosme replay files
@@ -96,7 +149,12 @@ function replayview() {
   local initial=
   [[ -n ${1:-} ]] && initial="-q ${1}"
   local output
-  output=$(fd -0 .sh ${dir} | xargs -0 ls -1tr | fzf -1 --tac --reverse --preview="${0} -P {}" --exact --bind alt-n:next-history,alt-p:previous-history,ctrl-j:preview-down,ctrl-k:preview-up,ctrl-n:down,ctrl-p:up,ctrl-d:preview-page-down,ctrl-u:preview-page-up --preview-window 'down,70%:wrap' ${initial})
+  output=$(fd -0 .sh ${dir} | xargs -0 ls -1tr | fzf \
+    -1 --tac --reverse --preview="${0} -P {}" \
+    --with-shell="bash -c" \
+    --footer '[Alt-i] Preview JSON with fx [Alt-r] Run it on controler [Alt-l] Run it locally' --exact \
+    --bind "alt-n:next-history,alt-p:previous-history,ctrl-j:preview-down,ctrl-k:preview-up,ctrl-n:down,ctrl-p:up,ctrl-d:preview-page-down,ctrl-u:preview-page-up,alt-i:execute(fx \$(echo {}|sed 's/.sh/.json/')),alt-r:execute({};read -n1 -p'Press a key to continue'),alt-l:execute({} -l;read -n1 -p'Press a key to continue')" \
+    --preview-window 'down,70%:wrap' ${initial})
   [[ -z $output ]] && return
   [[ -n ${symlink} ]] && {
     symlink=/tmp/${symlink}.sh
@@ -134,38 +192,8 @@ while getopts "t:il:rnyhcd:P:" opt; do
     targetlink=$OPTARG
     ;;
   P) ## Show a preview of the json and file for fzf
-    arg=$OPTARG
-    j="${arg%.sh}.json"
-    [[ -e ${j} ]] || exit
-    output=$(grep -Eo "X-((Github|Gitlab)-Event|Event-Key): ([^']*)" "${arg}")
-    left=${output%%:*}
-    right=${output#*: }
-    icon="🔗"
-    action=
-    case ${left} in
-    *Github*)
-      icon="$(echo_magenta ) Github"
-      if [[ ${right} == "pull_request" ]]; then
-        action=":$(jq -r '.action' ${j})"
-      fi
-      ;;
-    *Gitlab*) icon="$(echo_magenta ) Gitlab" ;;
-    *Event-Key*) icon="$(echo_magenta ) Bitbucket" ;;
-    *) icon="🔗 ${left}" ;;
-    esac
-
-    echo ${icon} $(echo_red ${right}${action})
-
-    mapfile -t headers < <(grep -oE -- "-H '[^'\"]*" "${arg}" | sed "s/-H '//" | sort -n)
-    for header in "${headers[@]}"; do
-      left=${header%%:*}
-      right=${header#*: }
-      echo " $(echo_yellow ${left}) $(echo_white_bold ${right})"
-    done
-
-    echo
-    jq -C . ${j}
-    grep "curl" ${arg}
+    ## Show a preview of the json and file for fzf
+    preview ${OPTARG}
     ;;
   l) ## Make a symlink
     symlink=$OPTARG
