@@ -95,9 +95,9 @@ fi
 # Set verbose flag for httpie if requested
 http_flags="--print=HhBb"
 if [[ "$verbose" == "true" ]]; then
-    http_flags="--print=HhBb --verbose"
+    http_flags+=" --verbose"
     set -x
 fi
 
 echo "Replaying webhook to: $targetURL"
-http $http_flags POST "${targetURL}" Content-Type:"{{ .ContentType }}" {{ .Headers }} < ./{{ .FileBase }}.json
+http -F $http_flags POST "${targetURL}" Content-Type:"{{ .ContentType }}" {{ .Headers }} < ./{{ .FileBase }}.json
