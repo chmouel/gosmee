@@ -47,7 +47,7 @@ github.com/urfave/cli/v2
 # github.com/xrash/smetrics v0.0.0-20250705151800-55b8f293f342
 ## explicit; go 1.15
 github.com/xrash/smetrics
-# golang.org/x/crypto v0.44.0
+# golang.org/x/crypto v0.45.0
 ## explicit; go 1.24.0
 golang.org/x/crypto/acme
 golang.org/x/crypto/acme/autocert
