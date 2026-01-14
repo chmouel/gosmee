@@ -1,32 +1,23 @@
-# 🔄 gosmee - A webhook forwarder/relayer and replayer
+# gosmee - A webhook forwarder, relayer, and replayer
 
 <img  align="right" alt="gosmee logo" src="https://github.com/user-attachments/assets/f032b06f-480b-4a47-9fe3-2e350adf98fb" width="120">
 
-✨ Gosmee is a powerful webhook relayer that runs anywhere with ease!
-📡 It also serves as a GitHub Hooks replayer using the GitHub API.
+Gosmee is a webhook relayer that runs anywhere with ease. It also serves as a GitHub Hooks replayer using the GitHub API.
 
-## 📝 Description
+## Description
 
-Gosmee enables you to relay webhooks from itself (as a server) or from
-<https://smee.io> to your local laptop or infrastructure hidden from the public
-internet.
+Gosmee enables you to relay webhooks from itself (as a server) or from <https://smee.io> to your local laptop or infrastructure hidden from the public internet.
 
-It makes exposing services on your local network (like localhost) or behind
-a VPN simple and secure. This allows public services, such as GitHub, to push
-webhooks directly to your local environment.
+It makes exposing services on your local network (like localhost) or behind a VPN quite straightforward. This allows public services, such as GitHub, to push webhooks directly to your local environment.
 
 Here's how it works:
 
-1. Configure your Webhook to send events to a <https://smee.io/> URL or to
-   your publicly accessible Gosmee server.
-2. Run the Gosmee client on your local machine to fetch these events and
-   forward them to your local service.
+1. Configure your webhook to send events to a <https://smee.io/> URL or to your publicly accessible Gosmee server.
+2. Run the Gosmee client on your local machine to fetch these events and forward them to your local service.
 
-This creates a seamless bridge between GitHub webhooks and your local
-development environment!
+This creates a proper bridge between GitHub webhooks and your local development environment.
 
-Alternatively, if you prefer not to use a relay server, you can use the
-GitHub API to replay webhook deliveries.
+Alternatively, if you'd rather not use a relay server, you can use the GitHub API to replay webhook deliveries directly. (beta)
 
 ### Diagram
 
@@ -58,10 +49,9 @@ sequenceDiagram
 
 ## Blog Post
 
-Learn more about the background and features of this project in this blog
-post: <https://blog.chmouel.com/posts/gosmee-webhook-forwarder-relayer>
+Learn more about the background and features of this project in this blog post: <https://blog.chmouel.com/posts/gosmee-webhook-forwarder-relayer>
 
-## 🖥️ Screenshot
+## Screenshot
 
 ![Screenshot](./.github/screenshot.png)
 
@@ -69,11 +59,11 @@ post: <https://blog.chmouel.com/posts/gosmee-webhook-forwarder-relayer>
 
 The web interface of the gosmee server features a live event feed that shows webhook events in real-time:
 
-- 🔴 Live status indicator showing connection state
+- Live status indicator showing connection state
 - Event counter showing number of received events
 - JSON tree viewer for easy payload inspection
 - Copy buttons for headers and payloads
-- 🔄 Replay functionality to resend events to your endpoint
+- Replay functionality to resend events to your endpoint
 - Clear button to remove all events from the feed
 
 Each event in the feed shows:
@@ -83,47 +73,13 @@ Each event in the feed shows:
 - Payload in both tree view and raw JSON formats
 - Option to replay individual events
 
-## 🛠️ Replay Viewer Utility
-
-<https://github.com/user-attachments/assets/dbd0978a-a8ef-4e77-b498-672497567b39>
-
-Gosmee includes a helper script [`misc/replayview`](./misc/replayview) for
-interactively browsing, previewing, and replaying webhook events saved by the
-client (`--saveDir`). This tool lets you:
-
-- Fuzzy-find replay shell scripts and their JSON payloads
-- Preview event metadata, headers, and payloads
-- Copy replay script paths to clipboard
-- Create symlinks for quick access
-- Run replay scripts directly
-- Interactively inspect JSON payloads (requires [`fx`](https://github.com/antonmedv/fx))
-
-**Usage:**
-
-```sh
-./misc/replayview -h
-```
-
-By default, it looks for replay files in `/tmp/save` or `/tmp/replay`. Use `-d
-<dir>` to specify a different directory.
-
-It will make a symlink of the chosen replay event to the file `/tmp/run.sh`,
-this redirect the event to the local service where to replay the payload
-easily.
-
-**Requirements:** `fzf`, `jq`, `fd`, and optionally [fx](https://fx.wtf/) for interactive JSON
-viewing.
-
-See the script header or run with `-h` for full options and details.
-
-## 📥 Install
+## Installation
 
 ### Release
 
-Go to the [release](https://github.com/chmouel/gosmee/releases) page and
-choose the appropriate archive or package for your platform.
+Please visit the [release](https://github.com/chmouel/gosmee/releases) page and choose the appropriate archive or package for your platform.
 
-## 🍺 Homebrew
+## Homebrew
 
 ```shell
 brew tap chmouel/gosmee https://github.com/chmouel/gosmee
@@ -136,7 +92,7 @@ brew install gosmee
 yay -S gosmee-bin
 ```
 
-### 🐳 Docker
+### Docker
 
 #### Gosmee client with Docker
 
@@ -156,7 +112,7 @@ docker run -d -p 3026:3026 --restart always --name example.org ghcr.io/chmouel/g
 go install -v github.com/chmouel/gosmee@latest
 ```
 
-### 📂 Git
+### Git
 
 Clone the repository and use:
 
@@ -165,7 +121,7 @@ Clone the repository and use:
 -$ ./bin/gosmee --help
 ```
 
-### ❄️ [Nix/NixOS](https://nixos.org/)
+### [Nix/NixOS](https://nixos.org/)
 
 Gosmee is available from [`nixpkgs`](https://github.com/NixOS/nixpkgs).
 
@@ -176,14 +132,13 @@ nix run nixpkgs#gosmee -- --help # your args are here
 
 ### System Services
 
-System Service example files for macOS and Linux are available in the
-[misc](./misc) directory.
+System service example files for macOS and Linux are available in the [misc](./misc) directory.
 
-### ☸️ Kubernetes
+### Kubernetes
 
 You can deploy gosmee on Kubernetes to relay webhooks to your internal services.
 
-Two deployment yaml are available:
+Two deployment configurations are available:
 
 - [gosmee-server-deployment.yaml](./misc/gosmee-server-deployment.yaml) - For deploying the public-facing server component
 - [gosmee-client-deployment.yaml](./misc/gosmee-client-deployment.yaml) - For deploying the client component that forwards to internal services
@@ -216,7 +171,7 @@ Key configuration:
 - Change the second argument to your internal service URL (e.g., `http://service.namespace:8080`)
 - The `--saveDir` flag enables saving webhook payloads to `/tmp/save` for later inspection
 
-For detailed configuration options, refer to the documentation comments in each deployment file.
+For detailed configuration options, please refer to the documentation comments in each deployment file.
 
 ### Shell completion
 
@@ -230,24 +185,21 @@ source <(gosmee completion bash)
 source <(gosmee completion zsh)
 ```
 
-## 🚀 Usage
+## Usage
 
-### 💻 Client
+### Client
 
-If you plan to use <https://smee.io>, you can generate your own smee URL by
-visiting <https://smee.io/new>.
+If you plan to use the <https://smee.io> service, you can generate your own smee URL by visiting <https://smee.io/new>.
 
-If you want to use <https://hook.pipelinesascode.com> then you can directly
-generate a URL with  the `-u / --new-url` flag to generate one.
+If you want to use the <https://hook.pipelinesascode.com> service then you can directly generate a URL with the `-u / --new-url` flag.
 
-Once you have it, the basic usage is:
+Once you have the relay URL, the basic usage is:
 
 ```shell
 gosmee client https://smee.io/aBcDeF https://localhost:8080
 ```
 
-This command will relay all payloads received by the smee URL to a service
-running on <http://localhost:8080>.
+This command will relay all payloads received by the smee URL to a service running on <http://localhost:8080>.
 
 You can also save all relays as shell scripts for easy replay:
 
@@ -255,10 +207,7 @@ You can also save all relays as shell scripts for easy replay:
 gosmee client --saveDir /tmp/savedreplay https://smee.io/aBcDeF https://localhost:8080
 ```
 
-This command saves the JSON data of new payloads to
-`/tmp/savedreplay/timestamp.json` and creates shell scripts with cURL options
-at `/tmp/savedreplay/timestamp.sh`. Replay webhooks easily by running these
-scripts!
+This command saves the JSON data of new payloads to `/tmp/savedreplay/timestamp.json` and creates shell scripts with cURL options at `/tmp/savedreplay/timestamp.sh`. Replay webhooks easily by running these scripts.
 
 You can configure the SSE client buffer size (in bytes) with the `--sse-buffer-size` flag. The default is `1048576` (1MB).
 
@@ -268,24 +217,22 @@ For those who prefer [HTTPie](https://httpie.io) over cURL, you can generate HTT
 gosmee client --httpie --saveDir /tmp/savedreplay https://smee.io/aBcDeF https://localhost:8080
 ```
 
-This will create replay scripts that use `http` command instead of `curl`. The
-generated scripts support the same features as cURL scripts the output will be
-a bit nicer and colorful to read.
+This will create replay scripts that use the `http` command instead of `curl`. The generated scripts support the same features as cURL scripts; the output will be rather nicer and presented in colour.
 
 You can ignore certain events (identified by GitLab/GitHub/Bitbucket) with one or more `--ignore-event` flags.
 
 If you only want to save payloads without replaying them, use `--noReplay`.
 
-By default, you'll get colorful output unless you specify `--nocolor`.
+By default, you'll get colourful output unless you specify `--nocolor`.
 
 Output logs as JSON with `--output json` (which implies `--nocolor`).
 
 #### Replay scripts
 
-Both cURL and HTTPie replay scripts include those command-line options:
+Both cURL and HTTPie replay scripts include these command-line options:
 
 - `-l, --local`: Use local debug URL
-- `-t, --target URL`: Specify target URL directly  
+- `-t, --target URL`: Specify target URL directly
 - `-h, --help`: Show help message
 - `-v, --verbose`: Enable verbose output
 
@@ -305,23 +252,17 @@ Both cURL and HTTPie replay scripts include those command-line options:
 ./timestamp.sh -h
 ```
 
-Scripts also respect the `GOSMEE_DEBUG_SERVICE` environment variable for
-alternative target URLs.
+Scripts also respect the `GOSMEE_DEBUG_SERVICE` environment variable for alternative target URLs.
 
-### 🖥️ Server
+### Server
 
-With `gosmee server` you can run your own relay server instead of using
-<https://smee.io>.
+With `gosmee server` you can run your own relay server instead of using <https://smee.io>.
 
-By default, `gosmee server` binds to `localhost` on port `3333`. For practical
-use, you'll want to expose it to your public IP or behind a proxy using the
-`--address` and `--port` flags.
+By default, `gosmee server` binds to `localhost` on port `3333`. For practical use, you'll want to expose it to your public IP or behind a proxy using the `--address` and `--port` flags.
 
-For security, you can use Let's Encrypt certificates with the `--tls-cert`
-and `--tls-key` flags.
+For security, you can use Let's Encrypt certificates with the `--tls-cert` and `--tls-key` flags.
 
-There are many customization options available - check them with `gosmee server
---help`.
+There are many flags available - check them with `gosmee server --help`.
 
 To use your server, access it with a URL format like:
 
@@ -338,7 +279,7 @@ http://localhost:3333/NqybHcEi
 
 #### Caddy
 
-[Caddy](https://caddyserver.com/) is the ideal way to run gosmee server:
+[Caddy](https://caddyserver.com/) is rather ideal for running gosmee server:
 
 ```caddyfile
 https://webhook.mydomain {
@@ -349,7 +290,7 @@ https://webhook.mydomain {
 }
 ```
 
-It automatically configures Let's Encrypt certificates for you!
+It automatically configures Let's Encrypt certificates for you.
 
 #### Nginx
 
@@ -367,10 +308,9 @@ Running gosmee server behind nginx requires some configuration:
     }
 ```
 
-⚠️ Long-running connections may occasionally cause errors with nginx.
-Contributions to debug this are welcome!
+Note: Long-running connections may occasionally cause errors with nginx. Contributions to debug this are most welcome.
 
-#### 🔒 Security
+#### Security
 
 ##### Webhook IP Restrictions
 
@@ -417,7 +357,7 @@ The server logs will show:
 
 Note: If no IP restrictions are configured, all POST requests will be allowed.
 
-##### 📦 Payload Size and Memory Management
+##### Payload Size and Memory Management
 
 ###### Server-Side
 
@@ -432,7 +372,7 @@ gosmee server --max-body-size 10485760
 
 ###### Client-Side
 
-The `gosmee client` also has a buffer for receiving messages from the server. If you are forwarding payloads larger than the default, you will need to increase this buffer.
+The `gosmee client` also has a buffer for receiving messages from the server. If you're forwarding payloads larger than the default, you'll need to increase this buffer.
 
 - **Flag**: `--sse-buffer-size`
 - **Default**: `1048576` (1MB)
@@ -445,13 +385,13 @@ Example:
 gosmee client --sse-buffer-size 5242880 <SMEE_URL> <TARGET_URL>
 ```
 
-###### ⚠️ Important Caveats
+###### Important Considerations
 
 Increasing payload and buffer sizes has security and performance implications:
 
-- **Increased Memory Consumption**: Both the client and server will consume more memory when these limits are raised. A server handling many simultaneous large webhooks, or a client with a large buffer, can use a significant amount of RAM.
+- **Increased Memory Consumption**: Both the client and server will consume more memory when these limits are raised. A server handling many simultaneous large webhooks, or a client with a large buffer, can use quite a bit of RAM.
 - **Denial-of-Service (DoS) Risk**: Exposing a server with a very large `max-body-size` can make it a target for DoS attacks, where an attacker sends huge payloads to exhaust server memory.
-- **Kubernetes Deployments**: If you are running `gosmee` in Kubernetes and increase these limits, you **must** update the memory `requests` and `limits` in the `gosmee-server-deployment.yaml` and `gosmee-client-deployment.yaml` files. Failure to do so may cause your Pods to be OOMKilled (Out Of Memory) by Kubernetes.
+- **Kubernetes Deployments**: If you're running `gosmee` in Kubernetes and increase these limits, you **must** update the memory `requests` and `limits` in the `gosmee-server-deployment.yaml` and `gosmee-client-deployment.yaml` files. Failure to do so may cause your Pods to be OOMKilled (Out Of Memory) by Kubernetes.
 
 Always set these values to the lowest practical limit that still accommodates your expected webhook sizes.
 
@@ -464,7 +404,7 @@ To prevent potential DoS attacks and ensure system stability:
 - Built-in validation for all endpoints that handle channel names
 - Protects against resource exhaustion attacks that could be caused by excessive channel name lengths
 
-##### 🔐 Webhook Signature Validation
+##### Webhook Signature Validation
 
 When running gosmee server, you can enable webhook signature validation for multiple providers with multiple secrets:
 
@@ -479,23 +419,22 @@ When enabled:
 - For Bitbucket Cloud/Server: Validates X-Hub-Signature header using HMAC SHA-256
 - For Gitea/Forge: Validates X-Gitea-Signature header using HMAC SHA-256
 - Supports multiple secrets - useful when receiving webhooks from different sources
-- Rejects requests with missing or invalid signatures with HTTP 401 Unauthorized
+- Rejects requests with missing or invalid signatures with HTTP 401 Unauthorised
 - Each secret is tried for validation, webhook is accepted if any secret matches
 - Performance impact is minimal: ~2μs per validation with negligible memory usage
 
 You can also set multiple secrets via the `GOSMEE_WEBHOOK_SIGNATURE` environment variable by separating them with commas.
 
-## 🔁 Replay webhook deliveries via the GitHub API (beta)
+## Replay Webhook Deliveries via the GitHub API (beta)
 
-If you prefer not to use a relay server with GitHub, you can replay webhook deliveries directly via the GitHub API.
+If you'd rather not use a relay server with GitHub, you can replay webhook deliveries directly via the GitHub API.
 
-This method is more reliable as you don't depend on relay server availability.
-You'll need a GitHub token with appropriate scopes:
+This method is more reliable as you don't depend on relay server availability. You'll need a GitHub token with appropriate scopes:
 
 - For repository webhooks: `read:repo_hook` or `repo` scope
-- For organization webhooks: `admin:org_hook` scope
+- For organisation webhooks: `admin:org_hook` scope
 
-Currently supports replaying webhooks from Repositories and Organizations (GitHub Apps webhooks not supported).
+Currently supports replaying webhooks from Repositories and Organisations (GitHub Apps webhooks not supported).
 
 First, find the Hook ID:
 
@@ -503,7 +442,7 @@ First, find the Hook ID:
 gosmee replay --github-token=$GITHUB_TOKEN --list-hooks org/repo
 ```
 
-List hooks for an organization:
+List hooks for an organisation:
 
 ```shell
 gosmee replay --github-token=$GITHUB_TOKEN --list-hooks org
@@ -530,43 +469,60 @@ gosmee replay --github-token=$GITHUB_TOKEN --list-deliveries org/repo HOOK_ID
 ```
 
 >[!NOTE]
->`gosmee replay` doesn't support paging yet and lists only the last
->100 deliveries. Specifying a date older than the last 100
->deliveries won't work.
+>`gosmee replay` doesn't support paging yet and lists only the last 100 deliveries. Specifying a date older than the last 100 deliveries won't work.
 >
 >When rate limited, gosmee will fail without recovery mechanisms.
 
-## 🌐 Beyond Webhook
+## Replay Viewer Utility
 
-Gosmee is webhook-specific. For other tunneling solutions, check
-<https://github.com/anderspitman/awesome-tunneling>. Recommended alternatives
-include [go-http-tunnel](https://github.com/mmatczuk/go-http-tunnel) or
-[tailscale](https://tailscale.com/).
+<https://github.com/user-attachments/assets/dbd0978a-a8ef-4e77-b498-672497567b39>
 
-## ⚠️ Caveats
+Gosmee includes a helper script [`misc/replayview`](./misc/replayview) for interactively browsing, previewing, and replaying webhook events saved by the client (`--saveDir`). This tool lets you:
 
-This tool is intended for local development and testing environments only!
-It hasn't undergone thorough security and performance reviews and
-should not be deployed in production systems.
+- Fuzzy-find replay shell scripts and their JSON payloads
+- Preview event metadata, headers, and payloads
+- Copy replay script paths to clipboard
+- Create symlinks for quick access
+- Run replay scripts directly
+- Interactively inspect JSON payloads (requires [`fx`](https://github.com/antonmedv/fx))
 
-[smee-sidecar](https://github.com/konflux-ci/smee-sidecar) is a service intended for
-monitoring gosmee deployments. It provides active health checks to verify that gosmee
-is serving requests.
+**Usage:**
 
-## 🙏 Thanks
+```sh
+./misc/replayview -h
+```
+
+By default, it looks for replay files in `/tmp/save` or `/tmp/replay`. Use `-d <dir>` to specify a different directory.
+
+It will create a symbolic link of the chosen replay event to the file `/tmp/run.sh`, which redirects the event to the local service for easy payload replay.
+
+**Requirements:** `fzf`, `jq`, `fd`, and optionally [fx](https://fx.wtf/) for interactive JSON viewing.
+
+See the script header or run with `-h` for full options and details.
+
+## Beyond Webhook
+
+Gosmee is webhook-specific. For other tunnelling solutions, check <https://github.com/anderspitman/awesome-tunneling>. Recommended alternatives include [go-http-tunnel](https://github.com/mmatczuk/go-http-tunnel) or [tailscale](https://tailscale.com/).
+
+## Caveats
+
+This tool is intended for local development and testing environments only. It hasn't undergone thorough security and performance reviews and should not be deployed in production systems.
+
+[smee-sidecar](https://github.com/konflux-ci/smee-sidecar) is a service intended for monitoring gosmee deployments. It provides active health checks to verify that gosmee is serving requests.
+
+## Thanks
 
 - Most of the work is powered by the [go-sse](https://github.com/r3labs/sse) library.
-- Previously used [pysmee](https://github.com/akrog/pysmee) but its underlying
-SSE library had issues with chunked transfers.
+- I previously used [pysmee](https://github.com/akrog/pysmee) but its underlying SSE library had issues with chunked transfers, that leads me to rewrite it in Go and add some specific features needed for my use cases.
 
-## 📜 Copyright
+## Copyright
 
 [Apache-2.0](./LICENSE)
 
-## 👥 Authors
+## Authors
 
 ### Chmouel Boudjnah
 
-- 🐘 Fediverse - <[@chmouel@chmouel.com](https://fosstodon.org/@chmouel)>
-- 🐦 Twitter - <[@chmouel](https://twitter.com/chmouel)>
-- 📝 Blog  - <[https://blog.chmouel.com](https://blog.chmouel.com)>
+- Fediverse - <[@chmouel@chmouel.com](https://fosstodon.org/@chmouel)>
+- Twitter - <[@chmouel](https://twitter.com/chmouel)>
+- Blog  - <[https://blog.chmouel.com](https://blog.chmouel.com)>
