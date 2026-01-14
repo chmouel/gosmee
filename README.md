@@ -1,6 +1,6 @@
 # 🔄 gosmee - A webhook forwarder/relayer and replayer
 
-<img  align="right" alt="gosmee logo" src="https://github.com/user-attachments/assets/7b3533a2-eeb9-4fd9-b10d-b5d4fac75438" width="120">
+<img  align="right" alt="gosmee logo" src="https://github.com/user-attachments/assets/f032b06f-480b-4a47-9fe3-2e350adf98fb" width="120">
 
 ✨ Gosmee is a powerful webhook relayer that runs anywhere with ease!
 📡 It also serves as a GitHub Hooks replayer using the GitHub API.
