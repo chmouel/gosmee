@@ -171,7 +171,7 @@ func validateWebhookSignature(secrets []string, payload []byte, r *http.Request)
 
 	// Check for GitHub signature
 	if githubSignature := r.Header.Get("X-Hub-Signature-256"); githubSignature != "" {
-		fmt.Fprintf(os.Stdout, "Received request %s %s\n", r.Method, r.URL.Path)
+		fmt.Fprintf(os.Stdout, "Received request %s %s\n", r.Method, r.URL.Path) //nolint:gosec // stdout, not web output
 		for _, secret := range secrets {
 			if validateGitHubWebhookSignature(secret, payload, githubSignature) {
 				return true
@@ -242,7 +242,7 @@ func handleWebhookPost(c *cli.Context, events *sse.Server, eventBroker *EventBro
 		var headersBuilder strings.Builder
 		payload := make(map[string]any)
 		for k, v := range r.Header {
-			headersBuilder.WriteString(fmt.Sprintf(" %s=%s", k, v[0]))
+			fmt.Fprintf(&headersBuilder, " %s=%s", k, v[0])
 			payload[strings.ToLower(k)] = v[0]
 		}
 		payload["timestamp"] = fmt.Sprintf("%d", now.UnixMilli())
@@ -271,7 +271,7 @@ func handleWebhookPost(c *cli.Context, events *sse.Server, eventBroker *EventBro
 			"version": strings.TrimSpace(string(Version)),
 		}
 		_ = json.NewEncoder(w).Encode(resp)
-		fmt.Fprintf(os.Stdout, "%s Published %s%s on channel %s\n",
+		fmt.Fprintf(os.Stdout, "%s Published %s%s on channel %s\n", //nolint:gosec // stdout, not web output
 			now.Format(timeFormat),
 			middleware.GetReqID(r.Context()),
 			headersBuilder.String(),

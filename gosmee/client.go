@@ -194,7 +194,7 @@ func emoji(emoji, color string, decorate bool) string {
 func buildHeaders(headers map[string]string) string {
 	var b strings.Builder
 	for k, v := range headers {
-		b.WriteString(fmt.Sprintf("%s=%s ", k, v))
+		fmt.Fprintf(&b, "%s=%s ", k, v)
 	}
 	return b.String()
 }
@@ -202,7 +202,7 @@ func buildHeaders(headers map[string]string) string {
 func buildCurlHeaders(headers map[string]string) string {
 	var b strings.Builder
 	for k, v := range headers {
-		b.WriteString(fmt.Sprintf("-H '%s: %s' ", k, v))
+		fmt.Fprintf(&b, "-H '%s: %s' ", k, v)
 	}
 	return b.String()
 }
@@ -270,7 +270,7 @@ func buildHttpieHeaders(headers map[string]string) string {
 	var b strings.Builder
 	for k, v := range headers {
 		// HTTPie expects headers in format 'Header-Name:value' and needs proper quoting
-		b.WriteString(fmt.Sprintf("%s:%s ", strconv.Quote(k), strconv.Quote(v)))
+		fmt.Fprintf(&b, "%s:%s ", strconv.Quote(k), strconv.Quote(v))
 	}
 	return b.String()
 }
@@ -303,7 +303,7 @@ func replayData(ropts *replayDataOpts, logger *slog.Logger, pm payloadMsg) error
 	if _, ok := pm.headers["Content-Type"]; !ok {
 		req.Header.Add("Content-Type", pm.contentType)
 	}
-	resp, err := client.Do(req)
+	resp, err := client.Do(req) //nolint:gosec // user-configured URL
 	if err != nil {
 		return err
 	}
@@ -394,7 +394,7 @@ func checkServerVersion(serverURL string, clientVersion string, logger *slog.Log
 	}
 
 	client := http.Client{Timeout: time.Duration(defaultTimeout) * time.Second}
-	resp, err := client.Do(req)
+	resp, err := client.Do(req) //nolint:gosec // user-configured URL
 	if err != nil {
 		// If we can't reach the server, don't fail - just warn
 		logger.WarnContext(context.Background(), fmt.Sprintf("%sCould not check server version: %s", emoji("⚠", "yellow+b", decorate), err.Error()))
