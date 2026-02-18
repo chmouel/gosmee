@@ -1,6 +1,7 @@
 package gosmee
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/base64"
@@ -9,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -282,6 +284,8 @@ type replayDataOpts struct {
 	localDebugURL               string
 	ignoreEvents                []string
 	useHttpie                   bool // Use httpie instead of curl
+	execCommand                 string
+	execOnEvents                []string
 }
 
 func replayData(ropts *replayDataOpts, logger *slog.Logger, pm payloadMsg) error {
@@ -318,6 +322,53 @@ func replayData(ropts *replayDataOpts, logger *slog.Logger, pm payloadMsg) error
 	}
 	s := fmt.Sprintf("%s%s", emoji("•", "magenta+b", ropts.decorate), msg)
 	logger.InfoContext(context.Background(), s)
+	return nil
+}
+
+func runExecCommand(ctx context.Context, rd *replayDataOpts, logger *slog.Logger, pm payloadMsg) error {
+	if len(rd.execOnEvents) > 0 {
+		if pm.eventType == "" {
+			logger.DebugContext(ctx, "skipping exec: event has no type and exec-on-events filter is set")
+			return nil
+		}
+		if !slices.Contains(rd.execOnEvents, pm.eventType) {
+			logger.DebugContext(ctx,
+				fmt.Sprintf("skipping exec for event type %s (not in exec-on-events list)", pm.eventType))
+			return nil
+		}
+	}
+
+	//nolint:gosec // Command is intentionally user-provided
+	cmd := exec.CommandContext(ctx, "sh", "-c", rd.execCommand)
+	cmd.Env = append(os.Environ(),
+		"GOSMEE_EVENT_TYPE="+pm.eventType,
+		"GOSMEE_EVENT_ID="+pm.eventID,
+		"GOSMEE_CONTENT_TYPE="+pm.contentType,
+		"GOSMEE_TIMESTAMP="+pm.timestamp,
+	)
+	cmd.Stdin = bytes.NewReader(pm.body)
+
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+
+	if stdout.Len() > 0 {
+		logger.InfoContext(ctx,
+			fmt.Sprintf("%sexec stdout: %s", emoji("→", "cyan+b", rd.decorate), strings.TrimSpace(stdout.String())))
+	}
+	if stderr.Len() > 0 {
+		logger.InfoContext(ctx,
+			fmt.Sprintf("%sexec stderr: %s", emoji("→", "yellow+b", rd.decorate), strings.TrimSpace(stderr.String())))
+	}
+
+	if err != nil {
+		return fmt.Errorf("exec command failed: %w", err)
+	}
+
+	logger.InfoContext(ctx,
+		fmt.Sprintf("%sexec command completed successfully for event %s", emoji("✓", "green+b", rd.decorate), pm.eventType))
 	return nil
 }
 
@@ -574,6 +625,13 @@ func (c goSmee) clientSetup() error {
 				s := fmt.Sprintf("%s %s forwarding message with headers '%s' - %s", nowStr, ansi.Color("ERROR", "red+b"), headers, err.Error())
 				c.logger.ErrorContext(context.Background(), s)
 				return
+			}
+		}
+
+		if c.replayDataOpts.execCommand != "" {
+			if err := runExecCommand(context.Background(), c.replayDataOpts, c.logger, pm); err != nil {
+				s := fmt.Sprintf("%s %s exec command failed for event '%s' - %s", nowStr, ansi.Color("ERROR", "red+b"), pm.eventType, err.Error())
+				c.logger.ErrorContext(context.Background(), s)
 			}
 		}
 	})

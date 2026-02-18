@@ -115,6 +115,15 @@ func (r *replayOpts) replayHooks(ctx context.Context, hookid int64) error {
 					continue
 				}
 			}
+			if r.replayDataOpts.execCommand != "" {
+				if err := runExecCommand(ctx, r.replayDataOpts, r.logger, pm); err != nil {
+					s := fmt.Sprintf("%s exec command failed for event '%s' - %s\n",
+						ansi.Color("ERROR", "red+b"),
+						pm.eventType,
+						err.Error())
+					r.logger.ErrorContext(context.Background(), s)
+				}
+			}
 		}
 
 		if len(deliveries) != 0 {
@@ -224,6 +233,8 @@ func replay(c *cli.Context) error {
 		ignoreEvents:      c.StringSlice("ignore-event"),
 		targetCnxTimeout:  c.Int("target-connection-timeout"),
 		insecureTLSVerify: c.Bool("insecure-skip-tls-verify"),
+		execCommand:       c.String("exec"),
+		execOnEvents:      c.StringSlice("exec-on-events"),
 	}
 	return ropt.replayHooks(ctx, hookID)
 }

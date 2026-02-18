@@ -1291,3 +1291,125 @@ func TestIsOlderVersion(t *testing.T) {
 		})
 	}
 }
+
+func TestRunExecCommand(t *testing.T) {
+	logger := slog.New(slog.DiscardHandler)
+
+	basePM := payloadMsg{
+		body:        []byte(`{"hello":"world"}`),
+		timestamp:   "2023-10-27T10.00.01.000",
+		contentType: "application/json",
+		eventType:   "push",
+		eventID:     "delivery-123",
+		headers:     map[string]string{"X-GitHub-Event": "push"},
+	}
+
+	t.Run("successful exec receives payload on stdin", func(t *testing.T) {
+		tmpFile := filepath.Join(t.TempDir(), "output.txt")
+		opts := &replayDataOpts{
+			execCommand: fmt.Sprintf("cat > %s", tmpFile),
+			decorate:    false,
+		}
+		err := runExecCommand(context.Background(), opts, logger, basePM)
+		assert.NilError(t, err)
+		data, err := os.ReadFile(tmpFile)
+		assert.NilError(t, err)
+		assert.Equal(t, string(data), `{"hello":"world"}`)
+	})
+
+	t.Run("environment variables are set", func(t *testing.T) {
+		tmpFile := filepath.Join(t.TempDir(), "env.txt")
+		opts := &replayDataOpts{
+			execCommand: fmt.Sprintf("env | grep GOSMEE_ > %s", tmpFile),
+			decorate:    false,
+		}
+		err := runExecCommand(context.Background(), opts, logger, basePM)
+		assert.NilError(t, err)
+		data, err := os.ReadFile(tmpFile)
+		assert.NilError(t, err)
+		envOutput := string(data)
+		assert.Assert(t, strings.Contains(envOutput, "GOSMEE_EVENT_TYPE=push"))
+		assert.Assert(t, strings.Contains(envOutput, "GOSMEE_EVENT_ID=delivery-123"))
+		assert.Assert(t, strings.Contains(envOutput, "GOSMEE_CONTENT_TYPE=application/json"))
+		assert.Assert(t, strings.Contains(envOutput, "GOSMEE_TIMESTAMP=2023-10-27T10.00.01.000"))
+	})
+
+	t.Run("non-zero exit code returns error", func(t *testing.T) {
+		opts := &replayDataOpts{
+			execCommand: "exit 1",
+			decorate:    false,
+		}
+		err := runExecCommand(context.Background(), opts, logger, basePM)
+		assert.Assert(t, err != nil)
+		assert.Assert(t, strings.Contains(err.Error(), "exec command failed"))
+	})
+
+	t.Run("exec-on-events matching event runs command", func(t *testing.T) {
+		tmpFile := filepath.Join(t.TempDir(), "output.txt")
+		opts := &replayDataOpts{
+			execCommand:  fmt.Sprintf("cat > %s", tmpFile),
+			execOnEvents: []string{"push"},
+			decorate:     false,
+		}
+		err := runExecCommand(context.Background(), opts, logger, basePM)
+		assert.NilError(t, err)
+		_, err = os.Stat(tmpFile)
+		assert.NilError(t, err, "file should exist because exec ran")
+	})
+
+	t.Run("exec-on-events non-matching event skips", func(t *testing.T) {
+		opts := &replayDataOpts{
+			execCommand:  "exit 1",
+			execOnEvents: []string{"pull_request"},
+			decorate:     false,
+		}
+		err := runExecCommand(context.Background(), opts, logger, basePM)
+		assert.NilError(t, err)
+	})
+
+	t.Run("exec-on-events with empty event type skips", func(t *testing.T) {
+		pmNoType := basePM
+		pmNoType.eventType = ""
+		opts := &replayDataOpts{
+			execCommand:  "exit 1",
+			execOnEvents: []string{"push"},
+			decorate:     false,
+		}
+		err := runExecCommand(context.Background(), opts, logger, pmNoType)
+		assert.NilError(t, err)
+	})
+
+	t.Run("no exec-on-events runs on all events", func(t *testing.T) {
+		tmpFile := filepath.Join(t.TempDir(), "output.txt")
+		opts := &replayDataOpts{
+			execCommand: fmt.Sprintf("cat > %s", tmpFile),
+			decorate:    false,
+		}
+		err := runExecCommand(context.Background(), opts, logger, basePM)
+		assert.NilError(t, err)
+		_, err = os.Stat(tmpFile)
+		assert.NilError(t, err)
+	})
+
+	t.Run("stderr is captured without error", func(t *testing.T) {
+		opts := &replayDataOpts{
+			execCommand: "echo error-output >&2",
+			decorate:    false,
+		}
+		err := runExecCommand(context.Background(), opts, logger, basePM)
+		assert.NilError(t, err)
+	})
+
+	t.Run("multiple exec-on-events filters", func(t *testing.T) {
+		tmpFile := filepath.Join(t.TempDir(), "output.txt")
+		opts := &replayDataOpts{
+			execCommand:  fmt.Sprintf("cat > %s", tmpFile),
+			execOnEvents: []string{"pull_request", "push", "issues"},
+			decorate:     false,
+		}
+		err := runExecCommand(context.Background(), opts, logger, basePM)
+		assert.NilError(t, err)
+		_, err = os.Stat(tmpFile)
+		assert.NilError(t, err, "file should exist because 'push' is in exec-on-events list")
+	})
+}
