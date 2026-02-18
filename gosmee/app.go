@@ -168,6 +168,8 @@ non-publicly accessible endpoint, forward those requests to your local service.`
 							insecureTLSVerify: c.Bool("insecure-skip-tls-verify"),
 							useHttpie:         c.Bool("httpie"),
 							sseBufferSize:     c.Int("sse-buffer-size"),
+							execCommand:       c.String("exec"),
+							execOnEvents:      c.StringSlice("exec-on-events"),
 						},
 						logger:  logger,
 						channel: c.String("channel"),

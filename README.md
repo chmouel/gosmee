@@ -227,6 +227,40 @@ By default, you'll get colourful output unless you specify `--nocolor`.
 
 Output logs as JSON with `--output json` (which implies `--nocolor`).
 
+#### Executing commands on webhook events
+
+You can execute a shell command whenever a webhook event is received using `--exec`:
+
+```shell
+gosmee client --exec 'jq . | tee /tmp/last-webhook.json' https://smee.io/aBcDeF http://localhost:8080
+```
+
+The JSON payload is passed to the command via stdin. The following environment variables are set:
+
+| Variable | Description |
+|---|---|
+| `GOSMEE_EVENT_TYPE` | The event type (e.g., `push`, `pull_request`) |
+| `GOSMEE_EVENT_ID` | The delivery ID |
+| `GOSMEE_CONTENT_TYPE` | The content type of the payload |
+| `GOSMEE_TIMESTAMP` | The timestamp of the event |
+
+To only run the command for specific event types, use `--exec-on-events`:
+
+```shell
+gosmee client --exec './handle-push.sh' --exec-on-events push --exec-on-events pull_request https://smee.io/aBcDeF http://localhost:8080
+```
+
+The `--exec` command runs after the webhook is forwarded to the target URL (if replay is enabled). A non-zero exit code is logged as an error but does not stop processing further events.
+
+Both `--exec` and `--exec-on-events` also work with the `replay` command.
+
+> **Security Warning**: The `--exec` flag runs arbitrary shell commands with
+> the webhook payload piped to stdin. When receiving webhooks from untrusted
+> sources, a malicious payload could exploit a naively written script (e.g.,
+> one that passes unsanitized fields to shell commands). Always validate and
+> sanitize webhook payloads in your exec scripts. Consider using
+> `--webhook-signature` on the server side to verify webhook authenticity.
+
 #### Replay scripts
 
 Both cURL and HTTPie replay scripts include these command-line options:
@@ -424,6 +458,17 @@ When enabled:
 - Performance impact is minimal: ~2μs per validation with negligible memory usage
 
 You can also set multiple secrets via the `GOSMEE_WEBHOOK_SIGNATURE` environment variable by separating them with commas.
+
+##### Command Execution (`--exec`)
+
+The `--exec` flag (available on both `client` and `replay` commands) executes a shell command for each webhook event, with the JSON payload passed via stdin. This is powerful but carries security risks:
+
+- **Untrusted sources**: If the gosmee server accepts webhooks from untrusted sources without `--webhook-signature` validation, an attacker can send crafted payloads. If your exec script passes unsanitized payload fields to shell commands (e.g., via `$(jq -r .field)`), this could lead to command injection.
+- **Mitigations**:
+  - Use `--webhook-signature` on the server to verify webhook authenticity
+  - Use `--allowed-ips` to restrict which IPs can send webhooks
+  - In your exec scripts, avoid passing raw payload fields to shell evaluation
+  - Use `--exec-on-events` to limit which event types trigger execution
 
 ## Replay Webhook Deliveries via the GitHub API (beta)
 

@@ -44,6 +44,16 @@ var commonFlags = []cli.Flag{
 		Value: false,
 		Usage: "If true, the target server's certificate will not be checked for validity. This will make your HTTPS connections insecure",
 	},
+	&cli.StringFlag{
+		Name:    "exec",
+		Usage:   "Shell command to execute on each incoming webhook event. The JSON payload is passed via stdin. Security warning: do not use this with untrusted webhook sources without proper input validation",
+		EnvVars: []string{"GOSMEE_EXEC"},
+	},
+	&cli.StringSliceFlag{
+		Name:    "exec-on-events",
+		Aliases: []string{"E"},
+		Usage:   "Only run --exec on these event types (e.g., push, pull_request). If not set, --exec runs on all events",
+	},
 }
 
 var replayFlags = []cli.Flag{
