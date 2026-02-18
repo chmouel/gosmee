@@ -53,7 +53,7 @@ func getNewHookURL(targetURL string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to create GET request: %w", err)
 	}
-	resp, err := client.Do(req)
+	resp, err := client.Do(req) //nolint:gosec // user-configured URL
 	if err != nil {
 		return "", fmt.Errorf("failed to make GET request: %w", err)
 	}
