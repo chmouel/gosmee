@@ -1,8 +1,9 @@
 package gosmee
 
 import (
-	"context" // For context.DeadlineExceeded
-	"fmt"     // For fmt.Sprintf in subtest names
+	"context"       // For context.DeadlineExceeded
+	"encoding/json" // For json.Unmarshal in exec tests
+	"fmt"           // For fmt.Sprintf in subtest names
 	"io"
 	"log/slog" // For http.MethodPost, etc.
 	"net/http" // For httptest.NewServer
@@ -1304,10 +1305,10 @@ func TestRunExecCommand(t *testing.T) {
 		headers:     map[string]string{"X-GitHub-Event": "push"},
 	}
 
-	t.Run("successful exec receives payload on stdin", func(t *testing.T) {
+	t.Run("successful exec receives payload via file", func(t *testing.T) {
 		tmpFile := filepath.Join(t.TempDir(), "output.txt")
 		opts := &replayDataOpts{
-			execCommand: fmt.Sprintf("cat > %s", tmpFile),
+			execCommand: fmt.Sprintf("cp $GOSMEE_PAYLOAD_FILE %s", tmpFile),
 			decorate:    false,
 		}
 		err := runExecCommand(context.Background(), opts, logger, basePM)
@@ -1332,6 +1333,54 @@ func TestRunExecCommand(t *testing.T) {
 		assert.Assert(t, strings.Contains(envOutput, "GOSMEE_EVENT_ID=delivery-123"))
 		assert.Assert(t, strings.Contains(envOutput, "GOSMEE_CONTENT_TYPE=application/json"))
 		assert.Assert(t, strings.Contains(envOutput, "GOSMEE_TIMESTAMP=2023-10-27T10.00.01.000"))
+		assert.Assert(t, strings.Contains(envOutput, "GOSMEE_PAYLOAD_FILE="))
+		assert.Assert(t, strings.Contains(envOutput, "GOSMEE_HEADERS_FILE="))
+	})
+
+	t.Run("payload file contains body", func(t *testing.T) {
+		tmpFile := filepath.Join(t.TempDir(), "payload_path.txt")
+		opts := &replayDataOpts{
+			execCommand: fmt.Sprintf("cp $GOSMEE_PAYLOAD_FILE %s", tmpFile),
+			decorate:    false,
+		}
+		err := runExecCommand(context.Background(), opts, logger, basePM)
+		assert.NilError(t, err)
+		data, err := os.ReadFile(tmpFile)
+		assert.NilError(t, err)
+		assert.Equal(t, string(data), `{"hello":"world"}`)
+	})
+
+	t.Run("headers file contains headers as JSON", func(t *testing.T) {
+		tmpFile := filepath.Join(t.TempDir(), "headers_path.txt")
+		opts := &replayDataOpts{
+			execCommand: fmt.Sprintf("cp $GOSMEE_HEADERS_FILE %s", tmpFile),
+			decorate:    false,
+		}
+		err := runExecCommand(context.Background(), opts, logger, basePM)
+		assert.NilError(t, err)
+		data, err := os.ReadFile(tmpFile)
+		assert.NilError(t, err)
+		var headers map[string]string
+		assert.NilError(t, json.Unmarshal(data, &headers))
+		assert.Equal(t, headers["X-GitHub-Event"], "push")
+	})
+
+	t.Run("temp files are cleaned up after exec", func(t *testing.T) {
+		pathFile := filepath.Join(t.TempDir(), "paths.txt")
+		opts := &replayDataOpts{
+			execCommand: fmt.Sprintf("echo $GOSMEE_PAYLOAD_FILE $GOSMEE_HEADERS_FILE > %s", pathFile),
+			decorate:    false,
+		}
+		err := runExecCommand(context.Background(), opts, logger, basePM)
+		assert.NilError(t, err)
+		data, err := os.ReadFile(pathFile)
+		assert.NilError(t, err)
+		paths := strings.Fields(strings.TrimSpace(string(data)))
+		assert.Equal(t, len(paths), 2)
+		for _, p := range paths {
+			_, err := os.Stat(p)
+			assert.Assert(t, os.IsNotExist(err), "temp file %s should have been cleaned up", p)
+		}
 	})
 
 	t.Run("non-zero exit code returns error", func(t *testing.T) {
@@ -1347,7 +1396,7 @@ func TestRunExecCommand(t *testing.T) {
 	t.Run("exec-on-events matching event runs command", func(t *testing.T) {
 		tmpFile := filepath.Join(t.TempDir(), "output.txt")
 		opts := &replayDataOpts{
-			execCommand:  fmt.Sprintf("cat > %s", tmpFile),
+			execCommand:  fmt.Sprintf("cp $GOSMEE_PAYLOAD_FILE %s", tmpFile),
 			execOnEvents: []string{"push"},
 			decorate:     false,
 		}
@@ -1382,7 +1431,7 @@ func TestRunExecCommand(t *testing.T) {
 	t.Run("no exec-on-events runs on all events", func(t *testing.T) {
 		tmpFile := filepath.Join(t.TempDir(), "output.txt")
 		opts := &replayDataOpts{
-			execCommand: fmt.Sprintf("cat > %s", tmpFile),
+			execCommand: fmt.Sprintf("cp $GOSMEE_PAYLOAD_FILE %s", tmpFile),
 			decorate:    false,
 		}
 		err := runExecCommand(context.Background(), opts, logger, basePM)
@@ -1403,7 +1452,7 @@ func TestRunExecCommand(t *testing.T) {
 	t.Run("multiple exec-on-events filters", func(t *testing.T) {
 		tmpFile := filepath.Join(t.TempDir(), "output.txt")
 		opts := &replayDataOpts{
-			execCommand:  fmt.Sprintf("cat > %s", tmpFile),
+			execCommand:  fmt.Sprintf("cp $GOSMEE_PAYLOAD_FILE %s", tmpFile),
 			execOnEvents: []string{"pull_request", "push", "issues"},
 			decorate:     false,
 		}

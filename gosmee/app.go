@@ -119,10 +119,15 @@ non-publicly accessible endpoint, forward those requests to your local service.`
 					}
 
 					var smeeURL, targetURL string
-					if os.Getenv("GOSMEE_URL") != "" && os.Getenv("GOSMEE_TARGET_URL") != "" {
+					noReplay := c.Bool("noReplay")
+					switch {
+					case os.Getenv("GOSMEE_URL") != "" && os.Getenv("GOSMEE_TARGET_URL") != "":
 						smeeURL = os.Getenv("GOSMEE_URL")
 						targetURL = os.Getenv("GOSMEE_TARGET_URL")
-					} else {
+					case c.String("exec") != "" && c.NArg() == 1:
+						smeeURL = c.Args().Get(0)
+						noReplay = true
+					default:
 						if c.NArg() != 2 {
 							return fmt.Errorf("need at least a smeeURL and a targetURL as arguments, ie: gosmee client https://server.smee.url/aBcdeFghijklmn http://localhost:8080")
 						}
@@ -132,8 +137,10 @@ non-publicly accessible endpoint, forward those requests to your local service.`
 					if _, err := url.Parse(smeeURL); err != nil {
 						return fmt.Errorf("smeeURL %s is not a valid url %w", smeeURL, err)
 					}
-					if _, err := url.Parse(targetURL); err != nil {
-						return fmt.Errorf("target url %s is not a valid url %w", targetURL, err)
+					if targetURL != "" {
+						if _, err := url.Parse(targetURL); err != nil {
+							return fmt.Errorf("target url %s is not a valid url %w", targetURL, err)
+						}
 					}
 					decorate := true
 					if !isatty.IsTerminal(os.Stdout.Fd()) {
@@ -161,7 +168,7 @@ non-publicly accessible endpoint, forward those requests to your local service.`
 							targetURL:         targetURL,
 							localDebugURL:     localDebugURL,
 							saveDir:           c.String("saveDir"),
-							noReplay:          c.Bool("noReplay"),
+							noReplay:          noReplay,
 							decorate:          decorate,
 							ignoreEvents:      c.StringSlice("ignore-event"),
 							targetCnxTimeout:  c.Int("target-connection-timeout"),

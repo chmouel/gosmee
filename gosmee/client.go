@@ -338,6 +338,34 @@ func runExecCommand(ctx context.Context, rd *replayDataOpts, logger *slog.Logger
 		}
 	}
 
+	// Write payload body to a temporary file
+	payloadFile, err := os.CreateTemp("", "gosmee-payload-*.json")
+	if err != nil {
+		return fmt.Errorf("failed to create payload temp file: %w", err)
+	}
+	defer os.Remove(payloadFile.Name())
+	if _, err := payloadFile.Write(pm.body); err != nil {
+		payloadFile.Close()
+		return fmt.Errorf("failed to write payload temp file: %w", err)
+	}
+	payloadFile.Close()
+
+	// Write headers to a temporary file as JSON
+	headersJSON, err := json.Marshal(pm.headers)
+	if err != nil {
+		return fmt.Errorf("failed to marshal headers: %w", err)
+	}
+	headersFile, err := os.CreateTemp("", "gosmee-headers-*.json")
+	if err != nil {
+		return fmt.Errorf("failed to create headers temp file: %w", err)
+	}
+	defer os.Remove(headersFile.Name())
+	if _, err := headersFile.Write(headersJSON); err != nil {
+		headersFile.Close()
+		return fmt.Errorf("failed to write headers temp file: %w", err)
+	}
+	headersFile.Close()
+
 	//nolint:gosec // Command is intentionally user-provided
 	cmd := exec.CommandContext(ctx, "sh", "-c", rd.execCommand)
 	cmd.Env = append(os.Environ(),
@@ -345,14 +373,24 @@ func runExecCommand(ctx context.Context, rd *replayDataOpts, logger *slog.Logger
 		"GOSMEE_EVENT_ID="+pm.eventID,
 		"GOSMEE_CONTENT_TYPE="+pm.contentType,
 		"GOSMEE_TIMESTAMP="+pm.timestamp,
+		"GOSMEE_PAYLOAD_FILE="+payloadFile.Name(),
+		"GOSMEE_HEADERS_FILE="+headersFile.Name(),
 	)
-	cmd.Stdin = bytes.NewReader(pm.body)
-
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	err := cmd.Run()
+	if err = cmd.Run(); err != nil {
+		if stdout.Len() > 0 {
+			logger.InfoContext(ctx,
+				fmt.Sprintf("%sexec stdout: %s", emoji("→", "cyan+b", rd.decorate), strings.TrimSpace(stdout.String())))
+		}
+		if stderr.Len() > 0 {
+			logger.InfoContext(ctx,
+				fmt.Sprintf("%sexec stderr: %s", emoji("→", "yellow+b", rd.decorate), strings.TrimSpace(stderr.String())))
+		}
+		return fmt.Errorf("exec command failed: %w", err)
+	}
 
 	if stdout.Len() > 0 {
 		logger.InfoContext(ctx,
@@ -361,10 +399,6 @@ func runExecCommand(ctx context.Context, rd *replayDataOpts, logger *slog.Logger
 	if stderr.Len() > 0 {
 		logger.InfoContext(ctx,
 			fmt.Sprintf("%sexec stderr: %s", emoji("→", "yellow+b", rd.decorate), strings.TrimSpace(stderr.String())))
-	}
-
-	if err != nil {
-		return fmt.Errorf("exec command failed: %w", err)
 	}
 
 	logger.InfoContext(ctx,
@@ -559,7 +593,12 @@ func (c goSmee) clientSetup() error {
 
 		// Check for explicit ready messages from SSE events
 		if string(msg.Event) == "ready" || string(msg.Data) == "ready" {
-			s := fmt.Sprintf("%s %sForwarding %s to %s", nowStr, emoji("✓", "yellow+b", c.replayDataOpts.decorate), ansi.Color(c.replayDataOpts.smeeURL, "green+u"), ansi.Color(c.replayDataOpts.targetURL, "green+u"))
+			var s string
+			if c.replayDataOpts.targetURL != "" {
+				s = fmt.Sprintf("%s %sForwarding %s to %s", nowStr, emoji("✓", "yellow+b", c.replayDataOpts.decorate), ansi.Color(c.replayDataOpts.smeeURL, "green+u"), ansi.Color(c.replayDataOpts.targetURL, "green+u"))
+			} else {
+				s = fmt.Sprintf("%s %sListening on %s", nowStr, emoji("✓", "yellow+b", c.replayDataOpts.decorate), ansi.Color(c.replayDataOpts.smeeURL, "green+u"))
+			}
 			c.logger.InfoContext(context.Background(), s)
 			return
 		}

@@ -46,7 +46,7 @@ var commonFlags = []cli.Flag{
 	},
 	&cli.StringFlag{
 		Name:    "exec",
-		Usage:   "Shell command to execute on each incoming webhook event. The JSON payload is passed via stdin. Security warning: do not use this with untrusted webhook sources without proper input validation",
+		Usage:   "Shell command to execute on each incoming webhook event. The JSON payload is available via $GOSMEE_PAYLOAD_FILE and headers via $GOSMEE_HEADERS_FILE (temporary files, cleaned up after execution). Security warning: do not use this with untrusted webhook sources without proper input validation",
 		EnvVars: []string{"GOSMEE_EXEC"},
 	},
 	&cli.StringSliceFlag{
