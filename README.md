@@ -211,6 +211,39 @@ This command saves the JSON data of new payloads to `/tmp/savedreplay/timestamp.
 
 You can configure the SSE client buffer size (in bytes) with the `--sse-buffer-size` flag. The default is `1048576` (1MB).
 
+#### Protected channels
+
+Protected channels are optional and only apply to channel IDs listed in the server's `--encrypted-channels-file`.
+
+Plaintext gosmee channels still work without a key file:
+
+```shell
+gosmee client https://myserverurl/plain-channel https://localhost:8080
+```
+
+When connecting to a protected channel on your own `gosmee server`, the client must use a pre-generated keypair file. There is no client-side auto-generation during `gosmee client` startup.
+
+Generate a keypair once:
+
+```shell
+gosmee keygen --key-file ~/.config/gosmee/client-key.json
+```
+
+This writes the private key file and prints the corresponding public key to stdout. Add that public key to the server's protected-channel config.
+
+Then connect with the key file:
+
+```shell
+gosmee client --encryption-key-file ~/.config/gosmee/client-key.json https://myserverurl/CHANNEL_ID https://localhost:8080
+```
+
+Notes:
+
+- This protected-channel flow only works with gosmee's own SSE endpoint. `https://smee.io` does not use client keys.
+- For gosmee channels that are not listed in `--encrypted-channels-file`, `--encryption-key-file` is not needed and payloads stay plaintext.
+- Payloads are encrypted from the gosmee server to authorized clients. The gosmee server still sees plaintext when it receives the webhook.
+- Saved payloads from `--saveDir` are written after decryption on the client side.
+
 For those who prefer [HTTPie](https://httpie.io) over cURL, you can generate HTTPie-based replay scripts:
 
 ```shell
@@ -301,7 +334,7 @@ For security, you can use Let's Encrypt certificates with the `--tls-cert` and `
 
 There are many flags available - check them with `gosmee server --help`.
 
-To use your server, access it with a URL format like:
+To use your server in normal plaintext mode, access it with a URL format like:
 
 <https://myserverurl/RANDOM_ID>
 
@@ -313,6 +346,42 @@ Generate a random ID easily with the `/new` endpoint:
 % curl http://localhost:3333/new
 http://localhost:3333/NqybHcEi
 ```
+
+#### Protected client channels
+
+If you want specific channels to be key-protected, provide `--encrypted-channels-file`. Only the channels listed in that file require authorized client keys and encrypted SSE delivery. All other gosmee channels continue to work in legacy plaintext mode.
+
+Example protected-channel config:
+
+```json
+{
+  "channels": {
+    "customer-a-channel": {
+      "allowed_public_keys": [
+        "CLIENT_PUBLIC_KEY_1",
+        "CLIENT_PUBLIC_KEY_2"
+      ]
+    }
+  }
+}
+```
+
+Start the server with that config:
+
+```shell
+gosmee server --encrypted-channels-file /etc/gosmee/channels.json --public-url https://myserverurl
+```
+
+For a protected channel, configure the webhook to post to:
+
+<https://myserverurl/customer-a-channel>
+
+Important:
+
+- Only channels listed in `--encrypted-channels-file` are protected.
+- A protected channel only delivers to clients whose public key is listed for that channel.
+- Unauthorized subscribers to a protected channel receive a generic not-found response.
+- The built-in browser UI and `/new` remain available for plaintext channels, but protected channels are not exposed through the browser UI.
 
 #### Caddy
 
@@ -393,6 +462,16 @@ The server logs will show:
 - Standard request logging including status code 403 for rejected IPs
 
 Note: If no IP restrictions are configured, all POST requests will be allowed.
+
+##### Protected Client Channels
+
+When `--encrypted-channels-file` is configured:
+
+- Only the listed channels require client public keys.
+- Unlisted channels remain normal plaintext gosmee channels.
+- A client must present a public key that matches one of a protected channel's `allowed_public_keys`.
+- Unauthorized subscribers to a protected channel receive a generic not-found response rather than a channel-specific error.
+- The built-in web UI does not participate in the protected-channel flow, but it remains available for plaintext channels.
 
 ##### Payload Size and Memory Management
 

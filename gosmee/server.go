@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -31,12 +32,18 @@ const (
 	timeFormat        = "2006-01-02T15.04.01.000"
 	contentType       = "application/json"
 	versionHeaderName = "X-Gosmee-Version"
+	minChannelLength  = 12
 	maxChannelLength  = 64 // Set maximum channel length to prevent DoS attacks
+	channelIDPattern  = "[a-zA-Z0-9_-]{12,64}"
+	channelPath       = "/{channel:" + channelIDPattern + "}"
+	eventsPath        = "/events/{channel:" + channelIDPattern + "}"
+	replayPath        = "/replay/{channel:" + channelIDPattern + "}"
 )
 
 var (
 	defaultServerPort    = 3333
 	defaultServerAddress = "localhost"
+	validChannelID       = regexp.MustCompile("^" + channelIDPattern + "$")
 )
 
 //go:embed templates/index.tmpl
@@ -47,8 +54,9 @@ var faviconSVG []byte
 
 // Subscriber represents a client connection listening for events.
 type Subscriber struct {
-	Channel string
-	Events  chan []byte
+	Channel   string
+	Events    chan []byte
+	PublicKey *[32]byte
 }
 
 // EventBroker manages event subscriptions and publications.
@@ -65,13 +73,14 @@ func NewEventBroker() *EventBroker {
 }
 
 // Subscribe adds a subscriber for a specific channel.
-func (eb *EventBroker) Subscribe(channel string) *Subscriber {
+func (eb *EventBroker) Subscribe(channel string, pubKey *[32]byte) *Subscriber {
 	eb.Lock()
 	defer eb.Unlock()
 
 	subscriber := &Subscriber{
-		Channel: channel,
-		Events:  make(chan []byte, 100), // Buffer size to prevent blocking
+		Channel:   channel,
+		Events:    make(chan []byte, 100), // Buffer size to prevent blocking
+		PublicKey: pubKey,
 	}
 
 	eb.subscribers[channel] = append(eb.subscribers[channel], subscriber)
@@ -92,21 +101,110 @@ func (eb *EventBroker) Unsubscribe(channel string, subscriber *Subscriber) {
 			break
 		}
 	}
+
+	if len(eb.subscribers[channel]) == 0 {
+		delete(eb.subscribers, channel)
+	}
 }
 
 // Publish sends an event to all subscribers of a channel.
 func (eb *EventBroker) Publish(channel string, data []byte) {
 	eb.RLock()
-	subscribers := eb.subscribers[channel]
+	subscribers := append([]*Subscriber(nil), eb.subscribers[channel]...)
 	eb.RUnlock()
 
 	// Send to each subscriber
 	for _, s := range subscribers {
+		payload := data
+		if s.PublicKey != nil {
+			encrypted, err := Encrypt(data, s.PublicKey)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "WARNING: encryption failed for subscriber on channel %s: %v\n", s.Channel, err) //nolint:gosec // stderr, not web output
+				continue
+			}
+			payload = encrypted
+		}
+
 		// Non-blocking send - if buffer is full, we'll skip this subscriber
 		select {
-		case s.Events <- data:
+		case s.Events <- payload:
 		default:
-			// Channel buffer full, could log this if desired
+			fmt.Fprintf(os.Stdout, "WARNING: event dropped for subscriber on channel %s: buffer full\n", s.Channel) //nolint:gosec // stdout, not web output
+		}
+	}
+}
+
+func rejectProtectedChannelRequest(w http.ResponseWriter) {
+	http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+}
+
+func nextPlaintextChannel(protectedChannels *ProtectedChannels) string {
+	for {
+		channel := randomString(minChannelLength)
+		if !protectedChannels.Has(channel) {
+			return channel
+		}
+	}
+}
+
+func isValidChannelID(channel string) bool {
+	return validChannelID.MatchString(channel)
+}
+
+func effectivePublicURL(publicURL, portAddr string, sslEnabled bool) string {
+	if publicURL != "" {
+		return publicURL
+	}
+
+	scheme := "http://"
+	if sslEnabled {
+		scheme = "https://"
+	}
+
+	return fmt.Sprintf("%s%s", scheme, portAddr)
+}
+
+func showNewURL(publicURL string, protectedChannels *ProtectedChannels) http.HandlerFunc {
+	return func(w http.ResponseWriter, _ *http.Request) {
+		url := fmt.Sprintf("%s/%s", publicURL, nextPlaintextChannel(protectedChannels))
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintf(w, "%s\n", url)
+	}
+}
+
+func serveIndex(publicURL, footer string, protectedChannels *ProtectedChannels) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		channel := chi.URLParam(r, "channel")
+		if channel == "" {
+			http.Redirect(w, r, fmt.Sprintf("%s/%s", publicURL, nextPlaintextChannel(protectedChannels)), http.StatusFound)
+			return
+		}
+		if protectedChannels.Has(channel) {
+			rejectProtectedChannelRequest(w)
+			return
+		}
+
+		url := fmt.Sprintf("%s/%s", publicURL, channel)
+		eventsURL := fmt.Sprintf("/events/%s", channel)
+
+		t, err := template.New("index").Parse(string(indexTmpl))
+		if err != nil {
+			errorIt(w, r, http.StatusInternalServerError, err)
+			return
+		}
+
+		w.Header().Set("Content-Type", "text/html")
+		w.WriteHeader(http.StatusOK)
+		varmap := map[string]string{
+			"URL":       url,
+			"EventsURL": eventsURL,
+			"Channel":   channel,
+			"Version":   string(Version),
+			"Footer":    footer,
+		}
+		if err := t.ExecuteTemplate(w, "index", varmap); err != nil {
+			errorIt(w, r, http.StatusInternalServerError, err)
 		}
 	}
 }
@@ -464,121 +562,35 @@ func retVersion(w http.ResponseWriter, _ *http.Request) {
 	}
 }
 
-func serve(c *cli.Context) error {
-	publicURL := c.String("public-url")
-	footer := c.String("footer")
-	footerFile := c.String("footer-file")
-	if footer != "" && footerFile != "" {
-		return fmt.Errorf("cannot use both --footer and --footer-file")
-	}
-	if footerFile != "" {
-		b, err := os.ReadFile(footerFile)
-		if err != nil {
-			return err
-		}
-		footer = string(b)
-	}
-
-	// Parse IP restrictions if configured
-	var allowedRanges *ipRanges
-	if ips := c.StringSlice("allowed-ips"); len(ips) > 0 {
-		var err error
-		allowedRanges, err = parseIPRanges(ips)
-		if err != nil {
-			return fmt.Errorf("failed to parse allowed IPs: %w", err)
-		}
-	}
-
-	// Initialize the SSE server and event broker
-	events := sse.New()
-	events.AutoReplay = false
-	events.AutoStream = true
-	eventBroker := NewEventBroker()
-
-	// Create two separate routers
-	mainRouter := chi.NewRouter()       // For unrestricted GET requests
-	restrictedRouter := chi.NewRouter() // For restricted POST requests
-
-	// Apply middleware to both routers (but NOT RealIP middleware which would interfere with our custom IP handling)
-	mainRouter.Use(middleware.RequestID)
-	// Do NOT use middleware.RealIP - it would override our trust-proxy setting
-	mainRouter.Use(middleware.Logger)
-	mainRouter.Use(middleware.Recoverer)
-
-	restrictedRouter.Use(middleware.RequestID)
-	// Do NOT use middleware.RealIP - it would override our trust-proxy setting
-	restrictedRouter.Use(middleware.Logger)
-	restrictedRouter.Use(middleware.Recoverer)
-
-	// Apply IP restriction middleware ONLY to restricted router
-	restrictedRouter.Use(ipRestrictMiddleware(allowedRanges, c.Bool("trust-proxy")))
-
-	// Define handlers
-	showNewURL := func(w http.ResponseWriter, _ *http.Request) {
-		channel := randomString(12)
-		url := fmt.Sprintf("%s/%s", publicURL, channel)
-		w.Header().Set("Content-Type", "text/plain")
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, "%s\n", url)
-	}
-
-	serveIndex := func(w http.ResponseWriter, r *http.Request) {
-		channel := chi.URLParam(r, "channel")
-		if channel == "" {
-			channel = randomString(12)
-			// Redirect / to /random_channel
-			http.Redirect(w, r, fmt.Sprintf("%s/%s", publicURL, channel), http.StatusFound)
-			return
-		}
-
-		url := fmt.Sprintf("%s/%s", publicURL, channel)
-		eventsURL := fmt.Sprintf("/events/%s", channel) // Relative path for EventSource
-
-		w.WriteHeader(http.StatusOK)
-		t, err := template.New("index").Parse(string(indexTmpl))
-		if err != nil {
-			errorIt(w, r, http.StatusInternalServerError, err)
-			return
-		}
-		varmap := map[string]string{
-			"URL":       url,
-			"EventsURL": eventsURL, // Pass events URL to template
-			"Channel":   channel,   // Pass channel name to template
-			"Version":   string(Version),
-			"Footer":    footer,
-		}
-		w.Header().Set("Content-Type", "text/html")
-		if err := t.ExecuteTemplate(w, "index", varmap); err != nil {
-			errorIt(w, r, http.StatusInternalServerError, err)
-		}
-	}
-
-	// Register all GET routes on the main router
-	mainRouter.Get("/favicon.ico", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "image/svg+xml")
-		_, _ = w.Write(faviconSVG)
-	})
-	mainRouter.Get("/", serveIndex)
-	mainRouter.Get("/new", showNewURL)
-	mainRouter.Get("/{channel:[a-zA-Z0-9-_]{12,64}}", serveIndex)
-
-	mainRouter.Get("/version", retVersion)
-	mainRouter.Get("/health", retVersion)
-	mainRouter.Get("/livez", retVersion)
-
-	// SSE endpoint for event streaming
-	mainRouter.Get("/events/{channel:[a-zA-Z0-9-_]{12,64}}", func(w http.ResponseWriter, r *http.Request) {
+func handleEventsGet(eventBroker *EventBroker, protectedChannels *ProtectedChannels) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		channel := chi.URLParam(r, "channel")
 		if channel == "" {
 			http.Error(w, "Channel name missing in URL", http.StatusBadRequest)
 			return
 		}
-
-		// Validate channel length
 		if len(channel) > maxChannelLength {
 			http.Error(w, "Channel name exceeds maximum length", http.StatusBadRequest)
 			return
 		}
+		var pubKey *[32]byte
+		if protectedChannels.Has(channel) {
+			pubKeyValue := r.URL.Query().Get("pubkey")
+			if pubKeyValue == "" {
+				rejectProtectedChannelRequest(w)
+				return
+			}
+
+			var err error
+			pubKey, err = ParsePublicKey(pubKeyValue)
+			if err != nil || !protectedChannels.IsAllowed(channel, pubKey) {
+				rejectProtectedChannelRequest(w)
+				return
+			}
+		}
+
+		subscriber := eventBroker.Subscribe(channel, pubKey)
+		defer eventBroker.Unsubscribe(channel, subscriber)
 
 		// Set headers for SSE
 		w.Header().Set("Content-Type", "text/event-stream")
@@ -597,10 +609,6 @@ func serve(c *cli.Context) error {
 		// Send initial connected message
 		fmt.Fprintf(w, "data: %s\n\n", `{"message":"connected"}`)
 		flusher.Flush()
-
-		// Subscribe to the channel
-		subscriber := eventBroker.Subscribe(channel)
-		defer eventBroker.Unsubscribe(channel, subscriber)
 
 		// Send ready message
 		fmt.Fprintf(w, "data: %s\n\n", `{"message":"ready"}`)
@@ -635,11 +643,86 @@ func serve(c *cli.Context) error {
 				flusher.Flush()
 			}
 		}
+	}
+}
+
+func serve(c *cli.Context) error {
+	publicURL := c.String("public-url")
+	footer := c.String("footer")
+	footerFile := c.String("footer-file")
+	if footer != "" && footerFile != "" {
+		return fmt.Errorf("cannot use both --footer and --footer-file")
+	}
+	if footerFile != "" {
+		b, err := os.ReadFile(footerFile)
+		if err != nil {
+			return err
+		}
+		footer = string(b)
+	}
+
+	protectedChannels, err := LoadProtectedChannels(c.String("encrypted-channels-file"))
+	if err != nil {
+		return fmt.Errorf("load protected channels: %w", err)
+	}
+
+	// Parse IP restrictions if configured
+	var allowedRanges *ipRanges
+	if ips := c.StringSlice("allowed-ips"); len(ips) > 0 {
+		allowedRanges, err = parseIPRanges(ips)
+		if err != nil {
+			return fmt.Errorf("failed to parse allowed IPs: %w", err)
+		}
+	}
+
+	// Initialize the SSE server and event broker
+	events := sse.New()
+	events.AutoReplay = false
+	events.AutoStream = true
+	eventBroker := NewEventBroker()
+	autoCert := c.Bool("auto-cert")
+	certFile := c.String("tls-cert")
+	certKey := c.String("tls-key")
+	sslEnabled := certFile != "" && certKey != ""
+	portAddr := fmt.Sprintf("%s:%d", c.String("address"), c.Int("port"))
+	publicURL = effectivePublicURL(publicURL, portAddr, sslEnabled)
+
+	// Create two separate routers
+	mainRouter := chi.NewRouter()       // For unrestricted GET requests
+	restrictedRouter := chi.NewRouter() // For restricted POST requests
+
+	// Apply middleware to both routers (but NOT RealIP middleware which would interfere with our custom IP handling)
+	mainRouter.Use(middleware.RequestID)
+	// Do NOT use middleware.RealIP - it would override our trust-proxy setting
+	mainRouter.Use(middleware.Logger)
+	mainRouter.Use(middleware.Recoverer)
+
+	restrictedRouter.Use(middleware.RequestID)
+	// Do NOT use middleware.RealIP - it would override our trust-proxy setting
+	restrictedRouter.Use(middleware.Logger)
+	restrictedRouter.Use(middleware.Recoverer)
+
+	// Apply IP restriction middleware ONLY to restricted router
+	restrictedRouter.Use(ipRestrictMiddleware(allowedRanges, c.Bool("trust-proxy")))
+
+	// Register all GET routes on the main router
+	mainRouter.Get("/favicon.ico", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "image/svg+xml")
+		_, _ = w.Write(faviconSVG)
 	})
+	mainRouter.Get("/", serveIndex(publicURL, footer, protectedChannels))
+	mainRouter.Get("/new", showNewURL(publicURL, protectedChannels))
+	mainRouter.Get(channelPath, serveIndex(publicURL, footer, protectedChannels))
+	mainRouter.Get("/version", retVersion)
+	mainRouter.Get("/health", retVersion)
+	mainRouter.Get("/livez", retVersion)
+
+	// SSE endpoint for event streaming
+	mainRouter.Get(eventsPath, handleEventsGet(eventBroker, protectedChannels))
 
 	// Register POST routes on the restricted router
-	restrictedRouter.Post("/{channel:[a-zA-Z0-9-_]{12,64}}", handleWebhookPost(c, events, eventBroker, c.StringSlice("webhook-signature")))
-	restrictedRouter.Post("/replay/{channel:[a-zA-Z0-9-_]{12,64}}", handleReplayPost(c, events, eventBroker))
+	restrictedRouter.Post(channelPath, handleWebhookPost(c, events, eventBroker, c.StringSlice("webhook-signature")))
+	restrictedRouter.Post(replayPath, handleReplayPost(c, events, eventBroker))
 
 	// Create a final router which will route to the appropriate sub-router
 	finalRouter := chi.NewRouter()
@@ -652,20 +735,6 @@ func serve(c *cli.Context) error {
 			mainRouter.ServeHTTP(w, r)
 		}
 	}))
-
-	// Server setup
-	autoCert := c.Bool("auto-cert")
-	certFile := c.String("tls-cert")
-	certKey := c.String("tls-key")
-	sslEnabled := certFile != "" && certKey != ""
-	portAddr := fmt.Sprintf("%s:%d", c.String("address"), c.Int("port"))
-	if publicURL == "" {
-		publicURL = "http://"
-		if sslEnabled {
-			publicURL = "https://"
-		}
-		publicURL = fmt.Sprintf("%s%s", publicURL, portAddr)
-	}
 
 	fmt.Fprintf(os.Stdout, "Serving for webhooks on %s\n", publicURL)
 
