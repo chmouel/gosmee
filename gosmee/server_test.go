@@ -149,25 +149,25 @@ func TestWebhookSignatureValidation(t *testing.T) {
 		payload := []byte(`{"event":"test"}`)
 
 		// GitHub header
-		r := httptest.NewRequest(http.MethodPost, "/webhook", nil)
+		r := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/webhook", nil)
 		r.Header.Set("X-Hub-Signature-256", "sha256="+createGitHubSignature("secret1", payload))
 		valid := validateWebhookSignature(secrets, payload, r)
 		assert.Assert(t, valid, "Valid GitHub signature should be accepted")
 
 		// Bitbucket header
-		r = httptest.NewRequest(http.MethodPost, "/webhook", nil)
+		r = httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/webhook", nil)
 		r.Header.Set("X-Hub-Signature", createBitbucketSignature("secret2", payload))
 		valid = validateWebhookSignature(secrets, payload, r)
 		assert.Assert(t, valid, "Valid Bitbucket signature should be accepted")
 
 		// GitLab token
-		r = httptest.NewRequest(http.MethodPost, "/webhook", nil)
+		r = httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/webhook", nil)
 		r.Header.Set("X-Gitlab-Token", "secret1")
 		valid = validateWebhookSignature(secrets, payload, r)
 		assert.Assert(t, valid, "Valid GitLab token should be accepted")
 
 		// Gitea signature
-		r = httptest.NewRequest(http.MethodPost, "/webhook", nil)
+		r = httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/webhook", nil)
 		r.Header.Set("X-Gitea-Signature", "sha256="+createGiteaSignature("secret2", payload))
 		valid = validateWebhookSignature(secrets, payload, r)
 		assert.Assert(t, valid, "Valid Gitea signature should be accepted")
@@ -177,7 +177,7 @@ func TestWebhookSignatureValidation(t *testing.T) {
 		assert.Assert(t, valid, "No secrets should always return true")
 
 		// Invalid signatures
-		r = httptest.NewRequest(http.MethodPost, "/webhook", nil)
+		r = httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/webhook", nil)
 		r.Header.Set("X-Hub-Signature-256", "sha256=invalid")
 		valid = validateWebhookSignature(secrets, payload, r)
 		assert.Assert(t, !valid, "Invalid signature should be rejected")
@@ -211,7 +211,7 @@ func TestHandleWebhookPost(t *testing.T) {
 			"data":  "value",
 		}
 		payloadBytes, _ := json.Marshal(payload)
-		req := httptest.NewRequest(http.MethodPost, "/webhook/test-channel", bytes.NewReader(payloadBytes))
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/webhook/test-channel", bytes.NewReader(payloadBytes))
 		req.Header.Set("Content-Type", contentType)
 		req.Header.Set("X-Event-Type", "test-event")
 
@@ -259,7 +259,7 @@ func TestHandleWebhookPost(t *testing.T) {
 	})
 
 	t.Run("Invalid Content Type", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodPost, "/webhook/test-channel", strings.NewReader("not json"))
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/webhook/test-channel", strings.NewReader("not json"))
 		req.Header.Set("Content-Type", "text/plain")
 
 		w := httptest.NewRecorder()
@@ -279,7 +279,7 @@ func TestHandleWebhookPost(t *testing.T) {
 	})
 
 	t.Run("Invalid JSON", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodPost, "/webhook/test-channel", strings.NewReader("not json"))
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/webhook/test-channel", strings.NewReader("not json"))
 		req.Header.Set("Content-Type", contentType)
 
 		w := httptest.NewRecorder()
@@ -300,7 +300,7 @@ func TestHandleWebhookPost(t *testing.T) {
 		payload := []byte(`{"event":"test"}`)
 
 		// Valid signature
-		req := httptest.NewRequest(http.MethodPost, "/webhook/test-channel", bytes.NewReader(payload))
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/webhook/test-channel", bytes.NewReader(payload))
 		req.Header.Set("Content-Type", contentType)
 		req.Header.Set("X-Hub-Signature-256", "sha256="+createGitHubSignature("test-secret", payload))
 
@@ -317,7 +317,7 @@ func TestHandleWebhookPost(t *testing.T) {
 		assert.Equal(t, resp.StatusCode, http.StatusAccepted)
 
 		// Invalid signature
-		req = httptest.NewRequest(http.MethodPost, "/webhook/test-channel", bytes.NewReader(payload))
+		req = httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/webhook/test-channel", bytes.NewReader(payload))
 		req.Header.Set("Content-Type", contentType)
 		req.Header.Set("X-Hub-Signature-256", "sha256=invalid")
 
@@ -336,7 +336,7 @@ func TestHandleWebhookPost(t *testing.T) {
 }
 
 func TestRetVersion(t *testing.T) {
-	req := httptest.NewRequest(http.MethodGet, "/version", nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/version", nil)
 	w := httptest.NewRecorder()
 
 	retVersion(w, req)
@@ -384,7 +384,7 @@ func TestIPRestrictions(t *testing.T) {
 
 	t.Run("Get Real IP", func(t *testing.T) {
 		// Test direct IP
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
 		req.RemoteAddr = "192.168.0.1:12345"
 
 		ip, err := getRealIP(req, false)
@@ -392,7 +392,7 @@ func TestIPRestrictions(t *testing.T) {
 		assert.Equal(t, ip.String(), "192.168.0.1")
 
 		// Test X-Forwarded-For with trust proxy
-		req = httptest.NewRequest(http.MethodGet, "/", nil)
+		req = httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
 		req.RemoteAddr = "127.0.0.1:12345"
 		req.Header.Set("X-Forwarded-For", "10.0.0.1")
 
@@ -406,7 +406,7 @@ func TestIPRestrictions(t *testing.T) {
 		assert.Equal(t, ip.String(), "127.0.0.1")
 
 		// Test invalid remote addr
-		req = httptest.NewRequest(http.MethodGet, "/", nil)
+		req = httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
 		req.RemoteAddr = "invalid"
 
 		_, err = getRealIP(req, false)
@@ -426,7 +426,7 @@ func TestIPRestrictions(t *testing.T) {
 		})
 
 		// Test allowed IP with POST request (IP restriction is only applied to POST requests)
-		req := httptest.NewRequest(http.MethodPost, "/", nil) // Changed from GET to POST
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/", nil) // Changed from GET to POST
 		req.RemoteAddr = "127.0.0.1:12345"
 		w := httptest.NewRecorder()
 
@@ -436,7 +436,7 @@ func TestIPRestrictions(t *testing.T) {
 
 		// Test disallowed IP with POST request
 		nextCalled = false
-		req = httptest.NewRequest(http.MethodPost, "/", nil) // Changed from GET to POST
+		req = httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/", nil) // Changed from GET to POST
 		req.RemoteAddr = "192.168.0.1:12345"
 		w = httptest.NewRecorder()
 
@@ -446,7 +446,7 @@ func TestIPRestrictions(t *testing.T) {
 
 		// Test that GET request bypasses IP restriction
 		nextCalled = false
-		req = httptest.NewRequest(http.MethodGet, "/", nil)
+		req = httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
 		req.RemoteAddr = "192.168.0.1:12345" // IP would be restricted for POST
 		w = httptest.NewRecorder()
 
