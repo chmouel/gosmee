@@ -80,6 +80,15 @@ var replayFlags = []cli.Flag{
 	},
 }
 
+var keygenFlags = []cli.Flag{
+	&cli.StringFlag{
+		Name:     "key-file",
+		Usage:    "Path to write the client keypair JSON file",
+		Required: true,
+		EnvVars:  []string{"GOSMEE_ENCRYPTION_KEY_FILE"},
+	},
+}
+
 var clientFlags = []cli.Flag{
 	&cli.BoolFlag{
 		Name:    "new-url",
@@ -114,6 +123,11 @@ var clientFlags = []cli.Flag{
 		Usage:   "SSE client buffer size in bytes",
 		Value:   1048576, // 1MB
 		EnvVars: []string{"GOSMEE_SSE_BUFFER_SIZE"},
+	},
+	&cli.StringFlag{
+		Name:    "encryption-key-file",
+		Usage:   "Path to the client encryption keypair JSON file",
+		EnvVars: []string{"GOSMEE_ENCRYPTION_KEY_FILE"},
 	},
 }
 
@@ -178,5 +192,10 @@ var serverFlags = []cli.Flag{
 		Usage:   "Maximum body size in bytes for incoming webhooks",
 		Value:   26214400, // 25MB
 		EnvVars: []string{"GOSMEE_MAX_BODY_SIZE"},
+	},
+	&cli.StringFlag{
+		Name:    "encrypted-channels-file",
+		Usage:   "Optional JSON file describing protected channel IDs and allowed client public keys",
+		EnvVars: []string{"GOSMEE_ENCRYPTED_CHANNELS_FILE"},
 	},
 }

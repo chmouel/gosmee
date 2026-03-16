@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -286,6 +287,7 @@ type replayDataOpts struct {
 	useHttpie                   bool // Use httpie instead of curl
 	execCommand                 string
 	execOnEvents                []string
+	encryptionKeyFile           string
 }
 
 func replayData(ropts *replayDataOpts, logger *slog.Logger, pm payloadMsg) error {
@@ -552,6 +554,38 @@ func isOlderVersion(v1, v2 []int) bool {
 	return len(v1) < len(v2)
 }
 
+func prepareSubscription(smeeURL, encryptionKeyFile string) (channel string, sseURL string, privateKey *[32]byte, err error) {
+	channel = filepath.Base(smeeURL)
+	baseURL := strings.TrimSuffix(smeeURL, "/"+channel)
+
+	if strings.HasPrefix(smeeURL, "https://smee.io") {
+		if encryptionKeyFile != "" {
+			return "", "", nil, fmt.Errorf("client key files are only supported with gosmee server URLs, not https://smee.io")
+		}
+		return smeeChannel, smeeURL, nil, nil
+	}
+
+	sseURL = fmt.Sprintf("%s/events/%s", baseURL, channel)
+	if encryptionKeyFile == "" {
+		return channel, sseURL, nil, nil
+	}
+
+	publicKey, loadedPrivateKey, err := LoadKeyPair(encryptionKeyFile)
+	if err != nil {
+		return "", "", nil, fmt.Errorf("load encryption keys: %w", err)
+	}
+
+	parsedURL, err := url.Parse(sseURL)
+	if err != nil {
+		return "", "", nil, fmt.Errorf("parse sse url: %w", err)
+	}
+	query := parsedURL.Query()
+	query.Set("pubkey", EncodePublicKey(publicKey))
+	parsedURL.RawQuery = query.Encode()
+
+	return channel, parsedURL.String(), loadedPrivateKey, nil
+}
+
 func (c goSmee) clientSetup() error {
 	version := strings.TrimSpace(string(Version))
 	s := fmt.Sprintf("%sStarting gosmee client version: %s", emoji("⇉", "green+b", c.replayDataOpts.decorate), version)
@@ -562,18 +596,12 @@ func (c goSmee) clientSetup() error {
 		c.logger.WarnContext(context.Background(), fmt.Sprintf("%sCould not get server version: %s", emoji("⚠", "yellow+b", c.replayDataOpts.decorate), err.Error()))
 	}
 
-	// Extract the base URL and channel from the smeeURL
-	channel := filepath.Base(c.replayDataOpts.smeeURL)
-	baseURL := strings.TrimSuffix(c.replayDataOpts.smeeURL, "/"+channel)
-
-	// Special case for smee.io
-	var sseURL string
-	if strings.HasPrefix(c.replayDataOpts.smeeURL, "https://smee.io") {
-		channel = smeeChannel
-		sseURL = c.replayDataOpts.smeeURL
-	} else {
-		// For our own server, connect to the /events/{channel} endpoint
-		sseURL = fmt.Sprintf("%s/events/%s", baseURL, channel)
+	channel, sseURL, privateKey, err := prepareSubscription(c.replayDataOpts.smeeURL, c.replayDataOpts.encryptionKeyFile)
+	if err != nil {
+		return err
+	}
+	if privateKey != nil {
+		c.logger.InfoContext(context.Background(), fmt.Sprintf("%sProtected channel mode enabled for gosmee SSE transport", emoji("🔐", "green+b", c.replayDataOpts.decorate)))
 	}
 
 	client := sse.NewClient(sseURL, sse.ClientMaxBufferSize(c.replayDataOpts.sseBufferSize))
@@ -621,7 +649,18 @@ func (c goSmee) clientSetup() error {
 			return
 		}
 
-		pm, err := c.parse(now, msg.Data)
+		payload := msg.Data
+		if privateKey != nil && IsEncrypted(msg.Data) {
+			decryptedPayload, err := Decrypt(msg.Data, privateKey)
+			if err != nil {
+				s := fmt.Sprintf("%s %s decrypting message %s", nowStr, ansi.Color("ERROR", "red+b"), err.Error())
+				c.logger.ErrorContext(context.Background(), s)
+				return
+			}
+			payload = decryptedPayload
+		}
+
+		pm, err := c.parse(now, payload)
 		if err != nil {
 			s := fmt.Sprintf("%s %s parsing message %s", nowStr, ansi.Color("ERROR", "red+b"), err.Error())
 			c.logger.ErrorContext(context.Background(), s)

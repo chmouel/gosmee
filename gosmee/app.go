@@ -98,6 +98,22 @@ non-publicly accessible endpoint, forward those requests to your local service.`
 				Flags: serverFlags,
 			},
 			{
+				Name:  "keygen",
+				Usage: "Generate a client encryption keypair and print the public key",
+				Action: func(c *cli.Context) error {
+					publicKey, privateKey, err := GenerateKeyPair()
+					if err != nil {
+						return err
+					}
+					if err := SaveKeyPair(c.String("key-file"), publicKey, privateKey); err != nil {
+						return err
+					}
+					fmt.Fprintln(os.Stdout, EncodePublicKey(publicKey))
+					return nil
+				},
+				Flags: keygenFlags,
+			},
+			{
 				Name:      "client",
 				UsageText: "gosmee [command options] SMEE_URL LOCAL_SERVICE_URL",
 				Usage:     "Make a client from the relay server to your local service",
@@ -177,6 +193,7 @@ non-publicly accessible endpoint, forward those requests to your local service.`
 							sseBufferSize:     c.Int("sse-buffer-size"),
 							execCommand:       c.String("exec"),
 							execOnEvents:      c.StringSlice("exec-on-events"),
+							encryptionKeyFile: c.String("encryption-key-file"),
 						},
 						logger:  logger,
 						channel: c.String("channel"),

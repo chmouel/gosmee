@@ -12,8 +12,11 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/r3labs/sse/v2"
@@ -27,7 +30,7 @@ func TestEventBroker(t *testing.T) {
 
 		// Subscribe to a channel
 		channel := "test-channel"
-		subscriber := eb.Subscribe(channel)
+		subscriber := eb.Subscribe(channel, nil)
 
 		// Verify subscriber was added
 		assert.Equal(t, subscriber.Channel, channel)
@@ -46,7 +49,8 @@ func TestEventBroker(t *testing.T) {
 		eb.Unsubscribe(channel, subscriber)
 
 		// Verify subscriber was removed
-		assert.Equal(t, len(eb.subscribers[channel]), 0)
+		_, ok := eb.subscribers[channel]
+		assert.Assert(t, !ok, "channel state should be removed when the last subscriber unsubscribes")
 
 		// Verify channel was closed (this would panic if not closed properly)
 		_, isOpen := <-subscriber.Events
@@ -58,8 +62,8 @@ func TestEventBroker(t *testing.T) {
 		channel := "test-channel"
 
 		// Create multiple subscribers
-		sub1 := eb.Subscribe(channel)
-		sub2 := eb.Subscribe(channel)
+		sub1 := eb.Subscribe(channel, nil)
+		sub2 := eb.Subscribe(channel, nil)
 
 		// Verify both were added
 		assert.Equal(t, len(eb.subscribers[channel]), 2)
@@ -84,6 +88,33 @@ func TestEventBroker(t *testing.T) {
 
 		// Verify only sub2 received it
 		assert.DeepEqual(t, <-sub2.Events, testData2)
+	})
+
+	t.Run("Encrypted Subscribers Receive Ciphertext", func(t *testing.T) {
+		eb := NewEventBroker()
+		channel := "secret-channel"
+
+		plaintextSubscriber := eb.Subscribe(channel, nil)
+
+		eb.Publish(channel, []byte(`{"test":"public"}`))
+		assert.DeepEqual(t, <-plaintextSubscriber.Events, []byte(`{"test":"public"}`))
+
+		publicKey, privateKey, err := GenerateKeyPair()
+		assert.NilError(t, err)
+
+		encryptedSubscriber := eb.Subscribe(channel, publicKey)
+
+		testData := []byte(`{"test":"secret"}`)
+		eb.Publish(channel, testData)
+
+		assert.DeepEqual(t, <-plaintextSubscriber.Events, testData)
+
+		receivedEncrypted := <-encryptedSubscriber.Events
+		assert.Assert(t, IsEncrypted(receivedEncrypted))
+
+		decrypted, err := Decrypt(receivedEncrypted, privateKey)
+		assert.NilError(t, err)
+		assert.DeepEqual(t, decrypted, testData)
 	})
 }
 
@@ -203,7 +234,7 @@ func TestHandleWebhookPost(t *testing.T) {
 
 	t.Run("Valid Webhook", func(t *testing.T) {
 		// Create a subscriber to verify event was published
-		subscriber := eventBroker.Subscribe("test-channel")
+		subscriber := eventBroker.Subscribe("test-channel", nil)
 
 		// Create a test request
 		payload := map[string]any{
@@ -256,6 +287,23 @@ func TestHandleWebhookPost(t *testing.T) {
 
 		// Clean up
 		eventBroker.Unsubscribe("test-channel", subscriber)
+	})
+
+	t.Run("Unconfigured Channel Stays Plaintext", func(t *testing.T) {
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/webhook/unknown-channel", strings.NewReader(`{"ok":true}`))
+		req.Header.Set("Content-Type", contentType)
+
+		w := httptest.NewRecorder()
+
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("channel", "unknown-channel")
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+		handler := handleWebhookPost(ctx, events, eventBroker, []string{})
+		handler(w, req)
+
+		resp := w.Result()
+		assert.Equal(t, resp.StatusCode, http.StatusAccepted)
 	})
 
 	t.Run("Invalid Content Type", func(t *testing.T) {
@@ -332,6 +380,229 @@ func TestHandleWebhookPost(t *testing.T) {
 
 		resp = w.Result()
 		assert.Equal(t, resp.StatusCode, http.StatusUnauthorized)
+	})
+}
+
+func TestHandleEventsGet(t *testing.T) {
+	eventBroker := NewEventBroker()
+	allowedKey := mustGeneratePublicKey(t)
+	protectedChannels := mustProtectedChannels(t, map[string][]string{
+		"test-channel": {allowedKey},
+	})
+	router := chi.NewRouter()
+	router.Get("/events/{channel:[a-zA-Z0-9_-]{12,64}}", handleEventsGet(eventBroker, protectedChannels))
+
+	t.Run("Rejects Invalid Public Key", func(t *testing.T) {
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/events/test-channel?pubkey=!!!", nil)
+		w := httptest.NewRecorder()
+
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, w.Result().StatusCode, http.StatusNotFound)
+	})
+
+	t.Run("Rejects Missing Public Key", func(t *testing.T) {
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/events/test-channel", nil)
+		w := httptest.NewRecorder()
+
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, w.Result().StatusCode, http.StatusNotFound)
+	})
+
+	t.Run("Allows Plaintext Subscriber On Unprotected Channel", func(t *testing.T) {
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/events/plain-channel", nil)
+		reqCtx, cancel := context.WithCancel(req.Context())
+		req = req.WithContext(reqCtx)
+		defer cancel()
+
+		response := httptest.NewRecorder()
+		done := make(chan struct{})
+		go func() {
+			router.ServeHTTP(response, req)
+			close(done)
+		}()
+
+		assert.Assert(t, eventually(t, func() bool {
+			eventBroker.RLock()
+			defer eventBroker.RUnlock()
+			return len(eventBroker.subscribers["plain-channel"]) == 1
+		}))
+
+		eventBroker.Publish("plain-channel", []byte(`{"plain":true}`))
+
+		assert.Assert(t, eventually(t, func() bool {
+			return strings.Contains(response.Body.String(), `{"plain":true}`)
+		}))
+
+		body := response.Body.String()
+		assert.Assert(t, strings.Contains(body, `{"message":"connected"}`))
+		assert.Assert(t, strings.Contains(body, `{"message":"ready"}`))
+		assert.Assert(t, strings.Contains(body, `{"plain":true}`))
+		assert.Assert(t, !strings.Contains(body, `"ciphertext"`))
+
+		cancel()
+		<-done
+	})
+
+	t.Run("Allows Unprotected Channel Even With PubKey Query", func(t *testing.T) {
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/events/unknown-channel?pubkey="+url.QueryEscape(allowedKey), nil)
+		reqCtx, cancel := context.WithCancel(req.Context())
+		req = req.WithContext(reqCtx)
+		defer cancel()
+
+		response := httptest.NewRecorder()
+		done := make(chan struct{})
+		go func() {
+			router.ServeHTTP(response, req)
+			close(done)
+		}()
+
+		assert.Assert(t, eventually(t, func() bool {
+			eventBroker.RLock()
+			defer eventBroker.RUnlock()
+			return len(eventBroker.subscribers["unknown-channel"]) == 1
+		}))
+
+		eventBroker.Publish("unknown-channel", []byte(`{"plain":true}`))
+		assert.Assert(t, eventually(t, func() bool {
+			return strings.Contains(response.Body.String(), `{"plain":true}`)
+		}))
+		assert.Assert(t, !strings.Contains(response.Body.String(), `"ciphertext"`))
+
+		cancel()
+		<-done
+	})
+
+	t.Run("Allows Authorized Subscriber", func(t *testing.T) {
+		publicKey, privateKey, err := GenerateKeyPair()
+		assert.NilError(t, err)
+		allowed := EncodePublicKey(publicKey)
+
+		protectedChannels = mustProtectedChannels(t, map[string][]string{
+			"test-channel": {allowed},
+		})
+		router = chi.NewRouter()
+		router.Get("/events/{channel:[a-zA-Z0-9_-]{12,64}}", handleEventsGet(eventBroker, protectedChannels))
+
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/events/test-channel?pubkey="+url.QueryEscape(allowed), nil)
+		reqCtx, cancel := context.WithCancel(req.Context())
+		req = req.WithContext(reqCtx)
+		defer cancel()
+
+		response := httptest.NewRecorder()
+		done := make(chan struct{})
+		go func() {
+			router.ServeHTTP(response, req)
+			close(done)
+		}()
+
+		assert.Assert(t, eventually(t, func() bool {
+			eventBroker.RLock()
+			defer eventBroker.RUnlock()
+			return len(eventBroker.subscribers["test-channel"]) == 1
+		}))
+
+		eventBroker.Publish("test-channel", []byte(`{"secret":true}`))
+
+		assert.Assert(t, eventually(t, func() bool {
+			return strings.Contains(response.Body.String(), `"ciphertext"`)
+		}))
+
+		body := response.Body.String()
+		assert.Assert(t, strings.Contains(body, `{"message":"connected"}`))
+		assert.Assert(t, strings.Contains(body, `{"message":"ready"}`))
+
+		parts := strings.Split(body, "data: ")
+		lastData := strings.TrimSpace(parts[len(parts)-1])
+		decrypted, err := Decrypt([]byte(lastData), privateKey)
+		assert.NilError(t, err)
+		assert.DeepEqual(t, decrypted, []byte(`{"secret":true}`))
+
+		cancel()
+		<-done
+	})
+}
+
+func TestServeIndexAndNewURL(t *testing.T) {
+	protectedChannels := mustProtectedChannels(t, map[string][]string{
+		"protectedchan": {mustGeneratePublicKey(t)},
+	})
+
+	t.Run("root redirects to a plaintext channel", func(t *testing.T) {
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
+		w := httptest.NewRecorder()
+
+		handler := serveIndex("https://example.com", "", protectedChannels)
+		handler(w, req)
+
+		resp := w.Result()
+		assert.Equal(t, resp.StatusCode, http.StatusFound)
+		location := resp.Header.Get("Location")
+		assert.Assert(t, strings.HasPrefix(location, "https://example.com/"))
+		assert.Assert(t, !strings.HasSuffix(location, "/protectedchan"))
+	})
+
+	t.Run("plaintext channel page is rendered", func(t *testing.T) {
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/plainchannel1", nil)
+		w := httptest.NewRecorder()
+
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("channel", "plainchannel1")
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+		handler := serveIndex("https://example.com", "footer text", protectedChannels)
+		handler(w, req)
+
+		resp := w.Result()
+		assert.Equal(t, resp.StatusCode, http.StatusOK)
+		body, err := io.ReadAll(resp.Body)
+		assert.NilError(t, err)
+		assert.Assert(t, strings.Contains(string(body), "plainchannel1"))
+		assert.Assert(t, strings.Contains(string(body), "/events/plainchannel1"))
+	})
+
+	t.Run("protected channel page is hidden", func(t *testing.T) {
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/protectedchan", nil)
+		w := httptest.NewRecorder()
+
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("channel", "protectedchan")
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+		handler := serveIndex("https://example.com", "", protectedChannels)
+		handler(w, req)
+
+		assert.Equal(t, w.Result().StatusCode, http.StatusNotFound)
+	})
+
+	t.Run("new endpoint avoids protected channels", func(t *testing.T) {
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/new", nil)
+		w := httptest.NewRecorder()
+
+		handler := showNewURL("https://example.com", protectedChannels)
+		handler(w, req)
+
+		resp := w.Result()
+		assert.Equal(t, resp.StatusCode, http.StatusOK)
+		body, err := io.ReadAll(resp.Body)
+		assert.NilError(t, err)
+		assert.Assert(t, strings.HasPrefix(strings.TrimSpace(string(body)), "https://example.com/"))
+		assert.Assert(t, !strings.Contains(string(body), "protectedchan"))
+	})
+}
+
+func TestEffectivePublicURL(t *testing.T) {
+	t.Run("returns explicit public URL unchanged", func(t *testing.T) {
+		assert.Equal(t, effectivePublicURL("https://hooks.example.com", "localhost:3333", false), "https://hooks.example.com")
+	})
+
+	t.Run("defaults to http address when tls is disabled", func(t *testing.T) {
+		assert.Equal(t, effectivePublicURL("", "localhost:3333", false), "http://localhost:3333")
+	})
+
+	t.Run("defaults to https address when tls is enabled", func(t *testing.T) {
+		assert.Equal(t, effectivePublicURL("", "localhost:3333", true), "https://localhost:3333")
 	})
 }
 
@@ -474,4 +745,46 @@ func createGiteaSignature(secret string, payload []byte) string {
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write(payload)
 	return hex.EncodeToString(mac.Sum(nil))
+}
+
+func eventually(t *testing.T, predicate func() bool) bool {
+	t.Helper()
+
+	for range 50 {
+		if predicate() {
+			return true
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	return false
+}
+
+func mustGeneratePublicKey(t *testing.T) string {
+	t.Helper()
+
+	publicKey, _, err := GenerateKeyPair()
+	assert.NilError(t, err)
+	return EncodePublicKey(publicKey)
+}
+
+func mustProtectedChannels(t *testing.T, channels map[string][]string) *ProtectedChannels {
+	t.Helper()
+
+	cfg := protectedChannelsFile{
+		Channels: make(map[string]protectedChannelConfig, len(channels)),
+	}
+	for channel, allowedKeys := range channels {
+		cfg.Channels[channel] = protectedChannelConfig{AllowedPublicKeys: allowedKeys}
+	}
+
+	data, err := json.Marshal(cfg)
+	assert.NilError(t, err)
+
+	path := t.TempDir() + "/channels.json"
+	assert.NilError(t, os.WriteFile(path, data, 0o600))
+
+	protectedChannels, err := LoadProtectedChannels(path)
+	assert.NilError(t, err)
+	return protectedChannels
 }

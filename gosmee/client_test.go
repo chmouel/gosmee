@@ -951,7 +951,7 @@ func TestCheckServerVersion(t *testing.T) {
 // callback within clientSetup. It allows testing the decision tree of the handler.
 // It returns booleans indicating if saveData and replayData were called.
 // Actual calls to saveData and replayData are made if conditions are met.
-func processTestEvent(t *testing.T, gs *goSmee, now time.Time, msg *sse.Event, targetServer *httptest.Server) (saveCalled bool, replayCalled bool, errResult error) {
+func processTestEvent(t *testing.T, gs *goSmee, now time.Time, msg *sse.Event, privateKey *[32]byte, targetServer *httptest.Server) (saveCalled bool, replayCalled bool, errResult error) {
 	t.Helper()
 
 	// Initial skip logic (from client.go)
@@ -967,7 +967,17 @@ func processTestEvent(t *testing.T, gs *goSmee, now time.Time, msg *sse.Event, t
 		return false, false, nil
 	}
 
-	pm, err := gs.parse(now, msg.Data)
+	payload := msg.Data
+	if privateKey != nil && IsEncrypted(msg.Data) {
+		decryptedPayload, err := Decrypt(msg.Data, privateKey)
+		if err != nil {
+			gs.logger.ErrorContext(context.Background(), fmt.Sprintf("Error decrypting message: %s", err.Error()))
+			return false, false, err
+		}
+		payload = decryptedPayload
+	}
+
+	pm, err := gs.parse(now, payload)
 	if err != nil {
 		gs.logger.ErrorContext(context.Background(), fmt.Sprintf("Error parsing message: %s", err.Error()))
 		return false, false, err // Propagate parse error
@@ -1064,7 +1074,7 @@ func TestClientSetupEventCallback(t *testing.T) {
 			Data: []byte(defaultPayloadJSON),
 		}
 
-		saveCalled, replayCalled, err := processTestEvent(t, gs, baseTime, event, replayServer)
+		saveCalled, replayCalled, err := processTestEvent(t, gs, baseTime, event, nil, replayServer)
 		assert.NilError(t, err)
 		assert.Assert(t, saveCalled, "saveData was not called")
 		assert.Assert(t, replayCalled, "replayData was not called")
@@ -1120,7 +1130,7 @@ func TestClientSetupEventCallback(t *testing.T) {
 				// os.RemoveAll(tmpDir) // This might be too aggressive if TempDir is per parent test
 				// os.MkdirAll(tmpDir, 0750) // Recreate it
 
-				saveCalled, replayCalled, err := processTestEvent(t, gs, baseTime, tc.event, nil)
+				saveCalled, replayCalled, err := processTestEvent(t, gs, baseTime, tc.event, nil, nil)
 				assert.NilError(t, err, "processTestEvent returned an unexpected error for %s", tc.name)
 				assert.Assert(t, !saveCalled, "saveData was called for skipped event: %s", tc.name)
 				assert.Assert(t, !replayCalled, "replayData was called for skipped event: %s", tc.name)
@@ -1143,7 +1153,7 @@ func TestClientSetupEventCallback(t *testing.T) {
 
 		// The processTestEvent helper propagates parse errors.
 		// The original callback logs the error and returns.
-		saveCalled, replayCalled, err := processTestEvent(t, gs, baseTime, event, nil)
+		saveCalled, replayCalled, err := processTestEvent(t, gs, baseTime, event, nil, nil)
 
 		assert.Assert(t, err != nil, "Expected an error from parse")
 		// Depending on parse's behavior, err might be a specific type or contain certain text.
@@ -1172,7 +1182,7 @@ func TestClientSetupEventCallback(t *testing.T) {
 			eventIgnored := &sse.Event{
 				Data: []byte(`{"x-github-event":"foo", "user-agent":"test-for-headers"}`),
 			}
-			saveCalled, replayCalled, err := processTestEvent(t, gs, baseTime, eventIgnored, replayServer)
+			saveCalled, replayCalled, err := processTestEvent(t, gs, baseTime, eventIgnored, nil, replayServer)
 			assert.NilError(t, err, "Error in processTestEvent for ignored event 'foo': %v", err)
 			assert.Assert(t, !saveCalled, "saveData called for ignored event type 'foo'")
 			assert.Assert(t, !replayCalled, "replayData called for ignored event type 'foo'")
@@ -1183,7 +1193,7 @@ func TestClientSetupEventCallback(t *testing.T) {
 			eventNotIgnored := &sse.Event{
 				Data: []byte(`{"x-github-event":"bar", "body":{"key":"val"}, "content-type":"application/json"}`),
 			}
-			saveCalled, replayCalled, err := processTestEvent(t, gs, baseTime, eventNotIgnored, replayServer)
+			saveCalled, replayCalled, err := processTestEvent(t, gs, baseTime, eventNotIgnored, nil, replayServer)
 			assert.NilError(t, err, "Error in processTestEvent for non-ignored event")
 			assert.Assert(t, saveCalled, "saveData NOT called for allowed event type 'bar'")
 			assert.Assert(t, replayCalled, "replayData NOT called for allowed event type 'bar'")
@@ -1205,7 +1215,7 @@ func TestClientSetupEventCallback(t *testing.T) {
 			eventNoType := &sse.Event{
 				Data: []byte(`{"user-agent":"gosmee-test", "body":{"key":"val"}, "content-type":"application/json"}`),
 			}
-			saveCalled, replayCalled, err := processTestEvent(t, gs, baseTime, eventNoType, replayServer)
+			saveCalled, replayCalled, err := processTestEvent(t, gs, baseTime, eventNoType, nil, replayServer)
 			assert.NilError(t, err, "Error in processTestEvent for event with no type")
 			assert.Assert(t, saveCalled, "saveData NOT called for event with no type")
 			assert.Assert(t, replayCalled, "replayData NOT called for event with no type")
@@ -1234,7 +1244,7 @@ func TestClientSetupEventCallback(t *testing.T) {
 			Data: []byte(`{"body":"test"}`),
 		}
 
-		saveCalled, replayCalled, err := processTestEvent(t, gs, baseTime, event, nil)
+		saveCalled, replayCalled, err := processTestEvent(t, gs, baseTime, event, nil, nil)
 
 		assert.Assert(t, err != nil, "Expected an error when parsed message has no headers. Input: {\"body\":\"test\"}")
 		if err != nil {
@@ -1242,6 +1252,76 @@ func TestClientSetupEventCallback(t *testing.T) {
 		}
 		assert.Assert(t, !saveCalled, "saveData should not be called when no headers")
 		assert.Assert(t, !replayCalled, "replayData should not be called when no headers")
+	})
+
+	t.Run("Encrypted Message Processing", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		opts := defaultOpts(tmpDir)
+
+		var replayServerCalled bool
+		replayServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			replayServerCalled = true
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer replayServer.Close()
+
+		publicKey, privateKey, err := GenerateKeyPair()
+		assert.NilError(t, err)
+
+		encryptedPayload, err := Encrypt([]byte(defaultPayloadJSON), publicKey)
+		assert.NilError(t, err)
+
+		gs := &goSmee{replayDataOpts: opts, logger: logger}
+		event := &sse.Event{Data: encryptedPayload}
+
+		saveCalled, replayCalled, err := processTestEvent(t, gs, baseTime, event, privateKey, replayServer)
+		assert.NilError(t, err)
+		assert.Assert(t, saveCalled, "saveData was not called for encrypted event")
+		assert.Assert(t, replayCalled, "replayData was not called for encrypted event")
+		assert.Assert(t, replayServerCalled, "Replay target server was not called for encrypted event")
+	})
+}
+
+func TestClientSetupKeyFileWithSmeeIOFails(t *testing.T) {
+	keyPath := filepath.Join(t.TempDir(), "client-key.json")
+	publicKey, privateKey, err := GenerateKeyPair()
+	assert.NilError(t, err)
+	assert.NilError(t, SaveKeyPair(keyPath, publicKey, privateKey))
+
+	gs := goSmee{
+		replayDataOpts: &replayDataOpts{
+			smeeURL:           "https://smee.io/test-channel",
+			targetURL:         "http://localhost:8080",
+			encryptionKeyFile: keyPath,
+		},
+		logger: slog.New(slog.DiscardHandler),
+	}
+
+	err = gs.clientSetup()
+	assert.Assert(t, err != nil)
+	assert.Assert(t, strings.Contains(err.Error(), "https://smee.io"))
+}
+
+func TestPrepareSubscription(t *testing.T) {
+	t.Run("plaintext gosmee server does not require a key file", func(t *testing.T) {
+		channel, sseURL, privateKey, err := prepareSubscription("https://example.com/plainchannel", "")
+		assert.NilError(t, err)
+		assert.Equal(t, channel, "plainchannel")
+		assert.Equal(t, sseURL, "https://example.com/events/plainchannel")
+		assert.Assert(t, privateKey == nil)
+	})
+
+	t.Run("protected gosmee server appends public key", func(t *testing.T) {
+		keyPath := filepath.Join(t.TempDir(), "client-key.json")
+		publicKey, privateKey, err := GenerateKeyPair()
+		assert.NilError(t, err)
+		assert.NilError(t, SaveKeyPair(keyPath, publicKey, privateKey))
+
+		channel, sseURL, loadedPrivateKey, err := prepareSubscription("https://example.com/protectedchan", keyPath)
+		assert.NilError(t, err)
+		assert.Equal(t, channel, "protectedchan")
+		assert.Assert(t, strings.HasPrefix(sseURL, "https://example.com/events/protectedchan?pubkey="))
+		assert.DeepEqual(t, loadedPrivateKey, privateKey)
 	})
 }
 
