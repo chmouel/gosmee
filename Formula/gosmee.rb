@@ -5,13 +5,13 @@
 class Gosmee < Formula
   desc "gosmee - A webhook and https://smee.io forwarder"
   homepage "https://github.com/chmouel/gosmee"
-  version "0.29.0"
+  version "0.30.0"
 
   on_macos do
-    url "https://github.com/chmouel/gosmee/releases/download/v0.29.0/gosmee_0.29.0_darwin_all.tar.gz"
-    sha256 "07ae66eaf473d12c5b9e93f7741bc2fa403f53a483146a18ea5ef1aefa0b573f"
+    url "https://github.com/chmouel/gosmee/releases/download/v0.30.0/gosmee_0.30.0_darwin_all.tar.gz"
+    sha256 "699aacf508a643583246cc8da2ef3598bf99a2e3afd03653ff1c3b85d3260a61"
 
-    def install
+    define_method(:install) do
       bin.install "gosmee" => "gosmee"
       output = Utils.popen_read("SHELL=bash #{bin}/gosmee completion bash")
       (bash_completion/"gosmee").write output
@@ -25,9 +25,9 @@ class Gosmee < Formula
 
   on_linux do
     if Hardware::CPU.intel? && Hardware::CPU.is_64_bit?
-      url "https://github.com/chmouel/gosmee/releases/download/v0.29.0/gosmee_0.29.0_linux_x86_64.tar.gz"
-      sha256 "9f0cddee4ef2821aca2e07c5e5beb92ff8c1c0576d3d423be72c13dfc7dedb8b"
-      def install
+      url "https://github.com/chmouel/gosmee/releases/download/v0.30.0/gosmee_0.30.0_linux_x86_64.tar.gz"
+      sha256 "45ead5b742d1c1878d88fbde880ac928529f122a04c061ee840c0bacea7a3c09"
+      define_method(:install) do
         bin.install "gosmee" => "gosmee"
         output = Utils.popen_read("SHELL=bash #{bin}/gosmee completion bash")
         (bash_completion/"gosmee").write output
@@ -39,9 +39,9 @@ class Gosmee < Formula
       end
     end
     if Hardware::CPU.arm? && Hardware::CPU.is_64_bit?
-      url "https://github.com/chmouel/gosmee/releases/download/v0.29.0/gosmee_0.29.0_linux_arm64.tar.gz"
-      sha256 "a9cd08947101d4741310c4c5589d16f818b10d69686ab5f36babd959305570f5"
-      def install
+      url "https://github.com/chmouel/gosmee/releases/download/v0.30.0/gosmee_0.30.0_linux_arm64.tar.gz"
+      sha256 "b2e335755f5568cdd88b628fcfbbf90633c459088db7adc062f05bd8f7ea55ba"
+      define_method(:install) do
         bin.install "gosmee" => "gosmee"
         output = Utils.popen_read("SHELL=bash #{bin}/gosmee completion bash")
         (bash_completion/"gosmee").write output
