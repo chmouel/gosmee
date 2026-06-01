@@ -15,7 +15,6 @@ import (
 	"text/template"
 	"time"
 
-	"golang.org/x/exp/slices" // For ignoreEvents check
 	"gotest.tools/v3/assert"
 
 	// "gotest.tools/v3/assert/cmp" // Removed as it's not strictly needed and was causing "imported and not used".
@@ -998,7 +997,14 @@ func processTestEvent(t *testing.T, gs *goSmee, now time.Time, msg *sse.Event, p
 	}
 
 	// ignoreEvents filtering (from client.go)
-	if len(gs.replayDataOpts.ignoreEvents) > 0 && pm.eventType != "" && slices.Contains(gs.replayDataOpts.ignoreEvents, pm.eventType) {
+	ignoredEvent := false
+	for _, e := range gs.replayDataOpts.ignoreEvents {
+		if e == pm.eventType {
+			ignoredEvent = true
+			break
+		}
+	}
+	if len(gs.replayDataOpts.ignoreEvents) > 0 && pm.eventType != "" && ignoredEvent {
 		gs.logger.InfoContext(context.Background(), fmt.Sprintf("Skipping event %s as per ignoreEvents list", pm.eventType))
 		return false, false, nil // This is a successful skip
 	}
