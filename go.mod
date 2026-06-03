@@ -3,7 +3,7 @@ module github.com/chmouel/gosmee
 go 1.25.0
 
 require (
-	github.com/go-chi/chi/v5 v5.2.5
+	github.com/go-chi/chi/v5 v5.3.0
 	github.com/google/go-github/v57 v57.0.0
 	github.com/lmittmann/tint v1.1.3
 	github.com/mattn/go-isatty v0.0.20
@@ -12,7 +12,6 @@ require (
 	github.com/r3labs/sse/v2 v2.10.0
 	github.com/urfave/cli/v2 v2.27.7
 	golang.org/x/crypto v0.49.0
-	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0
 	golang.org/x/text v0.35.0
 	gopkg.in/cenkalti/backoff.v1 v1.1.0
 	gotest.tools/v3 v3.5.2
