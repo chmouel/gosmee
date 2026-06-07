@@ -287,6 +287,7 @@ type replayDataOpts struct {
 	useHttpie                   bool // Use httpie instead of curl
 	execCommand                 string
 	execOnEvents                []string
+	execEnvVars                 []string
 	encryptionKeyFile           string
 }
 
@@ -370,7 +371,7 @@ func runExecCommand(ctx context.Context, rd *replayDataOpts, logger *slog.Logger
 
 	//nolint:gosec // Command is intentionally user-provided
 	cmd := exec.CommandContext(ctx, "sh", "-c", rd.execCommand)
-	cmd.Env = append(os.Environ(),
+	cmd.Env = append(buildExecEnv(rd.execEnvVars),
 		"GOSMEE_EVENT_TYPE="+pm.eventType,
 		"GOSMEE_EVENT_ID="+pm.eventID,
 		"GOSMEE_CONTENT_TYPE="+pm.contentType,
@@ -406,6 +407,59 @@ func runExecCommand(ctx context.Context, rd *replayDataOpts, logger *slog.Logger
 	logger.InfoContext(ctx,
 		fmt.Sprintf("%sexec command completed successfully for event %s", emoji("✓", "green+b", rd.decorate), pm.eventType))
 	return nil
+}
+
+func buildExecEnv(extraVarNames []string) []string {
+	allowlist := []string{
+		"PATH",
+		"HOME",
+		"TMPDIR",
+		"TEMP",
+		"TMP",
+		"USER",
+		"USERNAME",
+		"LOGNAME",
+		"SHELL",
+		"LANG",
+		"LC_ALL",
+		"LC_CTYPE",
+		"TZ",
+	}
+
+	execEnv := make([]string, 0, len(allowlist)+len(extraVarNames))
+	seen := map[string]struct{}{}
+	addEnvVar := func(name string) {
+		if name == "" {
+			return
+		}
+		if _, ok := seen[name]; ok {
+			return
+		}
+		value, ok := os.LookupEnv(name)
+		if !ok {
+			return
+		}
+		execEnv = append(execEnv, name+"="+value)
+		seen[name] = struct{}{}
+	}
+
+	for _, name := range allowlist {
+		addEnvVar(name)
+	}
+	for _, envVar := range os.Environ() {
+		name, _, ok := strings.Cut(envVar, "=")
+		if !ok {
+			continue
+		}
+		if strings.HasPrefix(name, "LC_") {
+			addEnvVar(name)
+		}
+	}
+	for _, name := range extraVarNames {
+		addEnvVar(name)
+	}
+
+	return execEnv
 }
 
 // checkServerVersion verifies that the client version is compatible with the server version.

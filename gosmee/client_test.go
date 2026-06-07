@@ -565,7 +565,7 @@ func TestReplayData(t *testing.T) {
 		// insecureTLSVerify: true  => InsecureSkipVerify: true (should succeed with self-signed)
 
 		t.Run("insecureTLSVerify=false makes connection fail", func(t *testing.T) {
-			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			server := httptest.NewTLSServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 				// Should not be called
 				t.Fatal("server handler should not be called on TLS handshake failure")
 			}))
@@ -1379,6 +1379,31 @@ func TestIsOlderVersion(t *testing.T) {
 	}
 }
 
+func TestBuildExecEnv(t *testing.T) {
+	t.Setenv("PATH", "/usr/bin:/bin")
+	t.Setenv("HOME", "/tmp/home")
+	t.Setenv("LC_MESSAGES", "en_US.UTF-8")
+	t.Setenv("AWS_SECRET_ACCESS_KEY", "super-secret")
+	t.Setenv("CUSTOM_EXTRA", "enabled")
+
+	got := buildExecEnv([]string{"CUSTOM_EXTRA", "MISSING_EXTRA"})
+	envMap := make(map[string]string, len(got))
+	for _, item := range got {
+		name, value, found := strings.Cut(item, "=")
+		assert.Assert(t, found)
+		envMap[name] = value
+	}
+
+	assert.Equal(t, envMap["PATH"], "/usr/bin:/bin")
+	assert.Equal(t, envMap["HOME"], "/tmp/home")
+	assert.Equal(t, envMap["LC_MESSAGES"], "en_US.UTF-8")
+	assert.Equal(t, envMap["CUSTOM_EXTRA"], "enabled")
+	_, hasSecret := envMap["AWS_SECRET_ACCESS_KEY"]
+	assert.Assert(t, !hasSecret)
+	_, hasMissing := envMap["MISSING_EXTRA"]
+	assert.Assert(t, !hasMissing)
+}
+
 func TestRunExecCommand(t *testing.T) {
 	logger := slog.New(slog.DiscardHandler)
 
@@ -1421,6 +1446,23 @@ func TestRunExecCommand(t *testing.T) {
 		assert.Assert(t, strings.Contains(envOutput, "GOSMEE_TIMESTAMP=2023-10-27T10.00.01.000"))
 		assert.Assert(t, strings.Contains(envOutput, "GOSMEE_PAYLOAD_FILE="))
 		assert.Assert(t, strings.Contains(envOutput, "GOSMEE_HEADERS_FILE="))
+	})
+
+	t.Run("parent secret env vars are not leaked and PATH is present", func(t *testing.T) {
+		t.Setenv("PATH", "/usr/bin:/bin")
+		t.Setenv("AWS_SECRET_ACCESS_KEY", "top-secret-value")
+		tmpFile := filepath.Join(t.TempDir(), "env-all.txt")
+		opts := &replayDataOpts{
+			execCommand: fmt.Sprintf("env > %s", tmpFile),
+			decorate:    false,
+		}
+		err := runExecCommand(context.Background(), opts, logger, basePM)
+		assert.NilError(t, err)
+		data, err := os.ReadFile(tmpFile)
+		assert.NilError(t, err)
+		envOutput := string(data)
+		assert.Assert(t, strings.Contains(envOutput, "PATH=/usr/bin:/bin"))
+		assert.Assert(t, !strings.Contains(envOutput, "AWS_SECRET_ACCESS_KEY=top-secret-value"))
 	})
 
 	t.Run("payload file contains body", func(t *testing.T) {
