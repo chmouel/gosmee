@@ -22,7 +22,7 @@ if [ -n "${previous_tag}" ]; then
   range="${previous_tag}..${TAG}"
 fi
 
-git log --patch --no-color "${range}" >/tmp/release-commits.txt
+git log --patch --no-color "${range}" -- . ':(exclude)vendor' >/tmp/release-commits.txt
 if [ ! -s /tmp/release-commits.txt ]; then
   echo "- None." >/tmp/release-commits.txt
 fi
@@ -107,12 +107,12 @@ EOF
 
 jq -n --rawfile prompt /tmp/release-prompt.txt '{contents:[{parts:[{text:$prompt}]}]}' >/tmp/gemini-request.json
 
-curl -fsS "https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}" \
+curl -sS "https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}" \
   -H "Content-Type: application/json" \
   -X POST \
   -d @/tmp/gemini-request.json >/tmp/gemini-response.json
 
-if ! jq -er '.candidates[0].content.parts | map(.text // "") | join("") | select(length > 0 and . != "null")' /tmp/gemini-response.json >/tmp/gh-release.md; then
+if ! jq -er '.candidates[0].content.parts | map(.text // "") | join("") | select(length > 0 and . != "null")' /tmp/gemini-response.json 2>/dev/null >/tmp/gh-release.md; then
   echo "Gemini returned invalid release notes"
   cat /tmp/gemini-response.json
   exit 1
