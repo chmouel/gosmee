@@ -54,6 +54,11 @@ var commonFlags = []cli.Flag{
 		Aliases: []string{"E"},
 		Usage:   "Only run --exec on these event types (e.g., push, pull_request). If not set, --exec runs on all events",
 	},
+	&cli.StringSliceFlag{
+		Name:    "exec-env-vars",
+		Usage:   "Additional environment variable names to pass through to --exec commands. Can be specified multiple times",
+		EnvVars: []string{"GOSMEE_EXEC_ENV_VARS"},
+	},
 }
 
 var replayFlags = []cli.Flag{

@@ -285,6 +285,8 @@ To only run the command for specific event types, use `--exec-on-events`:
 gosmee client --exec './handle-push.sh' --exec-on-events push --exec-on-events pull_request https://smee.io/aBcDeF http://localhost:8080
 ```
 
+By default, `--exec` runs with a minimal, safe environment (for example `PATH`, `HOME`, and locale-related variables), not the full gosmee process environment. To pass additional variables through, use `--exec-env-vars VAR_NAME` (repeat the flag for multiple names), or set `GOSMEE_EXEC_ENV_VARS` as a comma-separated list.
+
 The `--exec` command runs **synchronously** after the webhook is forwarded to the target URL (if replay is enabled). A slow command will delay processing of subsequent events. If you need asynchronous execution, background your command (e.g., `--exec './my-script.sh &'`). A non-zero exit code is logged as an error but does not stop processing further events.
 
 Both `--exec` and `--exec-on-events` also work with the `replay` command.
@@ -417,6 +419,9 @@ Running gosmee server behind nginx requires some configuration:
 Note: Long-running connections may occasionally cause errors with nginx. Contributions to debug this are most welcome.
 
 #### Security
+
+- `--replay-token` / `GOSMEE_REPLAY_TOKEN`: Require `Authorization: Bearer <token>` on `POST /replay/{channel}`. When set, the web UI will prompt for the token when you click Replay (stored in browser sessionStorage for convenience). When not set, the replay endpoint remains open for backward compatibility.
+- `--cors-origin` / `GOSMEE_CORS_ORIGIN`: Controls `Access-Control-Allow-Origin` for the SSE stream. Default is `*` (any origin can connect). Set a specific origin to restrict access. Set an empty string to omit the header entirely (same-origin only).
 
 For a full security reference — including webhook signature validation, IP restrictions, payload limits, channel name protection, and encrypted channels — see [SECURITY.md](./SECURITY.md).
 
