@@ -100,4 +100,4 @@ if [[ "$verbose" == "true" ]]; then
 fi
 
 echo "Replaying webhook to: $targetURL"
-http -F $http_flags POST "${targetURL}" Content-Type:"{{ .ContentType }}" {{ .Headers }} < ./{{ .FileBase }}.json
+http -F $http_flags POST "${targetURL}" Content-Type:{{ .ContentType }} {{ .Headers }} < ./{{ .FileBase }}.json

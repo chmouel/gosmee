@@ -200,10 +200,18 @@ func buildHeaders(headers map[string]string) string {
 	return b.String()
 }
 
+// shellQuote returns s wrapped in single quotes, safe for interpolation into a
+// POSIX shell command. Any embedded single quote is rendered using the
+// '\” idiom so that attacker-controlled values (e.g. webhook header values)
+// cannot break out of the quoting and inject shell commands.
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}
+
 func buildCurlHeaders(headers map[string]string) string {
 	var b strings.Builder
 	for k, v := range headers {
-		fmt.Fprintf(&b, "-H '%s: %s' ", k, v)
+		fmt.Fprintf(&b, "-H %s ", shellQuote(fmt.Sprintf("%s: %s", k, v)))
 	}
 	return b.String()
 }
@@ -255,10 +263,15 @@ func saveData(rd *replayDataOpts, logger *slog.Logger, pm payloadMsg) error {
 		FileBase      string
 		LocalDebugURL string
 	}{
-		Headers:       headers,
+		Headers: headers,
+		// ContentType comes from the (untrusted) webhook payload, so shell-quote
+		// it to prevent breaking out of the command and injecting shell code.
+		// Headers are quoted in build{Curl,Httpie}Headers above. TargetURL,
+		// LocalDebugURL and FileBase are operator-provided or regex-sanitized
+		// (see pmEventRe) and are quoted with literal "" in the templates.
 		TargetURL:     rd.targetURL,
 		LocalDebugURL: rd.localDebugURL,
-		ContentType:   pm.contentType,
+		ContentType:   shellQuote(pm.contentType),
 		FileBase:      fbasepath,
 	}); err != nil {
 		return err
@@ -270,8 +283,9 @@ func saveData(rd *replayDataOpts, logger *slog.Logger, pm payloadMsg) error {
 func buildHttpieHeaders(headers map[string]string) string {
 	var b strings.Builder
 	for k, v := range headers {
-		// HTTPie expects headers in format 'Header-Name:value' and needs proper quoting
-		fmt.Fprintf(&b, "%s:%s ", strconv.Quote(k), strconv.Quote(v))
+		// HTTPie expects headers as 'Header-Name:value'. Shell-quote the whole
+		// token so attacker-controlled keys/values cannot inject shell commands.
+		fmt.Fprintf(&b, "%s ", shellQuote(fmt.Sprintf("%s:%s", k, v)))
 	}
 	return b.String()
 }

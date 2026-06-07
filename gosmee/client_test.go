@@ -9,6 +9,7 @@ import (
 	"net/http" // For httptest.NewServer
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -242,7 +243,7 @@ func TestSaveData(t *testing.T) {
 		assert.NilError(t, err)
 		// Make script content check more resilient to header order from map iteration
 		actualScript := string(shData)
-		expectedCurlCmdPart := fmt.Sprintf("-H \"Content-Type: %s\"", pm.contentType)
+		expectedCurlCmdPart := fmt.Sprintf("-H \"Content-Type: \"%s", shellQuote(pm.contentType))
 		assert.Assert(t, strings.Contains(actualScript, expectedCurlCmdPart), "Script missing expected Content-Type header. Got: %s", actualScript)
 		for k, v := range pm.headers {
 			// buildCurlHeaders produces -H 'key: value' (single quotes)
@@ -302,7 +303,7 @@ func TestSaveData(t *testing.T) {
 		assert.NilError(t, err)
 		// Make script content check more resilient to header order from map iteration
 		actualScript := string(shData)
-		expectedCurlCmdPart := fmt.Sprintf("-H \"Content-Type: %s\"", pm.contentType)
+		expectedCurlCmdPart := fmt.Sprintf("-H \"Content-Type: \"%s", shellQuote(pm.contentType))
 		assert.Assert(t, strings.Contains(actualScript, expectedCurlCmdPart), "Script missing expected Content-Type header. Got: %s", actualScript)
 		for k, v := range pm.headers {
 			expectedHeader := fmt.Sprintf("-H '%s: %s'", k, v)
@@ -420,6 +421,154 @@ func TestBuildHeaders(t *testing.T) {
 		result := buildHeaders(headers)
 		assert.Equal(t, result, "x-MiXeD-CaSe=value ")
 	})
+}
+
+func TestShellQuote(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"plain", "application/json", "'application/json'"},
+		{"with spaces", "a b c", "'a b c'"},
+		{"empty", "", "''"},
+		{"single quote", "a'b", `'a'\''b'`},
+		{"command substitution", "$(rm -rf ~)", "'$(rm -rf ~)'"},
+		{"breakout attempt", "x'; rm -rf ~ #", `'x'\''; rm -rf ~ #'`},
+		{"backtick", "`id`", "'`id`'"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, shellQuote(tc.in), tc.want)
+		})
+	}
+}
+
+// TestBuildCurlHeadersInjection ensures attacker-controlled header keys/values
+// cannot break out of the single-quoted curl -H argument and inject shell code.
+func TestBuildCurlHeadersInjection(t *testing.T) {
+	headers := map[string]string{
+		"X-Evil": "x'; touch /tmp/pwned #",
+	}
+	result := buildCurlHeaders(headers)
+
+	// The full token must be a single safely-quoted argument.
+	assert.Assert(t, strings.Contains(result, `-H 'X-Evil: x'\''; touch /tmp/pwned #'`),
+		"curl header not safely quoted, got: %s", result)
+	// The naive (vulnerable) interpolation must NOT appear.
+	assert.Assert(t, !strings.Contains(result, `-H 'X-Evil: x'; touch`),
+		"curl header allows shell breakout, got: %s", result)
+}
+
+// TestBuildHttpieHeadersInjection ensures the same for httpie-style headers.
+func TestBuildHttpieHeadersInjection(t *testing.T) {
+	headers := map[string]string{
+		"X-Evil": "x'; touch /tmp/pwned #",
+	}
+	result := buildHttpieHeaders(headers)
+
+	assert.Assert(t, strings.Contains(result, `'X-Evil:x'\''; touch /tmp/pwned #'`),
+		"httpie header not safely quoted, got: %s", result)
+	assert.Assert(t, !strings.Contains(result, `'X-Evil:x'; touch`),
+		"httpie header allows shell breakout, got: %s", result)
+}
+
+// TestSaveDataNoShellInjection writes a payload whose header value and
+// content-type contain shell metacharacters and verifies the generated curl
+// replay script cannot be tricked into executing them. The script is actually
+// run against a local test server; the sentinel file the payload tries to
+// create must never appear.
+func TestSaveDataNoShellInjection(t *testing.T) {
+	bashPath, err := exec.LookPath("bash")
+	if err != nil {
+		t.Skip("bash not available")
+	}
+	if _, err := exec.LookPath("curl"); err != nil {
+		t.Skip("curl not available")
+	}
+
+	logger := slog.New(slog.DiscardHandler)
+	tmpDir := t.TempDir()
+	sentinel := filepath.Join(tmpDir, "pwned")
+
+	// Local server so curl in the generated script gets a quick 200 response.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	// Each field an attacker can influence tries to break out and `touch` the
+	// sentinel. If quoting is correct these are inert literal strings.
+	breakout := `x'; touch ` + sentinel + ` #`
+	pm := payloadMsg{
+		body:        []byte(`{"key":"value"}`),
+		timestamp:   "2023-10-27T10:00:00.000",
+		contentType: "application/json" + breakout,
+		headers: map[string]string{
+			"X-Evil":       breakout,
+			"Content-Type": "application/json" + breakout,
+		},
+	}
+
+	opts := replayDataOpts{
+		targetURL:     srv.URL,
+		localDebugURL: srv.URL,
+		saveDir:       tmpDir,
+		decorate:      false,
+	}
+
+	err = saveData(&opts, logger, pm)
+	assert.NilError(t, err)
+
+	shFile := filepath.Join(tmpDir, pm.timestamp+".sh")
+
+	// Sanity: the script must be syntactically valid (no broken quoting).
+	out, err := exec.CommandContext(context.Background(), bashPath, "-n", shFile).CombinedOutput()
+	assert.NilError(t, err, "generated script is not valid bash: %s", out)
+
+	// Run it for real; curl posts to the local server and exits.
+	out, err = exec.CommandContext(context.Background(), bashPath, shFile).CombinedOutput()
+	assert.NilError(t, err, "running generated script failed: %s", out)
+
+	_, statErr := os.Stat(sentinel)
+	assert.Assert(t, os.IsNotExist(statErr),
+		"shell injection succeeded: sentinel file %s was created", sentinel)
+}
+
+// TestBuildHeadersEscapedBreakout proves the escaped header tokens cannot be
+// re-parsed by a shell into a separate command. It expands the generated token
+// list through bash exactly as the replay scripts do and asserts the attacker's
+// `touch` side effect never fires (the value must stay a single inert argument).
+func TestBuildHeadersEscapedBreakout(t *testing.T) {
+	bashPath, err := exec.LookPath("bash")
+	if err != nil {
+		t.Skip("bash not available")
+	}
+
+	for name, build := range map[string]func(map[string]string) string{
+		"curl":   buildCurlHeaders,
+		"httpie": buildHttpieHeaders,
+	} {
+		t.Run(name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			sentinel := filepath.Join(tmpDir, "pwned")
+			value := `x'; touch ` + sentinel + ` #`
+			args := build(map[string]string{"X-Evil": value})
+
+			// `set -- <args>; printf ... "$@"` mirrors how the replay scripts
+			// splice the generated tokens onto the curl/http command line.
+			script := "set -- " + args + `; for a in "$@"; do printf '[%s]\n' "$a"; done`
+			out, err := exec.CommandContext(context.Background(), bashPath, "-c", script).CombinedOutput()
+			assert.NilError(t, err, "bash failed: %s", out)
+
+			_, statErr := os.Stat(sentinel)
+			assert.Assert(t, os.IsNotExist(statErr),
+				"shell breakout in %s args created %s; output: %s", name, sentinel, out)
+			// The hostile value must survive intact as a single argument.
+			assert.Assert(t, strings.Contains(string(out), value),
+				"%s arg was mangled, output: %s", name, out)
+		})
+	}
 }
 
 func TestReplayData(t *testing.T) {
