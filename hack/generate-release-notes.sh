@@ -57,6 +57,7 @@ INSTRUCTIONS
 - Group changes into logical sections:
   - Features
   - Bug Fixes
+  - Security
   - Performance Improvements
   - Maintenance / Refactoring
   - Dependencies
@@ -78,6 +79,10 @@ OUTPUT FORMAT (Markdown)
 - ...
 
 ### Bug Fixes
+
+- ...
+
+### Security
 
 - ...
 
