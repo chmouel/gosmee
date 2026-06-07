@@ -235,6 +235,7 @@ func replay(c *cli.Context) error {
 		insecureTLSVerify: c.Bool("insecure-skip-tls-verify"),
 		execCommand:       c.String("exec"),
 		execOnEvents:      c.StringSlice("exec-on-events"),
+		execEnvVars:       c.StringSlice("exec-env-vars"),
 	}
 	return ropt.replayHooks(ctx, hookID)
 }
