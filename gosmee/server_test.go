@@ -219,6 +219,7 @@ func newTestContext() *cli.Context {
 	app := cli.NewApp()
 	flagSet := flag.NewFlagSet("test", 0)
 	flagSet.Int("max-body-size", 26214400, "doc")
+	flagSet.String("replay-token", "", "doc")
 	return cli.NewContext(app, flagSet, nil)
 }
 
@@ -383,6 +384,73 @@ func TestHandleWebhookPost(t *testing.T) {
 	})
 }
 
+func TestHandleReplayPost(t *testing.T) {
+	makeReplayRequest := func(t *testing.T, replayToken, authHeader string) *httptest.ResponseRecorder {
+		t.Helper()
+
+		events := sse.New()
+		eventBroker := NewEventBroker()
+		subscriber := eventBroker.Subscribe("test-channel", nil)
+		defer eventBroker.Unsubscribe("test-channel", subscriber)
+
+		ctx := newTestContext()
+		assert.NilError(t, ctx.Set("replay-token", replayToken))
+
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/replay/test-channel", strings.NewReader(`{"event":"replay"}`))
+		req.Header.Set("Content-Type", contentType)
+		if authHeader != "" {
+			req.Header.Set("Authorization", authHeader)
+		}
+
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("channel", "test-channel")
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+		w := httptest.NewRecorder()
+		handler := handleReplayPost(ctx, events, eventBroker)
+		handler(w, req)
+
+		if w.Code == http.StatusAccepted {
+			select {
+			case event := <-subscriber.Events:
+				var eventData map[string]any
+				err := json.Unmarshal(event, &eventData)
+				assert.NilError(t, err)
+				assert.Assert(t, eventData["authorization"] == nil)
+			default:
+				t.Fatal("Expected event to be published but none was received")
+			}
+		}
+
+		return w
+	}
+
+	t.Run("No token configured and no auth header returns accepted", func(t *testing.T) {
+		resp := makeReplayRequest(t, "", "")
+		assert.Equal(t, resp.Code, http.StatusAccepted)
+	})
+
+	t.Run("Token configured and correct bearer auth returns accepted", func(t *testing.T) {
+		resp := makeReplayRequest(t, "test-replay-token", "Bearer test-replay-token")
+		assert.Equal(t, resp.Code, http.StatusAccepted)
+	})
+
+	t.Run("Token configured and wrong bearer auth returns unauthorized", func(t *testing.T) {
+		resp := makeReplayRequest(t, "test-replay-token", "Bearer wrong-token")
+		assert.Equal(t, resp.Code, http.StatusUnauthorized)
+	})
+
+	t.Run("Token configured and missing auth header returns unauthorized", func(t *testing.T) {
+		resp := makeReplayRequest(t, "test-replay-token", "")
+		assert.Equal(t, resp.Code, http.StatusUnauthorized)
+	})
+
+	t.Run("Token configured and malformed auth header returns unauthorized", func(t *testing.T) {
+		resp := makeReplayRequest(t, "test-replay-token", "Basic xxx")
+		assert.Equal(t, resp.Code, http.StatusUnauthorized)
+	})
+}
+
 func TestHandleEventsGet(t *testing.T) {
 	eventBroker := NewEventBroker()
 	allowedKey := mustGeneratePublicKey(t)
@@ -533,7 +601,7 @@ func TestServeIndexAndNewURL(t *testing.T) {
 		req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
 		w := httptest.NewRecorder()
 
-		handler := serveIndex("https://example.com", "", protectedChannels)
+		handler := serveIndex("https://example.com", "", "", protectedChannels)
 		handler(w, req)
 
 		resp := w.Result()
@@ -551,7 +619,7 @@ func TestServeIndexAndNewURL(t *testing.T) {
 		rctx.URLParams.Add("channel", "plainchannel1")
 		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
-		handler := serveIndex("https://example.com", "footer text", protectedChannels)
+		handler := serveIndex("https://example.com", "footer text", "", protectedChannels)
 		handler(w, req)
 
 		resp := w.Result()
@@ -572,7 +640,7 @@ func TestServeIndexAndNewURL(t *testing.T) {
 		rctx.URLParams.Add("channel", "protectedchan")
 		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
-		handler := serveIndex("https://example.com", "", protectedChannels)
+		handler := serveIndex("https://example.com", "", "", protectedChannels)
 		handler(w, req)
 
 		assert.Equal(t, w.Result().StatusCode, http.StatusNotFound)

@@ -173,7 +173,7 @@ func showNewURL(publicURL string, protectedChannels *ProtectedChannels) http.Han
 	}
 }
 
-func serveIndex(publicURL, footer string, protectedChannels *ProtectedChannels) http.HandlerFunc {
+func serveIndex(publicURL, footer, replayToken string, protectedChannels *ProtectedChannels) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		channel := chi.URLParam(r, "channel")
 		if channel == "" {
@@ -197,11 +197,12 @@ func serveIndex(publicURL, footer string, protectedChannels *ProtectedChannels) 
 		w.Header().Set("Content-Type", "text/html")
 		w.WriteHeader(http.StatusOK)
 		varmap := map[string]any{
-			"URL":       url,
-			"EventsURL": eventsURL,
-			"Channel":   channel,
-			"Version":   string(Version),
-			"Footer":    template.HTML(footer), //nolint:gosec // operator-trusted input; intentionally rendered as raw HTML
+			"URL":         url,
+			"EventsURL":   eventsURL,
+			"Channel":     channel,
+			"Version":     string(Version),
+			"ReplayToken": replayToken,
+			"Footer":      template.HTML(footer), //nolint:gosec // operator-trusted input; intentionally rendered as raw HTML
 		}
 		if err := t.ExecuteTemplate(w, "index", varmap); err != nil {
 			errorIt(w, r, http.StatusInternalServerError, err)
@@ -379,7 +380,23 @@ func handleWebhookPost(c *cli.Context, events *sse.Server, eventBroker *EventBro
 
 // handleReplayPost handles POST requests to the replay endpoint.
 func handleReplayPost(c *cli.Context, events *sse.Server, eventBroker *EventBroker) http.HandlerFunc {
+	replayToken := c.String("replay-token")
+
 	return func(w http.ResponseWriter, r *http.Request) {
+		if replayToken != "" {
+			authorizationHeader := r.Header.Get("Authorization")
+			if !strings.HasPrefix(authorizationHeader, "Bearer ") {
+				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+				return
+			}
+
+			providedToken := strings.TrimPrefix(authorizationHeader, "Bearer ")
+			if subtle.ConstantTimeCompare([]byte(providedToken), []byte(replayToken)) != 1 {
+				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+				return
+			}
+		}
+
 		channel := chi.URLParam(r, "channel")
 		if channel == "" {
 			http.Error(w, "Channel name missing in URL", http.StatusBadRequest)
@@ -409,6 +426,9 @@ func handleReplayPost(c *cli.Context, events *sse.Server, eventBroker *EventBrok
 		payload := make(map[string]any)
 		// Add basic headers from the replay request
 		for k, v := range r.Header {
+			if strings.EqualFold(k, "Authorization") {
+				continue
+			}
 			payload[strings.ToLower(k)] = v[0]
 		}
 		// Add timestamp and encode the body
@@ -710,9 +730,9 @@ func serve(c *cli.Context) error {
 		w.Header().Set("Content-Type", "image/svg+xml")
 		_, _ = w.Write(faviconSVG)
 	})
-	mainRouter.Get("/", serveIndex(publicURL, footer, protectedChannels))
+	mainRouter.Get("/", serveIndex(publicURL, footer, c.String("replay-token"), protectedChannels))
 	mainRouter.Get("/new", showNewURL(publicURL, protectedChannels))
-	mainRouter.Get(channelPath, serveIndex(publicURL, footer, protectedChannels))
+	mainRouter.Get(channelPath, serveIndex(publicURL, footer, c.String("replay-token"), protectedChannels))
 	mainRouter.Get("/version", retVersion)
 	mainRouter.Get("/health", retVersion)
 	mainRouter.Get("/livez", retVersion)
