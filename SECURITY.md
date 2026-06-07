@@ -59,6 +59,8 @@ IP allowlisting and signature validation are complementary controls. Use both wh
 
 If you know which IP ranges your webhooks will come from, restrict them with `--allowed-ips`. Requests from other IPs receive a 403 and are logged. The restriction applies only to POST requests — the web UI remains open.
 
+The examples below use `--trust-proxy` because they assume gosmee sits behind a reverse proxy. **Only enable `--trust-proxy` when gosmee is reachable exclusively through a trusted proxy that overwrites the forwarded headers** (see the warning under [Trusting Proxy Headers Safely](#trusting-proxy-headers-safely) below). If gosmee is directly reachable, drop `--trust-proxy` from these commands so the allowlist is enforced against the real connection address.
+
 ```shell
 # Accept webhooks from GitHub's ranges only
 gosmee server --trust-proxy \
@@ -83,6 +85,19 @@ gosmee server --trust-proxy \
 Use `--trust-proxy` when gosmee sits behind a reverse proxy so that `X-Forwarded-For` / `X-Real-IP` headers are used for the client IP. Both IPv4 and IPv6 addresses and CIDR ranges are supported. You can also set allowed IPs via the `GOSMEE_ALLOWED_IPS` environment variable (comma-separated) and enable proxy trust via `GOSMEE_TRUST_PROXY`.
 
 Official IP range docs: [GitHub](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/about-githubs-ip-addresses) · [GitLab.com](https://docs.gitlab.com/ee/user/gitlab_com/index.html#ipv4-addresses) · [Bitbucket Cloud](https://support.atlassian.com/bitbucket-cloud/docs/what-are-the-bitbucket-cloud-ip-addresses-i-should-use-to-configure-my-corporate-firewall/)
+
+### Trusting Proxy Headers Safely
+
+When `--trust-proxy` (or `GOSMEE_TRUST_PROXY`) is set, gosmee derives the client IP from the `X-Forwarded-For` (first value) and `X-Real-IP` request headers instead of the network connection's source address. These headers are trivially set by any HTTP client.
+
+> **Warning:** `--trust-proxy` makes `--allowed-ips` only as trustworthy as whatever sets those headers. If gosmee is reachable directly (not solely through your proxy), an attacker can send `X-Forwarded-For: <an-allowed-ip>` and bypass the allowlist entirely. The same spoofing also forges the client IP shown in logs.
+
+Only enable `--trust-proxy` when **both** of these hold:
+
+- **gosmee is not directly reachable.** Bind it to `localhost` (the default) or an internal interface, or firewall the listening port so the reverse proxy is the only path to it. Do not expose the gosmee port to the public internet while `--trust-proxy` is on.
+- **The proxy overwrites the forwarded headers.** Configure your proxy to *replace* `X-Forwarded-For` / `X-Real-IP` with the real connection address rather than appending to or passing through client-supplied values. A proxy that appends (so a client-controlled value ends up first) is unsafe, because gosmee trusts the first `X-Forwarded-For` entry.
+
+If you cannot guarantee both conditions, leave `--trust-proxy` off. Without it, gosmee uses the connection's source address, which cannot be spoofed by the client — though behind a proxy that means every request appears to come from the proxy, so `--allowed-ips` should then contain the proxy's address (or you should enforce source IPs at the proxy/firewall instead). Pair IP allowlisting with `--webhook-signature` so a spoofed or proxy-originated request still fails cryptographic validation.
 
 ### Validating Webhook Signatures
 

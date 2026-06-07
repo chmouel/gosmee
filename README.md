@@ -156,6 +156,7 @@ Key configuration:
 - Set `--public-url` to your actual domain where the service will be exposed
 - Configure an Ingress with TLS or use a service mesh for production use
 - For security, consider using `--webhook-signature` and `--allowed-ips` options
+- Only add `--trust-proxy` when your Ingress is the sole path to gosmee and overwrites `X-Forwarded-For` / `X-Real-IP`; otherwise the allowlist can be bypassed by spoofed headers (see [SECURITY.md](./SECURITY.md#trusting-proxy-headers-safely))
 
 #### Client Deployment
 
@@ -409,12 +410,17 @@ Running gosmee server behind nginx requires some configuration:
         proxy_pass         http://127.0.0.1:3333;
         proxy_set_header Connection '';
         proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-For $remote_addr;
         proxy_http_version 1.1;
         chunked_transfer_encoding off;
         proxy_read_timeout 372h;
     }
 ```
+
+> [!IMPORTANT]
+> If you run gosmee with `--trust-proxy` (required for `--allowed-ips` to work behind a proxy), the proxy must be the only way to reach gosmee and must **overwrite** the forwarded headers. The examples above bind/proxy to `127.0.0.1:3333`, so keep that port off the public internet (do not publish it directly).
+>
+> The nginx snippet sets `X-Forwarded-For $remote_addr` (the connection address) rather than `$proxy_add_x_forwarded_for`. The latter *appends* to any client-supplied `X-Forwarded-For`, which would leave an attacker-controlled value first — and gosmee trusts the first entry. See [SECURITY.md](./SECURITY.md#trusting-proxy-headers-safely) for details.
 
 Note: Long-running connections may occasionally cause errors with nginx. Contributions to debug this are most welcome.
 
