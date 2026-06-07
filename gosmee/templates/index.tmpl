@@ -870,9 +870,9 @@
                             <i class="fas fa-redo-alt"></i> 
                             Replay
                         </button>
-                        <span class="event-id">Event ID: ${eventId}</span>
+                        <span class="event-id">Event ID: ${escapeHtml(String(eventId))}</span>
                     </div>
-                    <span class="event-time">${timestamp}</span>
+                    <span class="event-time">${escapeHtml(String(timestamp))}</span>
                 </div>
                 <div class="event-payload">
                     <!-- Headers section -->
