@@ -718,6 +718,7 @@
         const instructionsContainer = document.getElementById('instructions-container');
         const mainContent = document.getElementById('main-content');
         const eventsUrl = '{{ .EventsURL }}';
+        const replayToken = '{{ .ReplayToken }}';
         let eventCount = 0;
         let eventSource;
         // Store JSON editors for each event
@@ -1112,6 +1113,9 @@
             // Get channel from URL
             const channel = window.location.pathname.split('/').pop();
             const payload = JSON.parse(rawContent.textContent);
+            if (replayToken) {
+                headers['Authorization'] = `Bearer ${replayToken}`;
+            }
 
             // Send replay request
             fetch(`/replay/${channel}`, {

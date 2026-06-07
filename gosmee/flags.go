@@ -187,6 +187,11 @@ var serverFlags = []cli.Flag{
 		Usage:   "Secret tokens to validate webhook signatures (GitHub, GitLab and many others). Can be specified multiple times",
 		EnvVars: []string{"GOSMEE_WEBHOOK_SIGNATURE"},
 	},
+	&cli.StringFlag{
+		Name:    "replay-token",
+		Usage:   "Bearer token required to authenticate replay requests to POST /replay/{channel}. When not set, the replay endpoint remains open for backward compatibility",
+		EnvVars: []string{"GOSMEE_REPLAY_TOKEN"},
+	},
 	&cli.IntFlag{
 		Name:    "max-body-size",
 		Usage:   "Maximum body size in bytes for incoming webhooks",
