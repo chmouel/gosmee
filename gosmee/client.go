@@ -294,7 +294,7 @@ func replayData(ropts *replayDataOpts, logger *slog.Logger, pm payloadMsg) error
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(ropts.targetCnxTimeout)*time.Second)
 	defer cancel()
 	//nolint:gosec // InsecureSkipVerify is controlled by user input for testing/self-signed certs
-	client := http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: !ropts.insecureTLSVerify}}}
+	client := http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: ropts.insecureTLSVerify}}}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, ropts.targetURL, strings.NewReader(string(pm.body)))
 	if err != nil {
 		return err
