@@ -558,8 +558,10 @@ func TestServeIndexAndNewURL(t *testing.T) {
 		assert.Equal(t, resp.StatusCode, http.StatusOK)
 		body, err := io.ReadAll(resp.Body)
 		assert.NilError(t, err)
-		assert.Assert(t, strings.Contains(string(body), "plainchannel1"))
-		assert.Assert(t, strings.Contains(string(body), "/events/plainchannel1"))
+		bodyStr := string(body)
+		assert.Assert(t, strings.Contains(bodyStr, "plainchannel1"))
+		// html/template contextually escapes JS strings, so "/" is rendered as `\/` in script blocks.
+		assert.Assert(t, strings.Contains(bodyStr, "/events/plainchannel1") || strings.Contains(bodyStr, "\\/events\\/plainchannel1"))
 	})
 
 	t.Run("protected channel page is hidden", func(t *testing.T) {

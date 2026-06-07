@@ -17,7 +17,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
-	"text/template"
+	"html/template"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -196,12 +196,12 @@ func serveIndex(publicURL, footer string, protectedChannels *ProtectedChannels) 
 
 		w.Header().Set("Content-Type", "text/html")
 		w.WriteHeader(http.StatusOK)
-		varmap := map[string]string{
+		varmap := map[string]any{
 			"URL":       url,
 			"EventsURL": eventsURL,
 			"Channel":   channel,
 			"Version":   string(Version),
-			"Footer":    footer,
+			"Footer":    template.HTML(footer), //nolint:gosec // operator-trusted input; intentionally rendered as raw HTML
 		}
 		if err := t.ExecuteTemplate(w, "index", varmap); err != nil {
 			errorIt(w, r, http.StatusInternalServerError, err)
