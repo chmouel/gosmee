@@ -1,6 +1,13 @@
 name: Create and publish a Docker image to ghcr
 
-on: ["push"]
+on:
+  push:
+    paths:
+      - "**.go"
+      - "go.mod"
+      - "go.sum"
+      - "Dockerfile"
+      - ".github/workflows/build.yml"
 
 env:
   REGISTRY: ghcr.io
