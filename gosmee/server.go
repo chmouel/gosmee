@@ -173,7 +173,7 @@ func showNewURL(publicURL string, protectedChannels *ProtectedChannels) http.Han
 	}
 }
 
-func serveIndex(publicURL, footer, replayToken string, protectedChannels *ProtectedChannels) http.HandlerFunc {
+func serveIndex(publicURL, footer string, protectedChannels *ProtectedChannels) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		channel := chi.URLParam(r, "channel")
 		if channel == "" {
@@ -197,12 +197,11 @@ func serveIndex(publicURL, footer, replayToken string, protectedChannels *Protec
 		w.Header().Set("Content-Type", "text/html")
 		w.WriteHeader(http.StatusOK)
 		varmap := map[string]any{
-			"URL":         url,
-			"EventsURL":   eventsURL,
-			"Channel":     channel,
-			"Version":     string(Version),
-			"ReplayToken": replayToken,
-			"Footer":      template.HTML(footer), //nolint:gosec // operator-trusted input; intentionally rendered as raw HTML
+			"URL":       url,
+			"EventsURL": eventsURL,
+			"Channel":   channel,
+			"Version":   string(Version),
+			"Footer":    template.HTML(footer), //nolint:gosec // operator-trusted input; intentionally rendered as raw HTML
 		}
 		if err := t.ExecuteTemplate(w, "index", varmap); err != nil {
 			errorIt(w, r, http.StatusInternalServerError, err)
@@ -381,6 +380,10 @@ func handleWebhookPost(c *cli.Context, events *sse.Server, eventBroker *EventBro
 // handleReplayPost handles POST requests to the replay endpoint.
 func handleReplayPost(c *cli.Context, events *sse.Server, eventBroker *EventBroker) http.HandlerFunc {
 	replayToken := c.String("replay-token")
+	// Hash the expected token once so the comparison operates on fixed-length
+	// digests, avoiding leaking the token length via ConstantTimeCompare's
+	// early return on length mismatch.
+	expectedTokenHash := sha256.Sum256([]byte(replayToken))
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		if replayToken != "" {
@@ -391,7 +394,8 @@ func handleReplayPost(c *cli.Context, events *sse.Server, eventBroker *EventBrok
 			}
 
 			providedToken := strings.TrimPrefix(authorizationHeader, "Bearer ")
-			if subtle.ConstantTimeCompare([]byte(providedToken), []byte(replayToken)) != 1 {
+			providedTokenHash := sha256.Sum256([]byte(providedToken))
+			if subtle.ConstantTimeCompare(providedTokenHash[:], expectedTokenHash[:]) != 1 {
 				http.Error(w, "Unauthorized", http.StatusUnauthorized)
 				return
 			}
@@ -733,9 +737,9 @@ func serve(c *cli.Context) error {
 		w.Header().Set("Content-Type", "image/svg+xml")
 		_, _ = w.Write(faviconSVG)
 	})
-	mainRouter.Get("/", serveIndex(publicURL, footer, c.String("replay-token"), protectedChannels))
+	mainRouter.Get("/", serveIndex(publicURL, footer, protectedChannels))
 	mainRouter.Get("/new", showNewURL(publicURL, protectedChannels))
-	mainRouter.Get(channelPath, serveIndex(publicURL, footer, c.String("replay-token"), protectedChannels))
+	mainRouter.Get(channelPath, serveIndex(publicURL, footer, protectedChannels))
 	mainRouter.Get("/version", retVersion)
 	mainRouter.Get("/health", retVersion)
 	mainRouter.Get("/livez", retVersion)

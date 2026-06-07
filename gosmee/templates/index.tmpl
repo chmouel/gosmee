@@ -718,7 +718,6 @@
         const instructionsContainer = document.getElementById('instructions-container');
         const mainContent = document.getElementById('main-content');
         const eventsUrl = '{{ .EventsURL }}';
-        const replayToken = '{{ .ReplayToken }}';
         let eventCount = 0;
         let eventSource;
         // Store JSON editors for each event
@@ -1076,6 +1075,18 @@
             }
         }
 
+        // Function to get replay token (from sessionStorage or prompt)
+        function getReplayToken() {
+            let token = sessionStorage.getItem('gosmee-replay-token');
+            if (!token) {
+                token = prompt('Enter replay token (leave empty if server does not require authentication):');
+                if (token) {
+                    sessionStorage.setItem('gosmee-replay-token', token);
+                }
+            }
+            return token;
+        }
+
         // Function to replay an event
         window.replayEvent = function (id, event) {
             event.preventDefault();
@@ -1113,19 +1124,43 @@
             // Get channel from URL
             const channel = window.location.pathname.split('/').pop();
             const payload = JSON.parse(rawContent.textContent);
-            if (replayToken) {
-                headers['Authorization'] = `Bearer ${replayToken}`;
-            }
 
-            // Send replay request
-            fetch(`/replay/${channel}`, {
-                method: 'POST',
-                headers: headers,
-                credentials: 'omit',
-                body: JSON.stringify(payload)
-            })
+            // Helper function to attempt replay
+            const attemptReplay = (authToken) => {
+                const requestHeaders = { ...headers };
+                if (authToken) {
+                    requestHeaders['Authorization'] = `Bearer ${authToken}`;
+                }
+
+                return fetch(`/replay/${channel}`, {
+                    method: 'POST',
+                    headers: requestHeaders,
+                    credentials: 'omit',
+                    body: JSON.stringify(payload)
+                });
+            };
+
+            // Try replay without token first
+            attemptReplay(null)
+                .then(response => {
+                    if (response.status === 401) {
+                        // Server requires authentication, prompt for token
+                        const token = getReplayToken();
+                        if (!token) {
+                            throw new Error('Replay requires authentication');
+                        }
+                        // Retry with token
+                        return attemptReplay(token);
+                    }
+                    return response;
+                })
                 .then(response => {
                     if (!response.ok) {
+                        if (response.status === 401) {
+                            // Token was invalid, clear it and prompt again
+                            sessionStorage.removeItem('gosmee-replay-token');
+                            throw new Error('Invalid replay token. Please try again.');
+                        }
                         throw new Error(`Replay failed: ${response.status} ${response.statusText}`);
                     }
                     return response.text();

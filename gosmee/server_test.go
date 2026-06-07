@@ -664,7 +664,7 @@ func TestServeIndexAndNewURL(t *testing.T) {
 		req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/", nil)
 		w := httptest.NewRecorder()
 
-		handler := serveIndex("https://example.com", "", "", protectedChannels)
+		handler := serveIndex("https://example.com", "", protectedChannels)
 		handler(w, req)
 
 		resp := w.Result()
@@ -682,7 +682,7 @@ func TestServeIndexAndNewURL(t *testing.T) {
 		rctx.URLParams.Add("channel", "plainchannel1")
 		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
-		handler := serveIndex("https://example.com", "footer text", "", protectedChannels)
+		handler := serveIndex("https://example.com", "footer text", protectedChannels)
 		handler(w, req)
 
 		resp := w.Result()
@@ -703,7 +703,7 @@ func TestServeIndexAndNewURL(t *testing.T) {
 		rctx.URLParams.Add("channel", "protectedchan")
 		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
-		handler := serveIndex("https://example.com", "", "", protectedChannels)
+		handler := serveIndex("https://example.com", "", protectedChannels)
 		handler(w, req)
 
 		assert.Equal(t, w.Result().StatusCode, http.StatusNotFound)

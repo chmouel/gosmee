@@ -28,6 +28,7 @@ internet → [gosmee server] → SSE stream → [gosmee client] → local servic
 |---|---|
 | Forged or tampered webhooks from untrusted senders | Signature validation, IP allowlisting |
 | Eavesdropping on the SSE relay stream | End-to-end encryption |
+| Unauthorized replay injection | `--replay-token` |
 | Payload-based resource exhaustion (DoS) | `--max-body-size`, channel name length limit |
 | Command injection via exec scripts | `--exec` hardening, signature validation, IP allowlisting |
 | Unauthorized access to protected channels | Encrypted channels with public-key authentication |
@@ -44,6 +45,8 @@ If you do nothing else, apply these controls before deploying gosmee in producti
 - [ ] Set `--max-body-size` to a sensible limit for your workloads
 - [ ] Run as a non-root user with minimal filesystem permissions
 - [ ] Enable encrypted channels for sensitive payloads
+- [ ] Set `--replay-token` if the replay endpoint is exposed to untrusted networks
+- [ ] Set `--cors-origin` to your dashboard URL if you do not want arbitrary websites connecting to the SSE stream
 - [ ] If using `--exec`, validate and sanitize all payload fields in scripts before passing them to shell commands
 
 ---
@@ -101,6 +104,32 @@ gosmee automatically detects the provider from the request headers and validates
 Requests with a missing or invalid signature are rejected with HTTP 401. When multiple secrets are configured, each is tried in turn — useful when migrating secrets or receiving webhooks from multiple sources. The overhead is negligible (~2 μs per request).
 
 Secrets can also be set via `GOSMEE_WEBHOOK_SIGNATURE` (comma-separated).
+
+---
+
+## Protecting the Replay Endpoint
+
+The `/replay/{channel}` endpoint re-sends a captured event to all SSE subscribers on that channel. This is useful for debugging and incident replay, but it is also a write path into your relay stream.
+
+Without authentication, anyone who can reach the server can POST to `/replay/{channel}` and inject payloads into any channel they can name.
+
+Set `--replay-token` (or `GOSMEE_REPLAY_TOKEN`) to require bearer-token authentication:
+
+```shell
+gosmee server --replay-token=MY_SECRET_TOKEN
+```
+
+When set, replay requests must include:
+
+```text
+Authorization: Bearer <token>
+```
+
+Missing or incorrect tokens are rejected with HTTP 401.
+
+The web UI Replay button will prompt you to enter the token when you first attempt to replay an event. The token is stored in your browser's sessionStorage for convenience during the session.
+
+If `--replay-token` is not set, the replay endpoint remains open for backward compatibility.
 
 ---
 
@@ -180,6 +209,27 @@ Encryption covers the **server-to-client SSE leg only**. Incoming webhook POST b
 | | TLS transport (use a reverse proxy) |
 
 Encryption requires gosmee's own server — smee.io is not supported.
+
+### Restricting SSE Cross-Origin Access
+
+The SSE endpoint (`/events/{channel}`) sets `Access-Control-Allow-Origin`. By default, it is `*`.
+
+That default means any website that knows a channel ID can open an `EventSource` connection and receive all payloads for that channel.
+
+Use `--cors-origin` (or `GOSMEE_CORS_ORIGIN`) to control this header:
+
+```shell
+# Default (backward compatible): allow all origins
+gosmee server --cors-origin="*"
+
+# Restrict browser access to one origin
+gosmee server --cors-origin="https://dashboard.example.com"
+
+# Omit the header entirely (same-origin browser access only)
+gosmee server --cors-origin=""
+```
+
+The default `*` preserves backward compatibility for existing deployments.
 
 ---
 
