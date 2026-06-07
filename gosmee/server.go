@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"io"
 	"net"
 	"net/http"
@@ -17,7 +18,6 @@ import (
 	"slices"
 	"strings"
 	"sync"
-	"html/template"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -582,7 +582,7 @@ func retVersion(w http.ResponseWriter, _ *http.Request) {
 	}
 }
 
-func handleEventsGet(eventBroker *EventBroker, protectedChannels *ProtectedChannels) http.HandlerFunc {
+func handleEventsGet(eventBroker *EventBroker, protectedChannels *ProtectedChannels, corsOrigin string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		channel := chi.URLParam(r, "channel")
 		if channel == "" {
@@ -617,7 +617,9 @@ func handleEventsGet(eventBroker *EventBroker, protectedChannels *ProtectedChann
 		w.Header().Set("Cache-Control", "no-cache")
 		w.Header().Set("Connection", "keep-alive")
 		w.Header().Set("X-Accel-Buffering", "no")
-		w.Header().Set("Access-Control-Allow-Origin", "*")
+		if corsOrigin != "" {
+			w.Header().Set("Access-Control-Allow-Origin", corsOrigin)
+		}
 
 		// Get the flusher for immediate writes
 		flusher, ok := w.(http.Flusher)
@@ -668,6 +670,7 @@ func handleEventsGet(eventBroker *EventBroker, protectedChannels *ProtectedChann
 
 func serve(c *cli.Context) error {
 	publicURL := c.String("public-url")
+	corsOrigin := c.String("cors-origin")
 	footer := c.String("footer")
 	footerFile := c.String("footer-file")
 	if footer != "" && footerFile != "" {
@@ -738,7 +741,7 @@ func serve(c *cli.Context) error {
 	mainRouter.Get("/livez", retVersion)
 
 	// SSE endpoint for event streaming
-	mainRouter.Get(eventsPath, handleEventsGet(eventBroker, protectedChannels))
+	mainRouter.Get(eventsPath, handleEventsGet(eventBroker, protectedChannels, corsOrigin))
 
 	// Register POST routes on the restricted router
 	restrictedRouter.Post(channelPath, handleWebhookPost(c, events, eventBroker, c.StringSlice("webhook-signature")))

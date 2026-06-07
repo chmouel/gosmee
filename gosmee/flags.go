@@ -203,4 +203,10 @@ var serverFlags = []cli.Flag{
 		Usage:   "Optional JSON file describing protected channel IDs and allowed client public keys",
 		EnvVars: []string{"GOSMEE_ENCRYPTED_CHANNELS_FILE"},
 	},
+	&cli.StringFlag{
+		Name:    "cors-origin",
+		Usage:   "CORS origin for SSE endpoint. Set a specific origin (e.g. https://example.com) to restrict which websites can connect to the SSE stream; set empty string to omit Access-Control-Allow-Origin entirely (same-origin only)",
+		Value:   "*",
+		EnvVars: []string{"GOSMEE_CORS_ORIGIN"},
+	},
 }

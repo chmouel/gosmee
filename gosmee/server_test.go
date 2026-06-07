@@ -458,7 +458,7 @@ func TestHandleEventsGet(t *testing.T) {
 		"test-channel": {allowedKey},
 	})
 	router := chi.NewRouter()
-	router.Get("/events/{channel:[a-zA-Z0-9_-]{12,64}}", handleEventsGet(eventBroker, protectedChannels))
+	router.Get("/events/{channel:[a-zA-Z0-9_-]{12,64}}", handleEventsGet(eventBroker, protectedChannels, "*"))
 
 	t.Run("Rejects Invalid Public Key", func(t *testing.T) {
 		req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/events/test-channel?pubkey=!!!", nil)
@@ -551,7 +551,7 @@ func TestHandleEventsGet(t *testing.T) {
 			"test-channel": {allowed},
 		})
 		router = chi.NewRouter()
-		router.Get("/events/{channel:[a-zA-Z0-9_-]{12,64}}", handleEventsGet(eventBroker, protectedChannels))
+		router.Get("/events/{channel:[a-zA-Z0-9_-]{12,64}}", handleEventsGet(eventBroker, protectedChannels, "*"))
 
 		req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/events/test-channel?pubkey="+url.QueryEscape(allowed), nil)
 		reqCtx, cancel := context.WithCancel(req.Context())
@@ -590,6 +590,69 @@ func TestHandleEventsGet(t *testing.T) {
 		cancel()
 		<-done
 	})
+}
+
+func TestHandleEventsGetCORSOrigin(t *testing.T) {
+	testCases := []struct {
+		name           string
+		corsOrigin     string
+		expectedHeader string
+		expectPresent  bool
+	}{
+		{
+			name:           "Wildcard Origin",
+			corsOrigin:     "*",
+			expectedHeader: "*",
+			expectPresent:  true,
+		},
+		{
+			name:           "Specific Origin",
+			corsOrigin:     "https://example.com",
+			expectedHeader: "https://example.com",
+			expectPresent:  true,
+		},
+		{
+			name:          "Empty Origin Omits Header",
+			corsOrigin:    "",
+			expectPresent: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			eventBroker := NewEventBroker()
+			protectedChannels, err := LoadProtectedChannels("")
+			assert.NilError(t, err)
+			router := chi.NewRouter()
+			router.Get("/events/{channel:[a-zA-Z0-9_-]{12,64}}", handleEventsGet(eventBroker, protectedChannels, tc.corsOrigin))
+
+			req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/events/plainchannel1", nil)
+			reqCtx, cancel := context.WithCancel(req.Context())
+			req = req.WithContext(reqCtx)
+			defer cancel()
+
+			response := httptest.NewRecorder()
+			done := make(chan struct{})
+			go func() {
+				router.ServeHTTP(response, req)
+				close(done)
+			}()
+
+			assert.Assert(t, eventually(t, func() bool {
+				return strings.Contains(response.Body.String(), `{"message":"connected"}`)
+			}))
+
+			headerValue := response.Header().Get("Access-Control-Allow-Origin")
+			if tc.expectPresent {
+				assert.Equal(t, headerValue, tc.expectedHeader)
+			} else {
+				assert.Equal(t, headerValue, "")
+			}
+
+			cancel()
+			<-done
+		})
+	}
 }
 
 func TestServeIndexAndNewURL(t *testing.T) {
