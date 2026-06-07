@@ -560,11 +560,28 @@ func TestReplayData(t *testing.T) {
 	})
 
 	t.Run("insecureTLSVerify flag", func(t *testing.T) {
-		// Based on client.go: InsecureSkipVerify: !ropts.insecureTLSVerify
-		// insecureTLSVerify: false => InsecureSkipVerify: true (should succeed with self-signed)
-		// insecureTLSVerify: true  => InsecureSkipVerify: false (should fail with self-signed)
+		// Based on client.go: InsecureSkipVerify: ropts.insecureTLSVerify
+		// insecureTLSVerify: false => InsecureSkipVerify: false (should fail with self-signed)
+		// insecureTLSVerify: true  => InsecureSkipVerify: true (should succeed with self-signed)
 
-		t.Run("insecureTLSVerify=false makes connection succeed", func(t *testing.T) {
+		t.Run("insecureTLSVerify=false makes connection fail", func(t *testing.T) {
+			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				// Should not be called
+				t.Fatal("server handler should not be called on TLS handshake failure")
+			}))
+			defer server.Close()
+
+			opts := replayDataOpts{
+				targetURL:         server.URL,
+				targetCnxTimeout:  5,
+				insecureTLSVerify: false, // so InsecureSkipVerify becomes false
+			}
+			err := replayData(&opts, logger, basePayload)
+			assert.Assert(t, err != nil)
+			assert.Assert(t, strings.Contains(err.Error(), "x509"), "Error message should contain x509: %v", err)
+		})
+
+		t.Run("insecureTLSVerify=true makes connection succeed", func(t *testing.T) {
 			var serverCalled bool
 			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 				serverCalled = true
@@ -575,28 +592,11 @@ func TestReplayData(t *testing.T) {
 			opts := replayDataOpts{
 				targetURL:         server.URL,
 				targetCnxTimeout:  5,
-				insecureTLSVerify: false, // so InsecureSkipVerify becomes true
+				insecureTLSVerify: true, // so InsecureSkipVerify becomes true
 			}
 			err := replayData(&opts, logger, basePayload)
 			assert.NilError(t, err)
 			assert.Assert(t, serverCalled)
-		})
-
-		t.Run("insecureTLSVerify=true makes connection fail", func(t *testing.T) {
-			server := httptest.NewTLSServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
-				// Should not be called
-				t.Fatal("server handler should not be called on TLS handshake failure")
-			}))
-			defer server.Close()
-
-			opts := replayDataOpts{
-				targetURL:         server.URL,
-				targetCnxTimeout:  5,
-				insecureTLSVerify: true, // so InsecureSkipVerify becomes false
-			}
-			err := replayData(&opts, logger, basePayload)
-			assert.Assert(t, err != nil)
-			assert.Assert(t, strings.Contains(err.Error(), "x509"), "Error message should contain x509: %v", err)
 		})
 	})
 
