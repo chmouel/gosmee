@@ -67,6 +67,68 @@ func getNewHookURL(targetURL string) (string, error) {
 	return string(b), err
 }
 
+func mergeFlags(base []cli.Flag, extra ...cli.Flag) []cli.Flag {
+	res := make([]cli.Flag, len(base)+len(extra))
+	copy(res, base)
+	copy(res[len(base):], extra)
+	return res
+}
+
+func makeBeforeHook(section string) cli.BeforeFunc {
+	return func(c *cli.Context) error {
+		if err := LoadConfig(c); err != nil {
+			return err
+		}
+		return ApplyConfigToContext(c, section)
+	}
+}
+
+func resolveClientURLs(c *cli.Context) (string, string, bool, error) {
+	noReplay := c.Bool("noReplay")
+	smeeURL := ""
+	targetURL := ""
+
+	switch {
+	case c.NArg() == 2:
+		smeeURL = c.Args().Get(0)
+		targetURL = c.Args().Get(1)
+	case c.String("exec") != "" && c.NArg() == 1:
+		smeeURL = c.Args().Get(0)
+		noReplay = true
+	case c.NArg() != 0:
+		return "", "", false, fmt.Errorf("need at least a smeeURL and a targetURL as arguments, ie: gosmee client https://server.smee.url/aBcdeFghijklmn http://localhost:8080")
+	}
+
+	if smeeURL == "" {
+		if envSmeeURL := os.Getenv("GOSMEE_URL"); envSmeeURL != "" {
+			smeeURL = envSmeeURL
+		} else {
+			smeeURL = GetConfigString("client", "smee-url")
+		}
+	}
+
+	if targetURL == "" {
+		if envTargetURL := os.Getenv("GOSMEE_TARGET_URL"); envTargetURL != "" {
+			targetURL = envTargetURL
+		} else {
+			targetURL = GetConfigString("client", "target-url")
+		}
+	}
+
+	if smeeURL == "" {
+		return "", "", false, fmt.Errorf("need at least a smeeURL and a targetURL as arguments, ie: gosmee client https://server.smee.url/aBcdeFghijklmn http://localhost:8080")
+	}
+	if targetURL == "" {
+		if c.String("exec") != "" {
+			noReplay = true
+		} else {
+			return "", "", false, fmt.Errorf("need a targetURL or an exec command when loading smee-url from configuration")
+		}
+	}
+
+	return smeeURL, targetURL, noReplay, nil
+}
+
 func makeapp() *cli.App {
 	app := &cli.App{
 		Name:  "gosmee",
@@ -79,16 +141,18 @@ non-publicly accessible endpoint, forward those requests to your local service.`
 		Flags:                commonFlags, // Add commonFlags here so --new-url is a global flag
 		Commands: []*cli.Command{
 			{
-				Name:  "replay",
-				Usage: "Replay payloads from GitHub",
+				Name:   "replay",
+				Usage:  "Replay payloads from GitHub",
+				Before: makeBeforeHook("replay"),
 				Action: func(c *cli.Context) error {
 					return replay(c)
 				},
-				Flags: append(commonFlags, replayFlags...),
+				Flags: mergeFlags(commonFlags, replayFlags...),
 			},
 			{
-				Name:  "server",
-				Usage: "Make gosmee a relay server from your external webhook",
+				Name:   "server",
+				Usage:  "Make gosmee a relay server from your external webhook",
+				Before: makeBeforeHook("server"),
 				Action: func(c *cli.Context) error {
 					if !isatty.IsTerminal(os.Stdout.Fd()) {
 						ansi.DisableColors(true)
@@ -98,9 +162,13 @@ non-publicly accessible endpoint, forward those requests to your local service.`
 				Flags: serverFlags,
 			},
 			{
-				Name:  "keygen",
-				Usage: "Generate a client encryption keypair and print the public key",
+				Name:   "keygen",
+				Usage:  "Generate a client encryption keypair and print the public key",
+				Before: makeBeforeHook("keygen"),
 				Action: func(c *cli.Context) error {
+					if c.String("key-file") == "" {
+						return fmt.Errorf("required flag \"key-file\" not set")
+					}
 					publicKey, privateKey, err := GenerateKeyPair()
 					if err != nil {
 						return err
@@ -117,6 +185,7 @@ non-publicly accessible endpoint, forward those requests to your local service.`
 				Name:      "client",
 				UsageText: "gosmee [command options] SMEE_URL LOCAL_SERVICE_URL",
 				Usage:     "Make a client from the relay server to your local service",
+				Before:    makeBeforeHook("client"),
 				Action: func(c *cli.Context) error {
 					logger, nocolor, err := getLogger(c)
 					if err != nil {
@@ -134,21 +203,9 @@ non-publicly accessible endpoint, forward those requests to your local service.`
 						return cli.Exit("", 0) // Exit successfully after printing URL
 					}
 
-					var smeeURL, targetURL string
-					noReplay := c.Bool("noReplay")
-					switch {
-					case os.Getenv("GOSMEE_URL") != "" && os.Getenv("GOSMEE_TARGET_URL") != "":
-						smeeURL = os.Getenv("GOSMEE_URL")
-						targetURL = os.Getenv("GOSMEE_TARGET_URL")
-					case c.String("exec") != "" && c.NArg() == 1:
-						smeeURL = c.Args().Get(0)
-						noReplay = true
-					default:
-						if c.NArg() != 2 {
-							return fmt.Errorf("need at least a smeeURL and a targetURL as arguments, ie: gosmee client https://server.smee.url/aBcdeFghijklmn http://localhost:8080")
-						}
-						smeeURL = c.Args().Get(0)
-						targetURL = c.Args().Get(1)
+					smeeURL, targetURL, noReplay, err := resolveClientURLs(c)
+					if err != nil {
+						return err
 					}
 					if _, err := url.Parse(smeeURL); err != nil {
 						return fmt.Errorf("smeeURL %s is not a valid url %w", smeeURL, err)
@@ -201,7 +258,7 @@ non-publicly accessible endpoint, forward those requests to your local service.`
 					}
 					return cfg.clientSetup()
 				},
-				Flags: append(commonFlags, clientFlags...),
+				Flags: mergeFlags(commonFlags, clientFlags...),
 			},
 			{
 				Name:  "completion",

@@ -1099,7 +1099,7 @@ func TestCheckServerVersion(t *testing.T) {
 // callback within clientSetup. It allows testing the decision tree of the handler.
 // It returns booleans indicating if saveData and replayData were called.
 // Actual calls to saveData and replayData are made if conditions are met.
-func processTestEvent(t *testing.T, gs *goSmee, now time.Time, msg *sse.Event, privateKey *[32]byte, targetServer *httptest.Server) (saveCalled bool, replayCalled bool, errResult error) {
+func processTestEvent(t *testing.T, gs *goSmee, now time.Time, msg *sse.Event, privateKey *[32]byte, targetServer *httptest.Server) (saveCalled, replayCalled bool, errResult error) {
 	t.Helper()
 
 	// Initial skip logic (from client.go)

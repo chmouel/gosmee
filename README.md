@@ -431,6 +431,60 @@ Note: Long-running connections may occasionally cause errors with nginx. Contrib
 
 For a full security reference — including webhook signature validation, IP restrictions, payload limits, channel name protection, and encrypted channels — see [SECURITY.md](./SECURITY.md).
 
+## Configuration File
+
+`gosmee` reads settings from a YAML file. CLI flags beat environment variables, which beat the config file.
+
+### Default path
+
+| Platform | Path |
+|----------|------|
+| Linux/BSD | `~/.config/gosmee/config.yaml` |
+| macOS | `~/Library/Application Support/gosmee/config.yaml` |
+| Windows | `%APPDATA%\gosmee\config.yaml` |
+
+If the file is absent, `gosmee` starts without it.
+
+### Override the path
+
+Use `-F` / `--config` or `GOSMEE_CONFIG`:
+
+```shell
+gosmee client --config /path/to/config.yaml
+```
+
+### Structure
+
+Top-level keys apply to all commands. Keys inside a named section (`client`, `server`, `replay`, `keygen`) apply only to that command and override the top-level value for it.
+
+```yaml
+output: pretty
+saveDir: /tmp/savedreplay
+nocolor: false
+
+client:
+  smee-url: https://smee.io/aBcDeF
+  target-url: http://localhost:8080
+  sse-buffer-size: 1048576
+  channel: messages
+  saveDir: /tmp/client-specific  # overrides top-level saveDir
+
+server:
+  port: 8080
+  address: 0.0.0.0
+  trust-proxy: true
+  cors-origin: "https://my-trusted-site.com"
+  allowed-ips:
+    - 192.168.1.0/24
+    - 10.0.0.0/8
+
+replay:
+  org-repo: chmouel/gosmee
+  hook-id: "123456789"
+  target-url: http://localhost:8080
+  github-token: ghp_yourGitHubTokenHere
+```
+
 ## Replay Webhook Deliveries via the GitHub API (beta)
 
 If you'd rather not use a relay server with GitHub, you can replay webhook deliveries directly via the GitHub API.

@@ -1,0 +1,131 @@
+# gosmee configuration file
+#
+# Default location: ~/.config/gosmee/config.yaml (Linux/BSD)
+#                   ~/Library/Application Support/gosmee/config.yaml (macOS)
+#
+# Override with: --config/-F flag or GOSMEE_CONFIG environment variable
+#
+# Precedence: CLI flags > environment variables > this file > built-in defaults
+#
+# Top-level keys apply to all commands that support them.
+# Command-specific sections override top-level values for that command.
+
+# --- Common options (apply to client, replay) ---
+
+# Output format: "pretty" (default) or "json"
+output: pretty
+
+# Disable colour output
+nocolor: false
+
+# Do not replay payloads on startup
+noReplay: false
+
+# Skip TLS verification for the target (insecure)
+insecure-skip-tls-verify: false
+
+# Save incoming payloads as shell replay scripts in this directory
+# saveDir: /tmp/gosmee-payloads
+
+# Seconds to wait when forwarding a request to the local service
+target-connection-timeout: 300
+
+# Ignore these event types
+# ignore-event:
+#   - push
+#   - ping
+
+# Shell command to run on each incoming event ($GOSMEE_PAYLOAD_FILE and
+# $GOSMEE_HEADERS_FILE are set by gosmee before the command runs)
+# exec: /usr/local/bin/handle-webhook.sh
+
+# Only run exec for these event types
+# exec-on-events:
+#   - pull_request
+#   - push
+
+# Additional environment variables to pass to exec
+# exec-env-vars:
+#   - MY_SECRET_TOKEN
+#   - BUILD_ENV
+
+# --- client command ---
+client:
+  smee-url: https://smee.io/your-channel-id
+  target-url: http://localhost:8080
+
+  # gosmee channel name (when not using smee.io)
+  # channel: my-channel
+
+  # Use httpie instead of curl in saved replay scripts
+  httpie: false
+
+  # Port for Kubernetes liveness/readiness health endpoint (0 = disabled)
+  health-port: 0
+
+  # SSE client buffer size in bytes (default 1 MiB)
+  sse-buffer-size: 1048576
+
+  # Path to client encryption keypair JSON file (for encrypted channels)
+  # encryption-key-file: ~/.config/gosmee/client-keypair.json
+
+# --- server command ---
+server:
+  port: 3333
+  address: 0.0.0.0
+
+  # Public URL shown to clients (set this when behind a reverse proxy)
+  # public-url: https://smee.example.com
+
+  # CIDR ranges or IPs that may send webhooks (empty = all)
+  # allowed-ips:
+  #   - 192.30.252.0/22
+  #   - 185.199.108.0/22
+
+  # Trust X-Forwarded-For / X-Real-IP headers (only set this behind a trusted proxy)
+  trust-proxy: false
+
+  # Get a Let's Encrypt TLS certificate automatically
+  auto-cert: false
+
+  # TLS certificate and key files (for manual TLS)
+  # tls-cert: /etc/gosmee/tls.crt
+  # tls-key:  /etc/gosmee/tls.key
+
+  # HTML string or file for the server footer
+  # footer: "© 2025 My Org"
+  # footer-file: /etc/gosmee/footer.html
+
+  # Secrets for validating incoming webhook signatures
+  # webhook-signature:
+  #   - supersecret1
+  #   - supersecret2
+
+  # Bearer token for POST /replay/{channel}
+  # replay-token: my-replay-token
+
+  # Max incoming webhook body size in bytes (default 25 MiB)
+  max-body-size: 26214400
+
+  # JSON file mapping channel IDs to allowed client public keys
+  # encrypted-channels-file: /etc/gosmee/encrypted-channels.json
+
+  # CORS origin for the SSE endpoint ("*" = all, "" = same-origin only)
+  cors-origin: "*"
+
+# --- replay command ---
+# replay:
+#  org-repo: myorg/myrepo
+#  hook-id: 123456789
+#  target-url: http://localhost:8080
+#
+#  # GitHub personal access token
+#  github-token: ghp_...
+#
+#  # Replay only events delivered since this time (format: "2024-01-15T10:00:00")
+#  time-since: "2024-01-15T10:00:00"
+
+# --- keygen command ---
+# keygen:
+#  # Where to write the client keypair JSON file
+#  key-file: ~/.config/gosmee/client-keypair.json
