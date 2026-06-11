@@ -82,6 +82,9 @@ golang.org/x/text/unicode/norm
 # gopkg.in/cenkalti/backoff.v1 v1.1.0
 ## explicit
 gopkg.in/cenkalti/backoff.v1
+# gopkg.in/yaml.v3 v3.0.1
+## explicit
+gopkg.in/yaml.v3
 # gotest.tools/v3 v3.5.2
 ## explicit; go 1.17
 gotest.tools/v3/assert

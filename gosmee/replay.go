@@ -100,7 +100,8 @@ func (r *replayOpts) replayHooks(ctx context.Context, hookid int64) error {
 					"%s forwarding message with headers '%s' - %s\n",
 					ansi.Color("ERROR", "red+b"),
 					pm.headers,
-					err.Error())
+					err.Error(),
+				)
 				r.logger.ErrorContext(context.Background(), s)
 				continue
 			}
@@ -135,6 +136,10 @@ func (r *replayOpts) replayHooks(ctx context.Context, hookid int64) error {
 
 func replay(c *cli.Context) error {
 	ctx := context.Background()
+	if c.String("github-token") == "" {
+		return fmt.Errorf("required flag \"github-token\" not set")
+	}
+
 	client := github.NewClient(nil)
 	client = client.WithAuthToken(c.String("github-token"))
 
@@ -150,6 +155,9 @@ func replay(c *cli.Context) error {
 	}
 
 	orgRepo := c.Args().Get(0)
+	if orgRepo == "" {
+		orgRepo = GetConfigString("replay", "org-repo")
+	}
 	if strings.Contains(orgRepo, "/") {
 		spt := strings.Split(orgRepo, "/")
 		ropt.org = spt[0]
@@ -162,11 +170,20 @@ func replay(c *cli.Context) error {
 		return fmt.Errorf("at least an org is required or an org/repo")
 	}
 
-	if c.IsSet("list-hooks") {
+	if ropt.repo == "" {
+		ropt.ghop = NewOrgLister(client, logger, ropt.org, ropt.repo)
+	} else {
+		ropt.ghop = NewRepoLister(client, logger, ropt.org, ropt.repo)
+	}
+
+	if c.Bool("list-hooks") {
 		return ropt.listHooks(ctx)
 	}
 
 	_hookID := c.Args().Get(1)
+	if _hookID == "" {
+		_hookID = GetConfigString("replay", "hook-id")
+	}
 	_hookID = strings.TrimSpace(_hookID)
 	if _hookID == "" {
 		return fmt.Errorf("hook-id is required, use --list-hooks to get the hook id")
@@ -181,18 +198,20 @@ func replay(c *cli.Context) error {
 		return fmt.Errorf("hook-id is required, use --list-hooks to get the hook id")
 	}
 
-	if c.IsSet("list-deliveries") {
+	if c.Bool("list-deliveries") {
 		return ropt.listDeliveries(ctx, hookID)
 	}
 	// TODO: remove duplication from client and here
 	var targetURL string
-	if os.Getenv("GOSMEE_TARGET_URL") != "" {
+	switch {
+	case os.Getenv("GOSMEE_TARGET_URL") != "":
 		targetURL = os.Getenv("GOSMEE_TARGET_URL")
-	} else {
-		if c.NArg() != 3 {
-			return fmt.Errorf("missing the target url where to forward the webhook, ie: http://localhost:8080")
-		}
+	case c.NArg() == 3:
 		targetURL = c.Args().Get(2)
+	case GetConfigString("replay", "target-url") != "":
+		targetURL = GetConfigString("replay", "target-url")
+	default:
+		return fmt.Errorf("missing the target url where to forward the webhook, ie: http://localhost:8080")
 	}
 	if _, err := url.Parse(targetURL); err != nil {
 		return fmt.Errorf("target url %s is not a valid url %w", targetURL, err)
@@ -219,12 +238,6 @@ func replay(c *cli.Context) error {
 		}
 		ropt.sinceTime = since
 	}
-	if ropt.repo == "" {
-		ropt.ghop = NewOrgLister(client, logger, ropt.org, ropt.repo)
-	} else {
-		ropt.ghop = NewRepoLister(client, logger, ropt.org, ropt.repo)
-	}
-
 	ropt.replayDataOpts = &replayDataOpts{
 		targetURL:         targetURL,
 		saveDir:           c.String("saveDir"),

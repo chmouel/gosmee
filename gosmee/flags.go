@@ -4,7 +4,15 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
+var configFlag = &cli.StringFlag{
+	Name:    "config",
+	Aliases: []string{"F"},
+	Usage:   "Path to the YAML configuration file",
+	EnvVars: []string{"GOSMEE_CONFIG"},
+}
+
 var commonFlags = []cli.Flag{
+	configFlag,
 	&cli.StringFlag{
 		Name:    "output",
 		Usage:   `Output format, one of "json", "pretty"`,
@@ -63,10 +71,9 @@ var commonFlags = []cli.Flag{
 
 var replayFlags = []cli.Flag{
 	&cli.StringFlag{
-		Name:     "github-token",
-		Usage:    "GitHub token to use to replay payloads",
-		Required: true,
-		Aliases:  []string{"t"},
+		Name:    "github-token",
+		Usage:   "GitHub token to use to replay payloads",
+		Aliases: []string{"t"},
 	},
 	&cli.BoolFlag{
 		Name:    "list-hooks",
@@ -86,11 +93,11 @@ var replayFlags = []cli.Flag{
 }
 
 var keygenFlags = []cli.Flag{
+	configFlag,
 	&cli.StringFlag{
-		Name:     "key-file",
-		Usage:    "Path to write the client keypair JSON file",
-		Required: true,
-		EnvVars:  []string{"GOSMEE_ENCRYPTION_KEY_FILE"},
+		Name:    "key-file",
+		Usage:   "Path to write the client keypair JSON file",
+		EnvVars: []string{"GOSMEE_ENCRYPTION_KEY_FILE"},
 	},
 }
 
@@ -137,6 +144,7 @@ var clientFlags = []cli.Flag{
 }
 
 var serverFlags = []cli.Flag{
+	configFlag,
 	&cli.StringFlag{
 		Name:  "public-url",
 		Usage: "Public URL to show to user, useful when you are behind a proxy.",

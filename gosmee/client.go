@@ -385,7 +385,8 @@ func runExecCommand(ctx context.Context, rd *replayDataOpts, logger *slog.Logger
 
 	//nolint:gosec // Command is intentionally user-provided
 	cmd := exec.CommandContext(ctx, "sh", "-c", rd.execCommand)
-	cmd.Env = append(buildExecEnv(rd.execEnvVars),
+	cmd.Env = append(
+		buildExecEnv(rd.execEnvVars),
 		"GOSMEE_EVENT_TYPE="+pm.eventType,
 		"GOSMEE_EVENT_ID="+pm.eventID,
 		"GOSMEE_CONTENT_TYPE="+pm.contentType,
@@ -477,7 +478,7 @@ func buildExecEnv(extraVarNames []string) []string {
 }
 
 // checkServerVersion verifies that the client version is compatible with the server version.
-func checkServerVersion(serverURL string, clientVersion string, logger *slog.Logger, decorate bool) error {
+func checkServerVersion(serverURL, clientVersion string, logger *slog.Logger, decorate bool) error {
 	// Extract base URL from the smeeURL (removing the channel part)
 	baseURL := serverURL
 	if parts := strings.Split(serverURL, "/"); len(parts) > 3 {
@@ -622,7 +623,7 @@ func isOlderVersion(v1, v2 []int) bool {
 	return len(v1) < len(v2)
 }
 
-func prepareSubscription(smeeURL, encryptionKeyFile string) (channel string, sseURL string, privateKey *[32]byte, err error) {
+func prepareSubscription(smeeURL, encryptionKeyFile string) (channel, sseURL string, privateKey *[32]byte, err error) {
 	channel = filepath.Base(smeeURL)
 	baseURL := strings.TrimSuffix(smeeURL, "/"+channel)
 

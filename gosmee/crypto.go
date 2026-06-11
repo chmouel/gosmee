@@ -35,7 +35,7 @@ func GenerateKeyPair() (*[32]byte, *[32]byte, error) {
 	return publicKey, privateKey, nil
 }
 
-func SaveKeyPair(path string, publicKey *[32]byte, privateKey *[32]byte) error {
+func SaveKeyPair(path string, publicKey, privateKey *[32]byte) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
 	}
