@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"flag"
 	"io"
 	"net"
@@ -19,10 +20,15 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/r3labs/sse/v2"
 	"github.com/urfave/cli/v2"
 	"gotest.tools/v3/assert"
 )
+
+type relayFunc func(ctx context.Context, channel string, data []byte) (string, error)
+
+func (f relayFunc) Publish(ctx context.Context, channel string, data []byte) (string, error) {
+	return f(ctx, channel, data)
+}
 
 func TestEventBroker(t *testing.T) {
 	t.Run("Subscribe and Publish", func(t *testing.T) {
@@ -43,7 +49,7 @@ func TestEventBroker(t *testing.T) {
 
 		// Verify subscriber received the message
 		receivedData := <-subscriber.Events
-		assert.DeepEqual(t, receivedData, testData)
+		assert.DeepEqual(t, receivedData.Data, testData)
 
 		// Unsubscribe
 		eb.Unsubscribe(channel, subscriber)
@@ -73,8 +79,8 @@ func TestEventBroker(t *testing.T) {
 		eb.Publish(channel, testData)
 
 		// Verify both received the message
-		assert.DeepEqual(t, <-sub1.Events, testData)
-		assert.DeepEqual(t, <-sub2.Events, testData)
+		assert.DeepEqual(t, (<-sub1.Events).Data, testData)
+		assert.DeepEqual(t, (<-sub2.Events).Data, testData)
 
 		// Unsubscribe one
 		eb.Unsubscribe(channel, sub1)
@@ -87,7 +93,7 @@ func TestEventBroker(t *testing.T) {
 		eb.Publish(channel, testData2)
 
 		// Verify only sub2 received it
-		assert.DeepEqual(t, <-sub2.Events, testData2)
+		assert.DeepEqual(t, (<-sub2.Events).Data, testData2)
 	})
 
 	t.Run("Encrypted Subscribers Receive Ciphertext", func(t *testing.T) {
@@ -97,7 +103,7 @@ func TestEventBroker(t *testing.T) {
 		plaintextSubscriber := eb.Subscribe(channel, nil)
 
 		eb.Publish(channel, []byte(`{"test":"public"}`))
-		assert.DeepEqual(t, <-plaintextSubscriber.Events, []byte(`{"test":"public"}`))
+		assert.DeepEqual(t, (<-plaintextSubscriber.Events).Data, []byte(`{"test":"public"}`))
 
 		publicKey, privateKey, err := GenerateKeyPair()
 		assert.NilError(t, err)
@@ -107,12 +113,12 @@ func TestEventBroker(t *testing.T) {
 		testData := []byte(`{"test":"secret"}`)
 		eb.Publish(channel, testData)
 
-		assert.DeepEqual(t, <-plaintextSubscriber.Events, testData)
+		assert.DeepEqual(t, (<-plaintextSubscriber.Events).Data, testData)
 
 		receivedEncrypted := <-encryptedSubscriber.Events
-		assert.Assert(t, IsEncrypted(receivedEncrypted))
+		assert.Assert(t, IsEncrypted(receivedEncrypted.Data))
 
-		decrypted, err := Decrypt(receivedEncrypted, privateKey)
+		decrypted, err := Decrypt(receivedEncrypted.Data, privateKey)
 		assert.NilError(t, err)
 		assert.DeepEqual(t, decrypted, testData)
 	})
@@ -226,12 +232,12 @@ func newTestContext() *cli.Context {
 func TestHandleWebhookPost(t *testing.T) {
 	// Set up router, SSE server, and event broker
 	router := chi.NewRouter()
-	events := sse.New()
 	eventBroker := NewEventBroker()
+	relay := newLocalPayloadRelay(eventBroker)
 	ctx := newTestContext()
 
 	// Set up the webhook endpoint
-	router.Post("/webhook/{channel}", handleWebhookPost(ctx, events, eventBroker, []string{}))
+	router.Post("/webhook/{channel}", handleWebhookPost(ctx, relay, []string{}))
 
 	t.Run("Valid Webhook", func(t *testing.T) {
 		// Create a subscriber to verify event was published
@@ -256,7 +262,7 @@ func TestHandleWebhookPost(t *testing.T) {
 		rctx.URLParams.Add("channel", "test-channel")
 		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
-		handler := handleWebhookPost(ctx, events, eventBroker, []string{})
+		handler := handleWebhookPost(ctx, relay, []string{})
 		handler(w, req)
 
 		// Check response
@@ -267,11 +273,11 @@ func TestHandleWebhookPost(t *testing.T) {
 		select {
 		case event := <-subscriber.Events:
 			// Verify the event data contains our payload
-			assert.Assert(t, len(event) > 0)
+			assert.Assert(t, len(event.Data) > 0)
 
 			// Parse the event and check key fields
 			var eventData map[string]any
-			err := json.Unmarshal(event, &eventData)
+			err := json.Unmarshal(event.Data, &eventData)
 			assert.NilError(t, err)
 
 			// Check that headers were properly set
@@ -300,7 +306,7 @@ func TestHandleWebhookPost(t *testing.T) {
 		rctx.URLParams.Add("channel", "unknown-channel")
 		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
-		handler := handleWebhookPost(ctx, events, eventBroker, []string{})
+		handler := handleWebhookPost(ctx, relay, []string{})
 		handler(w, req)
 
 		resp := w.Result()
@@ -317,7 +323,7 @@ func TestHandleWebhookPost(t *testing.T) {
 		rctx.URLParams.Add("channel", "test-channel")
 		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
-		handler := handleWebhookPost(ctx, events, eventBroker, []string{})
+		handler := handleWebhookPost(ctx, relay, []string{})
 		handler(w, req)
 
 		resp := w.Result()
@@ -337,7 +343,7 @@ func TestHandleWebhookPost(t *testing.T) {
 		rctx.URLParams.Add("channel", "test-channel")
 		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
-		handler := handleWebhookPost(ctx, events, eventBroker, []string{})
+		handler := handleWebhookPost(ctx, relay, []string{})
 		handler(w, req)
 
 		resp := w.Result()
@@ -359,7 +365,7 @@ func TestHandleWebhookPost(t *testing.T) {
 		rctx.URLParams.Add("channel", "test-channel")
 		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
-		handler := handleWebhookPost(ctx, events, eventBroker, secrets)
+		handler := handleWebhookPost(ctx, relay, secrets)
 		handler(w, req)
 
 		resp := w.Result()
@@ -376,7 +382,7 @@ func TestHandleWebhookPost(t *testing.T) {
 		rctx.URLParams.Add("channel", "test-channel")
 		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
-		handler = handleWebhookPost(ctx, events, eventBroker, secrets)
+		handler = handleWebhookPost(ctx, relay, secrets)
 		handler(w, req)
 
 		resp = w.Result()
@@ -384,12 +390,71 @@ func TestHandleWebhookPost(t *testing.T) {
 	})
 }
 
+func TestHandleWebhookPostRelay(t *testing.T) {
+	t.Run("Shared Relay Delivers To Another Server Instance", func(t *testing.T) {
+		ctx := newTestContext()
+		brokerA := NewEventBroker()
+		localA := newLocalPayloadRelay(brokerA)
+
+		brokerB := NewEventBroker()
+		localB := newLocalPayloadRelay(brokerB)
+		subscriberB := brokerB.Subscribe("test-channel", nil)
+		defer brokerB.Unsubscribe("test-channel", subscriberB)
+
+		sharedRelay := relayFunc(func(ctx context.Context, channel string, data []byte) (string, error) {
+			if _, err := localA.Publish(ctx, channel, data); err != nil {
+				return "", err
+			}
+			return localB.Publish(ctx, channel, data)
+		})
+
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/webhook/test-channel", strings.NewReader(`{"event":"test"}`))
+		req.Header.Set("Content-Type", contentType)
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("channel", "test-channel")
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+		w := httptest.NewRecorder()
+		handleWebhookPost(ctx, sharedRelay, []string{})(w, req)
+
+		assert.Equal(t, w.Result().StatusCode, http.StatusAccepted)
+		select {
+		case event := <-subscriberB.Events:
+			assert.Assert(t, len(event.Data) > 0)
+		default:
+			t.Fatal("Expected event to be delivered to subscriber on another server instance")
+		}
+	})
+
+	t.Run("Shared Publish Error Returns Server Error", func(t *testing.T) {
+		ctx := newTestContext()
+		failingRelay := relayFunc(func(context.Context, string, []byte) (string, error) {
+			return "", errors.New("redis unavailable")
+		})
+
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/webhook/test-channel", strings.NewReader(`{"event":"test"}`))
+		req.Header.Set("Content-Type", contentType)
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("channel", "test-channel")
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+		w := httptest.NewRecorder()
+		handleWebhookPost(ctx, failingRelay, []string{})(w, req)
+
+		resp := w.Result()
+		assert.Equal(t, resp.StatusCode, http.StatusInternalServerError)
+		body, err := io.ReadAll(resp.Body)
+		assert.NilError(t, err)
+		assert.Assert(t, strings.Contains(string(body), "publish event: redis unavailable"))
+	})
+}
+
 func TestHandleReplayPost(t *testing.T) {
 	makeReplayRequest := func(t *testing.T, replayToken, authHeader string) *httptest.ResponseRecorder {
 		t.Helper()
 
-		events := sse.New()
 		eventBroker := NewEventBroker()
+		relay := newLocalPayloadRelay(eventBroker)
 		subscriber := eventBroker.Subscribe("test-channel", nil)
 		defer eventBroker.Unsubscribe("test-channel", subscriber)
 
@@ -407,14 +472,14 @@ func TestHandleReplayPost(t *testing.T) {
 		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
 		w := httptest.NewRecorder()
-		handler := handleReplayPost(ctx, events, eventBroker)
+		handler := handleReplayPost(ctx, relay)
 		handler(w, req)
 
 		if w.Code == http.StatusAccepted {
 			select {
 			case event := <-subscriber.Events:
 				var eventData map[string]any
-				err := json.Unmarshal(event, &eventData)
+				err := json.Unmarshal(event.Data, &eventData)
 				assert.NilError(t, err)
 				assert.Assert(t, eventData["authorization"] == nil)
 			default:
@@ -448,6 +513,28 @@ func TestHandleReplayPost(t *testing.T) {
 	t.Run("Token configured and malformed auth header returns unauthorized", func(t *testing.T) {
 		resp := makeReplayRequest(t, "test-replay-token", "Basic xxx")
 		assert.Equal(t, resp.Code, http.StatusUnauthorized)
+	})
+
+	t.Run("Shared Publish Error Returns Server Error", func(t *testing.T) {
+		ctx := newTestContext()
+		failingRelay := relayFunc(func(context.Context, string, []byte) (string, error) {
+			return "", errors.New("redis unavailable")
+		})
+
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/replay/test-channel", strings.NewReader(`{"event":"replay"}`))
+		req.Header.Set("Content-Type", contentType)
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("channel", "test-channel")
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+		w := httptest.NewRecorder()
+		handleReplayPost(ctx, failingRelay)(w, req)
+
+		resp := w.Result()
+		assert.Equal(t, resp.StatusCode, http.StatusInternalServerError)
+		body, err := io.ReadAll(resp.Body)
+		assert.NilError(t, err)
+		assert.Assert(t, strings.Contains(string(body), "publish replay event: redis unavailable"))
 	})
 }
 

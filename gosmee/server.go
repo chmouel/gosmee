@@ -1,6 +1,7 @@
 package gosmee
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"crypto/subtle"
@@ -16,13 +17,13 @@ import (
 	"os"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/r3labs/sse/v2"
 	"github.com/urfave/cli/v2"
 	"golang.org/x/crypto/acme/autocert"
 )
@@ -41,9 +42,10 @@ const (
 )
 
 var (
-	defaultServerPort    = 3333
-	defaultServerAddress = "localhost"
-	validChannelID       = regexp.MustCompile("^" + channelIDPattern + "$")
+	defaultServerPort        = 3333
+	defaultServerAddress     = "localhost"
+	defaultRedisStreamMaxLen = 10000
+	validChannelID           = regexp.MustCompile("^" + channelIDPattern + "$")
 )
 
 //go:embed templates/index.tmpl
@@ -55,7 +57,7 @@ var faviconSVG []byte
 // Subscriber represents a client connection listening for events.
 type Subscriber struct {
 	Channel   string
-	Events    chan []byte
+	Events    chan relayEvent
 	PublicKey *[32]byte
 }
 
@@ -79,7 +81,7 @@ func (eb *EventBroker) Subscribe(channel string, pubKey *[32]byte) *Subscriber {
 
 	subscriber := &Subscriber{
 		Channel:   channel,
-		Events:    make(chan []byte, 100), // Buffer size to prevent blocking
+		Events:    make(chan relayEvent, 100), // Buffer size to prevent blocking
 		PublicKey: pubKey,
 	}
 
@@ -109,20 +111,25 @@ func (eb *EventBroker) Unsubscribe(channel string, subscriber *Subscriber) {
 
 // Publish sends an event to all subscribers of a channel.
 func (eb *EventBroker) Publish(channel string, data []byte) {
+	eb.PublishEvent(channel, relayEvent{Data: data})
+}
+
+// PublishEvent sends an event to all subscribers of a channel.
+func (eb *EventBroker) PublishEvent(channel string, event relayEvent) {
 	eb.RLock()
 	subscribers := append([]*Subscriber(nil), eb.subscribers[channel]...)
 	eb.RUnlock()
 
 	// Send to each subscriber
 	for _, s := range subscribers {
-		payload := data
+		payload := event
 		if s.PublicKey != nil {
-			encrypted, err := Encrypt(data, s.PublicKey)
+			encrypted, err := Encrypt(event.Data, s.PublicKey)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "WARNING: encryption failed for subscriber on channel %s: %v\n", s.Channel, err) //nolint:gosec // stderr, not web output
 				continue
 			}
-			payload = encrypted
+			payload.Data = encrypted
 		}
 
 		// Non-blocking send - if buffer is full, we'll skip this subscriber
@@ -302,7 +309,7 @@ func validateWebhookSignature(secrets []string, payload []byte, r *http.Request)
 }
 
 // handleWebhookPost handles POST requests to the webhook endpoint.
-func handleWebhookPost(c *cli.Context, events *sse.Server, eventBroker *EventBroker, webhookSecrets []string) http.HandlerFunc {
+func handleWebhookPost(c *cli.Context, relay payloadRelay, webhookSecrets []string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		now := time.Now().UTC()
 		if !strings.Contains(r.Header.Get("Content-Type"), contentType) {
@@ -351,12 +358,11 @@ func handleWebhookPost(c *cli.Context, events *sse.Server, eventBroker *EventBro
 			return
 		}
 
-		// Publish to both systems (r3labs/sse for backward compatibility)
-		events.CreateStream(channel)
-		events.Publish(channel, &sse.Event{Data: reencoded})
-
-		// Publish to our custom event broker for the web UI
-		eventBroker.Publish(channel, reencoded)
+		streamID, err := relay.Publish(r.Context(), channel, reencoded)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("publish event: %v", err), http.StatusInternalServerError)
+			return
+		}
 
 		// Add server version to response headers
 		w.Header().Set(versionHeaderName, strings.TrimSpace(string(Version)))
@@ -368,17 +374,24 @@ func handleWebhookPost(c *cli.Context, events *sse.Server, eventBroker *EventBro
 			"message": "ok",
 			"version": strings.TrimSpace(string(Version)),
 		}
+		if streamID != "" {
+			resp["stream_id"] = streamID
+		}
 		_ = json.NewEncoder(w).Encode(resp)
-		fmt.Fprintf(os.Stdout, "%s Published %s%s on channel %s\n", //nolint:gosec // stdout, not web output
+		logMessage := fmt.Sprintf("%s Published %s%s on channel %s", //nolint:gosec // stdout, not web output
 			now.Format(timeFormat),
 			middleware.GetReqID(r.Context()),
 			headersBuilder.String(),
 			channel)
+		if streamID != "" {
+			logMessage = fmt.Sprintf("%s stream_id=%s", logMessage, streamID)
+		}
+		fmt.Fprintln(os.Stdout, logMessage) //nolint:gosec // stdout, not web output
 	}
 }
 
 // handleReplayPost handles POST requests to the replay endpoint.
-func handleReplayPost(c *cli.Context, events *sse.Server, eventBroker *EventBroker) http.HandlerFunc {
+func handleReplayPost(c *cli.Context, relay payloadRelay) http.HandlerFunc {
 	replayToken := c.String("replay-token")
 	// Hash the expected token once so the comparison operates on fixed-length
 	// digests, avoiding leaking the token length via ConstantTimeCompare's
@@ -447,12 +460,22 @@ func handleReplayPost(c *cli.Context, events *sse.Server, eventBroker *EventBrok
 			return
 		}
 
-		// Publish to both systems (for UI and legacy clients)
-		events.CreateStream(channel)
-		events.Publish(channel, &sse.Event{Data: reencoded})
-		eventBroker.Publish(channel, reencoded)
+		streamID, err := relay.Publish(r.Context(), channel, reencoded)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("publish replay event: %v", err), http.StatusInternalServerError)
+			return
+		}
 
 		w.WriteHeader(http.StatusAccepted)
+		if streamID != "" {
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"status":    http.StatusAccepted,
+				"channel":   channel,
+				"message":   "replayed",
+				"stream_id": streamID,
+			})
+			return
+		}
 		_, _ = w.Write([]byte("replayed"))
 	}
 }
@@ -586,93 +609,285 @@ func retVersion(w http.ResponseWriter, _ *http.Request) {
 	}
 }
 
+func authorizeEventSubscriber(w http.ResponseWriter, r *http.Request, protectedChannels *ProtectedChannels) (string, *[32]byte, bool) {
+	channel := chi.URLParam(r, "channel")
+	if channel == "" {
+		http.Error(w, "Channel name missing in URL", http.StatusBadRequest)
+		return "", nil, false
+	}
+	if len(channel) > maxChannelLength {
+		http.Error(w, "Channel name exceeds maximum length", http.StatusBadRequest)
+		return "", nil, false
+	}
+
+	var pubKey *[32]byte
+	if protectedChannels.Has(channel) {
+		pubKeyValue := r.URL.Query().Get("pubkey")
+		if pubKeyValue == "" {
+			rejectProtectedChannelRequest(w)
+			return "", nil, false
+		}
+
+		var err error
+		pubKey, err = ParsePublicKey(pubKeyValue)
+		if err != nil || !protectedChannels.IsAllowed(channel, pubKey) {
+			rejectProtectedChannelRequest(w)
+			return "", nil, false
+		}
+	}
+
+	return channel, pubKey, true
+}
+
+func setupSSEHeaders(w http.ResponseWriter, corsOrigin string) {
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no")
+	if corsOrigin != "" {
+		w.Header().Set("Access-Control-Allow-Origin", corsOrigin)
+	}
+}
+
+func writeSSEEvent(w http.ResponseWriter, id, eventName string, data []byte) error {
+	if id != "" {
+		if _, err := fmt.Fprintf(w, "id: %s\n", id); err != nil {
+			return err
+		}
+	}
+	if eventName != "" {
+		if _, err := fmt.Fprintf(w, "event: %s\n", eventName); err != nil {
+			return err
+		}
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		if _, err := fmt.Fprintf(w, "data: %s\n", line); err != nil { //nolint:gosec // text/event-stream payload, not HTML output
+			return err
+		}
+	}
+	if _, err := fmt.Fprint(w, "\n"); err != nil {
+		return err
+	}
+	return http.NewResponseController(w).Flush()
+}
+
+func writeSSEComment(w http.ResponseWriter, comment string) error {
+	if _, err := fmt.Fprintf(w, ": %s\n\n", comment); err != nil {
+		return err
+	}
+	return http.NewResponseController(w).Flush()
+}
+
+func encryptRelayEvent(event relayEvent, pubKey *[32]byte) (relayEvent, error) {
+	if pubKey == nil {
+		return event, nil
+	}
+	encrypted, err := Encrypt(event.Data, pubKey)
+	if err != nil {
+		return relayEvent{}, err
+	}
+	event.Data = encrypted
+	return event, nil
+}
+
+func parseRedisStreamID(id string) (uint64, uint64, bool) {
+	millis, sequence, ok := strings.Cut(id, "-")
+	if !ok || millis == "" || sequence == "" {
+		return 0, 0, false
+	}
+	millisValue, err := strconv.ParseUint(millis, 10, 64)
+	if err != nil {
+		return 0, 0, false
+	}
+	sequenceValue, err := strconv.ParseUint(sequence, 10, 64)
+	if err != nil {
+		return 0, 0, false
+	}
+	return millisValue, sequenceValue, true
+}
+
+func isValidRedisStreamID(id string) bool {
+	_, _, ok := parseRedisStreamID(id)
+	return ok
+}
+
+func compareRedisStreamIDs(a, b string) (int, error) {
+	aMillis, aSequence, ok := parseRedisStreamID(a)
+	if !ok {
+		return 0, fmt.Errorf("invalid redis stream id %q", a)
+	}
+	bMillis, bSequence, ok := parseRedisStreamID(b)
+	if !ok {
+		return 0, fmt.Errorf("invalid redis stream id %q", b)
+	}
+	if aMillis < bMillis {
+		return -1, nil
+	}
+	if aMillis > bMillis {
+		return 1, nil
+	}
+	if aSequence < bSequence {
+		return -1, nil
+	}
+	if aSequence > bSequence {
+		return 1, nil
+	}
+	return 0, nil
+}
+
 func handleEventsGet(eventBroker *EventBroker, protectedChannels *ProtectedChannels, corsOrigin string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		channel := chi.URLParam(r, "channel")
-		if channel == "" {
-			http.Error(w, "Channel name missing in URL", http.StatusBadRequest)
+		if _, ok := w.(http.Flusher); !ok {
+			http.Error(w, "Streaming unsupported", http.StatusInternalServerError)
 			return
 		}
-		if len(channel) > maxChannelLength {
-			http.Error(w, "Channel name exceeds maximum length", http.StatusBadRequest)
+		channel, pubKey, ok := authorizeEventSubscriber(w, r, protectedChannels)
+		if !ok {
 			return
-		}
-		var pubKey *[32]byte
-		if protectedChannels.Has(channel) {
-			pubKeyValue := r.URL.Query().Get("pubkey")
-			if pubKeyValue == "" {
-				rejectProtectedChannelRequest(w)
-				return
-			}
-
-			var err error
-			pubKey, err = ParsePublicKey(pubKeyValue)
-			if err != nil || !protectedChannels.IsAllowed(channel, pubKey) {
-				rejectProtectedChannelRequest(w)
-				return
-			}
 		}
 
 		subscriber := eventBroker.Subscribe(channel, pubKey)
 		defer eventBroker.Unsubscribe(channel, subscriber)
 
-		// Set headers for SSE
-		w.Header().Set("Content-Type", "text/event-stream")
-		w.Header().Set("Cache-Control", "no-cache")
-		w.Header().Set("Connection", "keep-alive")
-		w.Header().Set("X-Accel-Buffering", "no")
-		if corsOrigin != "" {
-			w.Header().Set("Access-Control-Allow-Origin", corsOrigin)
-		}
+		setupSSEHeaders(w, corsOrigin)
 
-		// Get the flusher for immediate writes
-		flusher, ok := w.(http.Flusher)
-		if !ok {
-			http.Error(w, "Streaming unsupported", http.StatusInternalServerError)
+		if err := writeSSEEvent(w, "", "", []byte(`{"message":"connected"}`)); err != nil {
+			return
+		}
+		if err := writeSSEEvent(w, "", "", []byte(`{"message":"ready"}`)); err != nil {
 			return
 		}
 
-		// Send initial connected message
-		fmt.Fprintf(w, "data: %s\n\n", `{"message":"connected"}`)
-		flusher.Flush()
-
-		// Send ready message
-		fmt.Fprintf(w, "data: %s\n\n", `{"message":"ready"}`)
-		flusher.Flush()
-
-		// Start a ticker for keepalive messages
 		ticker := time.NewTicker(30 * time.Second)
 		defer ticker.Stop()
 
-		// Watch for client disconnection
 		clientGone := r.Context().Done()
 
-		// Event loop
 		for {
 			select {
 			case <-clientGone:
-				// Client disconnected
 				return
 
-			case data, ok := <-subscriber.Events:
-				// Check if channel is closed
+			case event, ok := <-subscriber.Events:
 				if !ok {
 					return
 				}
-				// Send event data to client
-				fmt.Fprintf(w, "data: %s\n\n", data)
-				flusher.Flush()
+				if err := writeSSEEvent(w, event.ID, "", event.Data); err != nil {
+					return
+				}
 
 			case <-ticker.C:
-				// Send keepalive comment
-				fmt.Fprint(w, ": keepalive\n\n")
-				flusher.Flush()
+				if err := writeSSEComment(w, "keepalive"); err != nil {
+					return
+				}
+			}
+		}
+	}
+}
+
+func handleRedisEventsGet(redisRelay *redisPayloadRelay, protectedChannels *ProtectedChannels, corsOrigin string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if _, ok := w.(http.Flusher); !ok {
+			http.Error(w, "Streaming unsupported", http.StatusInternalServerError)
+			return
+		}
+		channel, pubKey, ok := authorizeEventSubscriber(w, r, protectedChannels)
+		if !ok {
+			return
+		}
+
+		lastEventID := r.Header.Get("Last-Event-ID")
+		readAfterID := ""
+		if lastEventID != "" {
+			if !isValidRedisStreamID(lastEventID) {
+				http.Error(w, "invalid Last-Event-ID", http.StatusBadRequest)
+				return
+			}
+			readAfterID = lastEventID
+		} else {
+			newestID, exists, err := redisRelay.NewestID(r.Context(), channel)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("read redis stream tail: %v", err), http.StatusInternalServerError)
+				return
+			}
+			if exists {
+				readAfterID = newestID
+			} else {
+				readAfterID = "0-0"
+			}
+		}
+
+		var gapEvent []byte
+		if lastEventID != "" {
+			oldestID, exists, err := redisRelay.OldestID(r.Context(), channel)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("read redis stream history: %v", err), http.StatusInternalServerError)
+				return
+			}
+			if exists {
+				cmp, err := compareRedisStreamIDs(lastEventID, oldestID)
+				if err != nil {
+					http.Error(w, "invalid Last-Event-ID", http.StatusBadRequest)
+					return
+				}
+				if cmp < 0 {
+					fmt.Fprintf(os.Stderr, "WARNING: Redis stream history missed for channel %s: requested %s oldest retained %s\n", channel, lastEventID, oldestID) //nolint:gosec // stderr, not web output
+					readAfterID = "0-0"
+					gapEvent = []byte(fmt.Sprintf(`{"error":"missed_history","requested_id":%q,"oldest_id":%q}`, lastEventID, oldestID))
+				}
+			}
+		}
+
+		setupSSEHeaders(w, corsOrigin)
+		if err := writeSSEEvent(w, "", "", []byte(`{"message":"connected"}`)); err != nil {
+			return
+		}
+		if err := writeSSEEvent(w, "", "", []byte(`{"message":"ready"}`)); err != nil {
+			return
+		}
+		if len(gapEvent) > 0 {
+			if err := writeSSEEvent(w, "", "gosmee-gap", gapEvent); err != nil {
+				return
+			}
+		}
+
+		for {
+			events, err := redisRelay.Read(r.Context(), channel, readAfterID, 30*time.Second, 100)
+			if err != nil {
+				if r.Context().Err() != nil {
+					return
+				}
+				fmt.Fprintf(os.Stderr, "WARNING: Redis stream read failed for channel %s: %v\n", channel, err) //nolint:gosec // stderr, not web output
+				return
+			}
+			if len(events) == 0 {
+				if r.Context().Err() != nil {
+					return
+				}
+				if err := writeSSEComment(w, "keepalive"); err != nil {
+					return
+				}
+				continue
+			}
+			for _, event := range events {
+				event, err = encryptRelayEvent(event, pubKey)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "WARNING: encryption failed for Redis stream subscriber on channel %s: %v\n", channel, err) //nolint:gosec // stderr, not web output
+					continue
+				}
+				if err := writeSSEEvent(w, event.ID, "", event.Data); err != nil {
+					return
+				}
+				readAfterID = event.ID
 			}
 		}
 	}
 }
 
 func serve(c *cli.Context) error {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	publicURL := c.String("public-url")
 	corsOrigin := c.String("cors-origin")
 	footer := c.String("footer")
@@ -702,11 +917,20 @@ func serve(c *cli.Context) error {
 		}
 	}
 
-	// Initialize the SSE server and event broker
-	events := sse.New()
-	events.AutoReplay = false
-	events.AutoStream = true
+	// Initialize the in-process event broker used by non-Redis mode.
 	eventBroker := NewEventBroker()
+	localRelay := newLocalPayloadRelay(eventBroker)
+	var relay payloadRelay = localRelay
+	var redisRelay *redisPayloadRelay
+	if redisURL := c.String("redis-url"); redisURL != "" {
+		redisRelay, err = newRedisPayloadRelay(ctx, redisURL, int64(c.Int("redis-stream-maxlen")))
+		if err != nil {
+			return fmt.Errorf("configure redis relay: %w", err)
+		}
+		defer redisRelay.Close()
+		relay = redisRelay
+		fmt.Fprintln(os.Stdout, "Using Redis Streams relay")
+	}
 	autoCert := c.Bool("auto-cert")
 	certFile := c.String("tls-cert")
 	certKey := c.String("tls-key")
@@ -745,11 +969,15 @@ func serve(c *cli.Context) error {
 	mainRouter.Get("/livez", retVersion)
 
 	// SSE endpoint for event streaming
-	mainRouter.Get(eventsPath, handleEventsGet(eventBroker, protectedChannels, corsOrigin))
+	if redisRelay != nil {
+		mainRouter.Get(eventsPath, handleRedisEventsGet(redisRelay, protectedChannels, corsOrigin))
+	} else {
+		mainRouter.Get(eventsPath, handleEventsGet(eventBroker, protectedChannels, corsOrigin))
+	}
 
 	// Register POST routes on the restricted router
-	restrictedRouter.Post(channelPath, handleWebhookPost(c, events, eventBroker, c.StringSlice("webhook-signature")))
-	restrictedRouter.Post(replayPath, handleReplayPost(c, events, eventBroker))
+	restrictedRouter.Post(channelPath, handleWebhookPost(c, relay, c.StringSlice("webhook-signature")))
+	restrictedRouter.Post(replayPath, handleReplayPost(c, relay))
 
 	// Create a final router which will route to the appropriate sub-router
 	finalRouter := chi.NewRouter()

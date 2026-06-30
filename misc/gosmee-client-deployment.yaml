@@ -10,6 +10,7 @@
 # - The --saveDir flag enables saving webhook payloads to /tmp/save for later inspection
 # - The --health-port flag exposes a health endpoint for Kubernetes probes
 # - The --output json flag formats logs as JSON for better integration with log aggregation systems
+# - For Redis Streams restart resume, set --resume-state-file on a persistent volume
 #
 # Security:
 # - Container runs with a secure context (non-root, read-only filesystem, etc.)
@@ -47,6 +48,8 @@ spec:
               "/tmp/save",
               "--health-port",
               "8081",
+              # "--resume-state-file",
+              # "/state/resume.state",
               "https://yourserver.example.com/your-channel",
               "http://your-internal-service.namespace:8080",
             ]

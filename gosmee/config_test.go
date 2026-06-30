@@ -132,8 +132,11 @@ client:
   smee-url: "https://smee.io/abc"
   target-url: "http://localhost:8080"
   sse-buffer-size: 524288
+  resume-state-file: "/tmp/gosmee.resume"
 server:
   port: 8080
+  redis-url: redis://redis.example.com:6379/0
+  redis-stream-maxlen: 5000
 `
 		path := filepath.Join(tmpDir, "config4.yaml")
 		err := os.WriteFile(path, []byte(content), 0o644)
@@ -154,7 +157,10 @@ server:
 		assert.Equal(t, GetConfigString("client", "smee-url"), "https://smee.io/abc")
 		assert.Equal(t, GetConfigString("client", "target-url"), "http://localhost:8080")
 		assert.Equal(t, GetConfigString("client", "sse-buffer-size"), "524288")
+		assert.Equal(t, GetConfigString("client", "resume-state-file"), "/tmp/gosmee.resume")
 		assert.Equal(t, GetConfigString("server", "port"), "8080")
+		assert.Equal(t, GetConfigString("server", "redis-url"), "redis://redis.example.com:6379/0")
+		assert.Equal(t, GetConfigString("server", "redis-stream-maxlen"), "5000")
 	})
 }
 

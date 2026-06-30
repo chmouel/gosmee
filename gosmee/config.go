@@ -32,6 +32,7 @@ var commandFlags = map[string]map[string]bool{
 		"health-port":               true,
 		"sse-buffer-size":           true,
 		"encryption-key-file":       true,
+		"resume-state-file":         true,
 	},
 	"replay": {
 		"org-repo":                  true,
@@ -68,6 +69,8 @@ var commandFlags = map[string]map[string]bool{
 		"max-body-size":           true,
 		"encrypted-channels-file": true,
 		"cors-origin":             true,
+		"redis-url":               true,
+		"redis-stream-maxlen":     true,
 	},
 	"keygen": {
 		"key-file": true,

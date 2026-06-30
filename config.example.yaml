@@ -69,6 +69,9 @@ client:
   # Path to client encryption keypair JSON file (for encrypted channels)
   # encryption-key-file: ~/.config/gosmee/client-keypair.json
 
+  # Persist the last successfully processed Redis stream ID for restart resume
+  # resume-state-file: ~/.local/state/gosmee/resume.state
+
 # --- server command ---
 server:
   port: 3333
@@ -112,6 +115,12 @@ server:
 
   # CORS origin for the SSE endpoint ("*" = all, "" = same-origin only)
   cors-origin: "*"
+
+  # Redis URL for stream-backed durable cross-replica delivery (required for replicas > 1)
+  # redis-url: redis://redis.default.svc.cluster.local:6379/0
+
+  # Approximate maximum retained entries per channel stream (0 = no trimming)
+  redis-stream-maxlen: 10000
 
 # --- replay command ---
 # replay:

@@ -350,6 +350,46 @@ Generate a random ID easily with the `/new` endpoint:
 http://localhost:3333/NqybHcEi
 ```
 
+#### Redis Streams HA and scaling
+
+`gosmee server` can run with more than one replica when every replica uses the same Redis instance:
+
+```shell
+gosmee server --redis-url redis://redis.example.com:6379/0 --public-url https://myserverurl
+```
+
+Without Redis, each server process only knows about the SSE clients connected to that process. Behind a load balancer, a webhook `POST /{channel}` may land on one pod while the client is connected to another pod, and that payload will be missed.
+
+With `--redis-url` / `GOSMEE_REDIS_URL`, the pod that accepts the webhook writes the payload to a Redis Stream named `gosmee:stream:{channel}`. SSE clients read that stream directly, so a client can reconnect to another replica and resume with `Last-Event-ID` while the missed events are still retained.
+
+Delivery is at least once within the Redis retention window, not exactly once. Duplicates can happen after reconnects or failures. Treat webhook delivery IDs, such as `X-GitHub-Delivery`, as idempotency keys when your receiver has them.
+
+Stream retention defaults to about 10,000 entries per channel:
+
+```shell
+gosmee server \
+  --redis-url redis://redis.example.com:6379/0 \
+  --redis-stream-maxlen 10000 \
+  --public-url https://myserverurl
+```
+
+Set `--redis-stream-maxlen 0` to disable trimming, but only with an explicit Redis memory/retention plan. Full webhook delivery HA is only guaranteed while missed events remain in the stream. If a client reconnects with a `Last-Event-ID` older than the oldest retained event, gosmee sends a `gosmee-gap` SSE event and continues from the oldest retained entry.
+
+If Redis writes fail, gosmee returns a server error instead of silently falling back to local-only delivery. This mode does not make a single Redis instance highly available; production deployments need managed Redis or Redis failover behind `--redis-url`.
+
+For protected channels, Redis stores the server-side plaintext payload before per-client SSE encryption. Run Redis as trusted private infrastructure and use Redis authentication/TLS when needed.
+
+For client restart recovery, persist the last successfully processed stream ID:
+
+```shell
+gosmee client \
+  --resume-state-file ~/.local/state/gosmee/resume.state \
+  https://myserverurl/RANDOM_ID \
+  http://localhost:8080
+```
+
+The client only advances this checkpoint after parsing, optional `--saveDir`, target forwarding, and optional `--exec` all succeed. In Redis Streams mode, target HTTP responses `>=300` are treated as failures and retried forever with backoff. Without `--resume-state-file`, reconnect resume works only for the current process; restarts start live.
+
 #### Protected client channels
 
 If you want specific channels to be key-protected, provide `--encrypted-channels-file`. Only the channels listed in that file require authorized client keys and encrypted SSE delivery. All other gosmee channels continue to work in legacy plaintext mode.
@@ -431,6 +471,30 @@ Note: Long-running connections may occasionally cause errors with nginx. Contrib
 
 For a full security reference — including webhook signature validation, IP restrictions, payload limits, channel name protection, and encrypted channels — see [SECURITY.md](./SECURITY.md).
 
+## Development Tests
+
+Run the default unit test suite without external services:
+
+```shell
+make test
+```
+
+Run Redis Streams e2e tests with Docker:
+
+```shell
+make test-e2e
+```
+
+`make test-e2e` starts a temporary `redis:7-alpine` container when no Redis URL is configured, runs the real `gosmee` binaries against it, and removes the container afterward.
+
+To use an existing Redis instance instead:
+
+```shell
+GOSMEE_REDIS_TEST_URL=redis://localhost:6379/0 make test-e2e
+```
+
+Redis e2e tests are opt-in for local development and run in GitHub Actions for every push and pull request.
+
 ## Configuration File
 
 `gosmee` reads settings from a YAML file. CLI flags beat environment variables, which beat the config file.
@@ -466,6 +530,7 @@ client:
   smee-url: https://smee.io/aBcDeF
   target-url: http://localhost:8080
   sse-buffer-size: 1048576
+  resume-state-file: ~/.local/state/gosmee/resume.state
   channel: messages
   saveDir: /tmp/client-specific  # overrides top-level saveDir
 
@@ -474,6 +539,8 @@ server:
   address: 0.0.0.0
   trust-proxy: true
   cors-origin: "https://my-trusted-site.com"
+  redis-url: redis://redis.example.com:6379/0
+  redis-stream-maxlen: 10000
   allowed-ips:
     - 192.168.1.0/24
     - 10.0.0.0/8
