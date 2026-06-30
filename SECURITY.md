@@ -219,11 +219,14 @@ Encryption covers the **server-to-client SSE leg only**. Incoming webhook POST b
 | Encrypted | Not encrypted |
 |---|---|
 | SSE payload delivery to authorized clients | Incoming webhook POST bodies |
+| | Redis Stream payloads when `--redis-url` is set |
 | | Unlisted (plaintext) channels |
 | | Web UI and `/new` endpoint |
 | | TLS transport (use a reverse proxy) |
 
 Encryption requires gosmee's own server — smee.io is not supported.
+
+If you run multiple server replicas with Redis Streams, Redis stores the payload before gosmee encrypts it for each SSE subscriber. Payloads remain in Redis until stream trimming removes them. Treat Redis as trusted private infrastructure, enable Redis authentication/TLS where needed, and size `--redis-stream-maxlen` according to your retention and memory requirements.
 
 ### Restricting SSE Cross-Origin Access
 

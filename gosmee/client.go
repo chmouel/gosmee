@@ -1,12 +1,15 @@
 package gosmee
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -24,10 +27,8 @@ import (
 
 	"github.com/mgutz/ansi"
 	"github.com/mitchellh/mapstructure"
-	"github.com/r3labs/sse/v2"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
-	"gopkg.in/cenkalti/backoff.v1"
 )
 
 //go:embed templates/version
@@ -61,6 +62,37 @@ type payloadMsg struct {
 	contentType string
 	eventType   string
 	eventID     string
+}
+
+type clientSSEEvent struct {
+	ID    string
+	Event string
+	Data  []byte
+}
+
+type clientProcessingError struct {
+	err       error
+	permanent bool
+}
+
+func (e clientProcessingError) Error() string {
+	return e.err.Error()
+}
+
+func (e clientProcessingError) Unwrap() error {
+	return e.err
+}
+
+func permanentClientProcessingError(format string, args ...any) error {
+	return clientProcessingError{
+		err:       fmt.Errorf(format, args...),
+		permanent: true,
+	}
+}
+
+func isPermanentClientProcessingError(err error) bool {
+	var processingErr clientProcessingError
+	return errors.As(err, &processingErr) && processingErr.permanent
 }
 
 type messageBody struct {
@@ -168,14 +200,6 @@ func (c goSmee) parse(now time.Time, data []byte) (payloadMsg, error) {
 	// If there are no headers but we have content-type, ensure at least that header exists
 	if len(pm.headers) == 0 && pm.contentType != "" {
 		pm.headers["Content-Type"] = pm.contentType
-	}
-
-	if len(c.replayDataOpts.ignoreEvents) > 0 &&
-		pm.eventType != "" &&
-		slices.Contains(c.replayDataOpts.ignoreEvents, pm.eventType) {
-		s := fmt.Sprintf("%sskipping event %s as requested", emoji("!", "blue+b", c.replayDataOpts.decorate), pm.eventType)
-		c.logger.InfoContext(context.Background(), s)
-		return pm, nil
 	}
 
 	if len(pm.headers) == 0 && len(pm.body) == 0 {
@@ -303,9 +327,14 @@ type replayDataOpts struct {
 	execOnEvents                []string
 	execEnvVars                 []string
 	encryptionKeyFile           string
+	resumeStateFile             string
 }
 
 func replayData(ropts *replayDataOpts, logger *slog.Logger, pm payloadMsg) error {
+	return replayDataWithStatusPolicy(ropts, logger, pm, false)
+}
+
+func replayDataWithStatusPolicy(ropts *replayDataOpts, logger *slog.Logger, pm payloadMsg, failOnHTTPError bool) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(ropts.targetCnxTimeout)*time.Second)
 	defer cancel()
 	//nolint:gosec // InsecureSkipVerify is controlled by user input for testing/self-signed certs
@@ -339,6 +368,9 @@ func replayData(ropts *replayDataOpts, logger *slog.Logger, pm payloadMsg) error
 	}
 	s := fmt.Sprintf("%s%s", emoji("•", "magenta+b", ropts.decorate), msg)
 	logger.InfoContext(context.Background(), s)
+	if failOnHTTPError && resp.StatusCode > 299 {
+		return fmt.Errorf("target returned %s", resp.Status)
+	}
 	return nil
 }
 
@@ -655,6 +687,382 @@ func prepareSubscription(smeeURL, encryptionKeyFile string) (channel, sseURL str
 	return channel, parsedURL.String(), loadedPrivateKey, nil
 }
 
+type resumeState struct {
+	path string
+	id   string
+}
+
+func newResumeState(path string) (*resumeState, error) {
+	state := &resumeState{path: path}
+	if path == "" {
+		return state, nil
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return state, nil
+		}
+		return nil, fmt.Errorf("read resume state file: %w", err)
+	}
+	id := strings.TrimSpace(string(data))
+	if id == "" {
+		return state, nil
+	}
+	if !isValidRedisStreamID(id) {
+		return nil, fmt.Errorf("resume state file contains invalid Redis stream ID %q", id)
+	}
+	state.id = id
+	return state, nil
+}
+
+func (s *resumeState) ID() string {
+	if s == nil {
+		return ""
+	}
+	return s.id
+}
+
+func (s *resumeState) Advance(id string) error {
+	if s == nil || id == "" {
+		return nil
+	}
+	if !isValidRedisStreamID(id) {
+		return nil
+	}
+	if s.path != "" {
+		if err := writeResumeStateFile(s.path, id); err != nil {
+			return err
+		}
+	}
+	s.id = id
+	return nil
+}
+
+func writeResumeStateFile(path, id string) error {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return fmt.Errorf("create resume state directory: %w", err)
+	}
+
+	tmp, err := os.CreateTemp(dir, "."+filepath.Base(path)+".tmp-*")
+	if err != nil {
+		return fmt.Errorf("create temporary resume state file: %w", err)
+	}
+	tmpName := tmp.Name()
+	cleanup := true
+	defer func() {
+		if cleanup {
+			_ = os.Remove(tmpName)
+		}
+	}()
+
+	if _, err := tmp.WriteString(id + "\n"); err != nil {
+		_ = tmp.Close()
+		return fmt.Errorf("write temporary resume state file: %w", err)
+	}
+	if err := tmp.Sync(); err != nil {
+		_ = tmp.Close()
+		return fmt.Errorf("sync temporary resume state file: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("close temporary resume state file: %w", err)
+	}
+	if err := os.Rename(tmpName, path); err != nil {
+		return fmt.Errorf("replace resume state file: %w", err)
+	}
+	cleanup = false
+
+	if dirFile, err := os.Open(dir); err == nil {
+		_ = dirFile.Sync()
+		_ = dirFile.Close()
+	}
+	return nil
+}
+
+type retryBackoff struct {
+	next time.Duration
+}
+
+func newRetryBackoff() *retryBackoff {
+	return &retryBackoff{next: time.Second}
+}
+
+func (b *retryBackoff) Next() time.Duration {
+	delay := b.next
+	b.next *= 2
+	if b.next > 30*time.Second {
+		b.next = 30 * time.Second
+	}
+	return delay
+}
+
+func (b *retryBackoff) Reset() {
+	b.next = time.Second
+}
+
+func sleepWithContext(ctx context.Context, delay time.Duration) error {
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
+}
+
+func (c goSmee) shouldIgnoreEvent(eventType string) bool {
+	return eventType != "" && slices.Contains(c.replayDataOpts.ignoreEvents, eventType)
+}
+
+func isClientControlEvent(event clientSSEEvent) bool {
+	switch event.Event {
+	case "ready", "ping":
+		return true
+	}
+	if string(event.Data) == "ready" {
+		return true
+	}
+
+	var msg map[string]any
+	if err := json.Unmarshal(event.Data, &msg); err != nil || len(msg) != 1 {
+		return false
+	}
+	for key, value := range msg {
+		if !strings.EqualFold(key, "message") {
+			return false
+		}
+		message, ok := value.(string)
+		if !ok {
+			return false
+		}
+		return strings.EqualFold(message, "connected") || strings.EqualFold(message, "ready")
+	}
+	return false
+}
+
+func (c goSmee) processClientEvent(now time.Time, event clientSSEEvent, privateKey *[32]byte) (bool, error) {
+	nowStr := now.Format(tsFormat)
+
+	if isClientControlEvent(event) {
+		var s string
+		if c.replayDataOpts.targetURL != "" {
+			s = fmt.Sprintf("%s %sForwarding %s to %s", nowStr, emoji("✓", "yellow+b", c.replayDataOpts.decorate), ansi.Color(c.replayDataOpts.smeeURL, "green+u"), ansi.Color(c.replayDataOpts.targetURL, "green+u"))
+		} else {
+			s = fmt.Sprintf("%s %sListening on %s", nowStr, emoji("✓", "yellow+b", c.replayDataOpts.decorate), ansi.Color(c.replayDataOpts.smeeURL, "green+u"))
+		}
+		c.logger.InfoContext(context.Background(), s)
+		return false, nil
+	}
+
+	if event.Event == "gosmee-gap" {
+		c.logger.WarnContext(context.Background(), fmt.Sprintf("%s %s Redis stream history gap: %s", nowStr, emoji("⚠", "yellow+b", c.replayDataOpts.decorate), string(event.Data)))
+		return false, nil
+	}
+	if len(event.Data) == 0 || string(event.Data) == "{}" {
+		return false, nil
+	}
+
+	payload := event.Data
+	if privateKey != nil && IsEncrypted(event.Data) {
+		decryptedPayload, err := Decrypt(event.Data, privateKey)
+		if err != nil {
+			return false, permanentClientProcessingError("decrypting message: %w", err)
+		}
+		payload = decryptedPayload
+	}
+
+	pm, err := c.parse(now, payload)
+	if err != nil {
+		return false, permanentClientProcessingError("parsing message: %w", err)
+	}
+	if c.shouldIgnoreEvent(pm.eventType) {
+		c.logger.InfoContext(context.Background(), fmt.Sprintf("%sskipping event %s as requested", emoji("!", "blue+b", c.replayDataOpts.decorate), pm.eventType))
+		return true, nil
+	}
+
+	if len(pm.headers) == 0 {
+		return false, permanentClientProcessingError("no headers found in message")
+	}
+
+	headers := buildHeaders(pm.headers)
+	if c.replayDataOpts.saveDir != "" {
+		if err := saveData(c.replayDataOpts, c.logger, pm); err != nil {
+			return false, fmt.Errorf("saving message with headers %q: %w", headers, err)
+		}
+	}
+
+	if !c.replayDataOpts.noReplay {
+		if err := replayDataWithStatusPolicy(c.replayDataOpts, c.logger, pm, isValidRedisStreamID(event.ID)); err != nil {
+			return false, fmt.Errorf("forwarding message with headers %q: %w", headers, err)
+		}
+	}
+
+	if c.replayDataOpts.execCommand != "" {
+		if err := runExecCommand(context.Background(), c.replayDataOpts, c.logger, pm); err != nil {
+			return false, fmt.Errorf("exec command failed for event %q: %w", pm.eventType, err)
+		}
+	}
+
+	return true, nil
+}
+
+func (c goSmee) processClientEventWithRetry(ctx context.Context, event clientSSEEvent, privateKey *[32]byte, state *resumeState) error {
+	durable := isValidRedisStreamID(event.ID)
+	processingBackoff := newRetryBackoff()
+	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		processed, err := c.processClientEvent(time.Now().UTC(), event, privateKey)
+		if err == nil {
+			if processed && durable {
+				for {
+					if err := state.Advance(event.ID); err != nil {
+						delay := processingBackoff.Next()
+						c.logger.ErrorContext(ctx, fmt.Sprintf("%s checkpointing event %s failed: %s; retrying in %s", ansi.Color("ERROR", "red+b"), event.ID, err.Error(), delay))
+						if sleepErr := sleepWithContext(ctx, delay); sleepErr != nil {
+							return sleepErr
+						}
+						continue
+					}
+					break
+				}
+			}
+			return nil
+		}
+
+		if !durable {
+			c.logger.ErrorContext(ctx, fmt.Sprintf("%s processing event failed: %s", ansi.Color("ERROR", "red+b"), err.Error()))
+			return nil
+		}
+		if isPermanentClientProcessingError(err) {
+			c.logger.ErrorContext(ctx, fmt.Sprintf("%s poison event %s failed permanently: %s", ansi.Color("ERROR", "red+b"), event.ID, err.Error()))
+			return err
+		}
+
+		delay := processingBackoff.Next()
+		c.logger.ErrorContext(ctx, fmt.Sprintf("%s processing event %s failed: %s; retrying in %s", ansi.Color("ERROR", "red+b"), event.ID, err.Error(), delay))
+		if sleepErr := sleepWithContext(ctx, delay); sleepErr != nil {
+			return sleepErr
+		}
+	}
+}
+
+func (c goSmee) runSSEClient(ctx context.Context, sseURL, version string, privateKey *[32]byte) error {
+	state, err := newResumeState(c.replayDataOpts.resumeStateFile)
+	if err != nil {
+		return err
+	}
+	if state.ID() != "" {
+		c.logger.InfoContext(ctx, fmt.Sprintf("%sLoaded resume checkpoint %s", emoji("⇉", "blue+b", c.replayDataOpts.decorate), state.ID()))
+	}
+
+	httpClient := &http.Client{}
+	reconnectBackoff := newRetryBackoff()
+	for {
+		err := c.consumeSSEStream(ctx, httpClient, sseURL, version, privateKey, state, reconnectBackoff)
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if isPermanentClientProcessingError(err) {
+			return err
+		}
+		delay := reconnectBackoff.Next()
+		c.logger.WarnContext(ctx, fmt.Sprintf("%sSSE connection ended: %s; reconnecting in %s", emoji("⚠", "yellow+b", c.replayDataOpts.decorate), err.Error(), delay))
+		if err := sleepWithContext(ctx, delay); err != nil {
+			return err
+		}
+	}
+}
+
+func (c goSmee) consumeSSEStream(ctx context.Context, httpClient *http.Client, sseURL, version string, privateKey *[32]byte, state *resumeState, reconnectBackoff *retryBackoff) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, sseURL, nil)
+	if err != nil {
+		return fmt.Errorf("create SSE request: %w", err)
+	}
+	req.Header.Set("Accept", "text/event-stream")
+	req.Header.Set("Cache-Control", "no-cache")
+	req.Header.Set("User-Agent", fmt.Sprintf("gosmee/%s", version))
+	req.Header.Set("X-Accel-Buffering", "no")
+	if state.ID() != "" {
+		req.Header.Set("Last-Event-ID", state.ID())
+	}
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("connect to SSE stream: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("SSE endpoint returned %s", resp.Status)
+	}
+	reconnectBackoff.Reset()
+
+	readerSize := c.replayDataOpts.sseBufferSize
+	if readerSize < 4096 {
+		readerSize = 4096
+	}
+	reader := bufio.NewReaderSize(resp.Body, readerSize)
+
+	var event clientSSEEvent
+	var dataLines []string
+	dispatch := func() error {
+		if len(dataLines) == 0 && event.Event == "" && event.ID == "" {
+			return nil
+		}
+		event.Data = []byte(strings.Join(dataLines, "\n"))
+		if err := c.processClientEventWithRetry(ctx, event, privateKey, state); err != nil {
+			return err
+		}
+		event = clientSSEEvent{}
+		dataLines = nil
+		return nil
+	}
+
+	for {
+		line, err := reader.ReadString('\n')
+		if len(line) > 0 {
+			line = strings.TrimRight(line, "\r\n")
+			switch {
+			case line == "":
+				if err := dispatch(); err != nil {
+					return err
+				}
+			case strings.HasPrefix(line, ":"):
+			default:
+				field, value, hasValue := strings.Cut(line, ":")
+				if hasValue && strings.HasPrefix(value, " ") {
+					value = strings.TrimPrefix(value, " ")
+				}
+				switch field {
+				case "id":
+					event.ID = value
+				case "event":
+					event.Event = value
+				case "data":
+					if hasValue {
+						dataLines = append(dataLines, value)
+					} else {
+						dataLines = append(dataLines, "")
+					}
+				}
+			}
+		}
+		if err != nil {
+			if err == io.EOF {
+				if len(dataLines) > 0 {
+					if dispatchErr := dispatch(); dispatchErr != nil {
+						return dispatchErr
+					}
+				}
+				return fmt.Errorf("SSE stream closed")
+			}
+			return fmt.Errorf("read SSE stream: %w", err)
+		}
+	}
+}
+
 func (c goSmee) clientSetup() error {
 	version := strings.TrimSpace(string(Version))
 	s := fmt.Sprintf("%sStarting gosmee client version: %s", emoji("⇉", "green+b", c.replayDataOpts.decorate), version)
@@ -665,7 +1073,7 @@ func (c goSmee) clientSetup() error {
 		c.logger.WarnContext(context.Background(), fmt.Sprintf("%sCould not get server version: %s", emoji("⚠", "yellow+b", c.replayDataOpts.decorate), err.Error()))
 	}
 
-	channel, sseURL, privateKey, err := prepareSubscription(c.replayDataOpts.smeeURL, c.replayDataOpts.encryptionKeyFile)
+	_, sseURL, privateKey, err := prepareSubscription(c.replayDataOpts.smeeURL, c.replayDataOpts.encryptionKeyFile)
 	if err != nil {
 		return err
 	}
@@ -673,115 +1081,8 @@ func (c goSmee) clientSetup() error {
 		c.logger.InfoContext(context.Background(), fmt.Sprintf("%sProtected channel mode enabled for gosmee SSE transport", emoji("🔐", "green+b", c.replayDataOpts.decorate)))
 	}
 
-	client := sse.NewClient(sseURL, sse.ClientMaxBufferSize(c.replayDataOpts.sseBufferSize))
-	// Set up a custom exponential backoff strategy that never stops retrying
-	// By default, ExponentialBackOff gives up after 15 minutes, which can cause
-	// the client to get stuck. Setting MaxElapsedTime to 0 makes it retry forever.
-	expBackoff := backoff.NewExponentialBackOff()
-	expBackoff.MaxElapsedTime = 0 // Setting this to 0 means it will retry forever
-	client.ReconnectStrategy = expBackoff
 	c.logger.InfoContext(context.Background(), fmt.Sprintf("%sConfigured reconnection strategy to retry indefinitely", emoji("⇉", "blue+b", c.replayDataOpts.decorate)))
-	client.Headers["User-Agent"] = fmt.Sprintf("gosmee/%s", version)
-	client.Headers["X-Accel-Buffering"] = "no"
-
-	return client.Subscribe(channel, func(msg *sse.Event) {
-		now := time.Now().UTC()
-		nowStr := now.Format(tsFormat)
-
-		// Check for explicit ready messages from SSE events
-		if string(msg.Event) == "ready" || string(msg.Data) == "ready" {
-			var s string
-			if c.replayDataOpts.targetURL != "" {
-				s = fmt.Sprintf("%s %sForwarding %s to %s", nowStr, emoji("✓", "yellow+b", c.replayDataOpts.decorate), ansi.Color(c.replayDataOpts.smeeURL, "green+u"), ansi.Color(c.replayDataOpts.targetURL, "green+u"))
-			} else {
-				s = fmt.Sprintf("%s %sListening on %s", nowStr, emoji("✓", "yellow+b", c.replayDataOpts.decorate), ansi.Color(c.replayDataOpts.smeeURL, "green+u"))
-			}
-			c.logger.InfoContext(context.Background(), s)
-			return
-		}
-
-		// Skip ping events
-		if string(msg.Event) == "ping" {
-			return
-		}
-
-		// Check for empty data
-		if len(msg.Data) == 0 || string(msg.Data) == "{}" {
-			return
-		}
-
-		// Check if the message data contains a ready indicator or connected message
-		if strings.Contains(strings.ToLower(string(msg.Data)), "ready") ||
-			strings.Contains(strings.ToLower(string(msg.Data)), "\"message\"") &&
-				strings.Contains(strings.ToLower(string(msg.Data)), "\"connected\"") {
-			c.logger.DebugContext(context.Background(), fmt.Sprintf("%s Skipping connection message", nowStr))
-			return
-		}
-
-		payload := msg.Data
-		if privateKey != nil && IsEncrypted(msg.Data) {
-			decryptedPayload, err := Decrypt(msg.Data, privateKey)
-			if err != nil {
-				s := fmt.Sprintf("%s %s decrypting message %s", nowStr, ansi.Color("ERROR", "red+b"), err.Error())
-				c.logger.ErrorContext(context.Background(), s)
-				return
-			}
-			payload = decryptedPayload
-		}
-
-		pm, err := c.parse(now, payload)
-		if err != nil {
-			s := fmt.Sprintf("%s %s parsing message %s", nowStr, ansi.Color("ERROR", "red+b"), err.Error())
-			c.logger.ErrorContext(context.Background(), s)
-			return
-		}
-
-		// Check if this looks like a ready message or connected message based on specific patterns
-		if pm.eventType == "ready" || ((len(pm.body) > 0) && strings.ToLower(string(pm.body)) == "ready") {
-			c.logger.DebugContext(context.Background(), fmt.Sprintf("%s Skipping message with 'ready' in event type or body", nowStr))
-			return
-		}
-
-		// Check for empty body messages with "Message: connected" header
-		if len(pm.body) == 0 {
-			for k, v := range pm.headers {
-				if strings.EqualFold(k, "Message") && strings.EqualFold(v, "connected") {
-					c.logger.DebugContext(context.Background(), fmt.Sprintf("%s Skipping empty message with Message: connected header", nowStr))
-					return
-				}
-			}
-		}
-
-		if len(pm.headers) == 0 {
-			s := fmt.Sprintf("%s %s no headers found in message", nowStr, ansi.Color("ERROR", "red+b"))
-			c.logger.ErrorContext(context.Background(), s)
-			return
-		}
-
-		headers := buildHeaders(pm.headers)
-		if c.replayDataOpts.saveDir != "" {
-			if err := saveData(c.replayDataOpts, c.logger, pm); err != nil {
-				s := fmt.Sprintf("%s %s saving message with headers '%s' - %s", nowStr, ansi.Color("ERROR", "red+b"), headers, err.Error())
-				c.logger.ErrorContext(context.Background(), s)
-				return
-			}
-		}
-
-		if !c.replayDataOpts.noReplay {
-			if err := replayData(c.replayDataOpts, c.logger, pm); err != nil {
-				s := fmt.Sprintf("%s %s forwarding message with headers '%s' - %s", nowStr, ansi.Color("ERROR", "red+b"), headers, err.Error())
-				c.logger.ErrorContext(context.Background(), s)
-				return
-			}
-		}
-
-		if c.replayDataOpts.execCommand != "" {
-			if err := runExecCommand(context.Background(), c.replayDataOpts, c.logger, pm); err != nil {
-				s := fmt.Sprintf("%s %s exec command failed for event '%s' - %s", nowStr, ansi.Color("ERROR", "red+b"), pm.eventType, err.Error())
-				c.logger.ErrorContext(context.Background(), s)
-			}
-		}
-	})
+	return c.runSSEClient(context.Background(), sseURL, version, privateKey)
 }
 
 func serveHealthEndpoint(port int, logger *slog.Logger, decorate bool) {

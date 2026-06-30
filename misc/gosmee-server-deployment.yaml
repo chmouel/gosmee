@@ -10,6 +10,9 @@
 # - For production use, consider setting up an Ingress with TLS or use a service mesh
 # - To enable webhook signature validation, add --webhook-signature=SECRET arg
 # - For IP restrictions, add --allowed-ips args with appropriate CIDR ranges
+# - For replicas > 1, configure GOSMEE_REDIS_URL or --redis-url so webhook POSTs
+#   are written to Redis Streams and can be resumed by clients on any pod
+# - Size GOSMEE_REDIS_STREAM_MAXLEN or --redis-stream-maxlen for your retention window
 #
 # Usage:
 # kubectl apply -f gosmee-server-deployment.yaml
@@ -43,6 +46,10 @@ spec:
               "0.0.0.0",
               "--public-url",
               "https://yourserver.example.com",
+              # "--redis-url",
+              # "redis://redis.default.svc.cluster.local:6379/0",
+              # "--redis-stream-maxlen",
+              # "10000",
             ]
           ports:
             - containerPort: 3333

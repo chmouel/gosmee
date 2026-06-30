@@ -741,9 +741,8 @@
             eventSource.onerror = function (err) {
                 console.error('SSE connection error:', err);
                 statusLight.className = 'status-indicator status-disconnected';
-                eventSource.close();
-                // Reconnect after a delay
-                setTimeout(connectSSE, 5000);
+                // Let the browser's EventSource implementation reconnect so it
+                // preserves Last-Event-ID for Redis Streams resume.
             };
 
             eventSource.onmessage = function (event) {

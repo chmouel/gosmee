@@ -141,6 +141,11 @@ var clientFlags = []cli.Flag{
 		Usage:   "Path to the client encryption keypair JSON file",
 		EnvVars: []string{"GOSMEE_ENCRYPTION_KEY_FILE"},
 	},
+	&cli.StringFlag{
+		Name:    "resume-state-file",
+		Usage:   "Path to persist the last successfully processed Redis stream ID for durable resume",
+		EnvVars: []string{"GOSMEE_RESUME_STATE_FILE"},
+	},
 }
 
 var serverFlags = []cli.Flag{
@@ -221,5 +226,16 @@ var serverFlags = []cli.Flag{
 		Usage:   "CORS origin for SSE endpoint. Set a specific origin (e.g. https://example.com) to restrict which websites can connect to the SSE stream; set empty string to omit Access-Control-Allow-Origin entirely (same-origin only)",
 		Value:   "*",
 		EnvVars: []string{"GOSMEE_CORS_ORIGIN"},
+	},
+	&cli.StringFlag{
+		Name:    "redis-url",
+		Usage:   "Redis URL for stream-backed durable cross-replica delivery. When unset, gosmee uses in-memory single-replica delivery only",
+		EnvVars: []string{"GOSMEE_REDIS_URL"},
+	},
+	&cli.IntFlag{
+		Name:    "redis-stream-maxlen",
+		Usage:   "Maximum retained entries per Redis stream, using approximate trimming. Set 0 to disable trimming",
+		Value:   defaultRedisStreamMaxLen,
+		EnvVars: []string{"GOSMEE_REDIS_STREAM_MAXLEN"},
 	},
 }
