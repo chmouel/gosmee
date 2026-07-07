@@ -3,7 +3,7 @@ module github.com/chmouel/gosmee
 go 1.25.0
 
 require (
-	github.com/go-chi/chi/v5 v5.3.0
+	github.com/go-chi/chi/v5 v5.3.1
 	github.com/google/go-github/v57 v57.0.0
 	github.com/lmittmann/tint v1.1.3
 	github.com/mattn/go-isatty v0.0.22
