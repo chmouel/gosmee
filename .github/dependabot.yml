@@ -10,3 +10,7 @@ updates:
       interval: "daily"
     labels:
       - "dependencies"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
