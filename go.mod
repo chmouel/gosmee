@@ -13,7 +13,7 @@ require (
 	github.com/redis/go-redis/v9 v9.21.0
 	github.com/urfave/cli/v2 v2.27.7
 	golang.org/x/crypto v0.53.0
-	golang.org/x/text v0.38.0
+	golang.org/x/text v0.39.0
 	gopkg.in/yaml.v3 v3.0.1
 	gotest.tools/v3 v3.5.2
 )
