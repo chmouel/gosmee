@@ -15,6 +15,9 @@
 # Output format: "pretty" (default) or "json"
 output: pretty
 
+# Log level: debug, info (default), warn, or error
+log-level: info
+
 # Disable colour output
 nocolor: false
 
@@ -29,6 +32,9 @@ insecure-skip-tls-verify: false
 
 # Seconds to wait when forwarding a request to the local service
 target-connection-timeout: 300
+
+# Retries for transient target delivery failures
+target-retries: 5
 
 # Ignore these event types
 # ignore-event:

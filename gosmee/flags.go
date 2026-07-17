@@ -19,6 +19,12 @@ var commonFlags = []cli.Flag{
 		Value:   "pretty",
 		Aliases: []string{"o"},
 	},
+	&cli.StringFlag{
+		Name:    "log-level",
+		Usage:   "Log level: debug, info, warn, or error",
+		EnvVars: []string{"GOSMEE_LOG_LEVEL"},
+		Value:   "info",
+	},
 	&cli.StringSliceFlag{
 		Name:    "ignore-event",
 		Aliases: []string{"I"},
@@ -35,6 +41,12 @@ var commonFlags = []cli.Flag{
 		Usage:   "How long to wait when forwarding the request to the service",
 		EnvVars: []string{"GOSMEE_TARGET_TIMEOUT"},
 		Value:   defaultTimeout,
+	},
+	&cli.IntFlag{
+		Name:    "target-retries",
+		Usage:   "Number of retries for transient target delivery failures",
+		EnvVars: []string{"GOSMEE_TARGET_RETRIES"},
+		Value:   defaultTargetRetries,
 	},
 	&cli.BoolFlag{
 		Name:    "noReplay",

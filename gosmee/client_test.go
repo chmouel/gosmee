@@ -104,6 +104,31 @@ func TestGoSmeeEventID(t *testing.T) {
 	assert.Equal(t, m.eventID, "12345")
 }
 
+func TestGoSmeeProviderDeliveryID(t *testing.T) {
+	for _, header := range []string{"x-gitea-delivery", "x-forgejo-delivery", "x-gitlab-delivery", "x-event-id"} {
+		t.Run(header, func(t *testing.T) {
+			p := goSmee{
+				replayDataOpts: &replayDataOpts{},
+				logger:         slog.New(slog.DiscardHandler),
+			}
+			m, err := p.parse(time.Now().UTC(), []byte(fmt.Sprintf(`{"%s":"delivery-123", "body": {}}`, header)))
+			assert.NilError(t, err)
+			assert.Equal(t, m.eventID, "delivery-123")
+		})
+	}
+}
+
+func TestRedactTargetURL(t *testing.T) {
+	assert.Equal(t, redactTargetURL("https://user:secret@example.com/hook?token=secret#fragment"), "https://example.com/hook")
+}
+
+func TestParseRetryAfter(t *testing.T) {
+	resp := &http.Response{Header: http.Header{"Retry-After": []string{"3"}}}
+	assert.Equal(t, parseRetryAfter(resp), 3*time.Second)
+	resp.Header.Set("Retry-After", "not-a-date")
+	assert.Equal(t, parseRetryAfter(resp), time.Duration(0))
+}
+
 func TestParseVersion(t *testing.T) {
 	tests := []struct {
 		name    string

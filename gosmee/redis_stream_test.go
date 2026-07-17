@@ -128,6 +128,16 @@ func TestRedisPayloadRelayPublish(t *testing.T) {
 	})
 }
 
+func TestRelayEventMetadata(t *testing.T) {
+	deliveryID, eventType := relayEventMetadata([]byte(`{"x-gitea-delivery":"delivery-1","x-gitea-event":"pull_request","bodyB":"ignored"}`))
+	assert.Equal(t, deliveryID, "delivery-1")
+	assert.Equal(t, eventType, "pull_request")
+
+	deliveryID, eventType = relayEventMetadata([]byte(`{"x-github-delivery":"delivery-2","x-github-event":"push"}`))
+	assert.Equal(t, deliveryID, "delivery-2")
+	assert.Equal(t, eventType, "push")
+}
+
 func TestRedisPayloadRelayStreamIDs(t *testing.T) {
 	t.Run("oldest ID surfaces Redis errors", func(t *testing.T) {
 		relay := newRedisPayloadRelayWithClient(&fakeRedisStreamClient{xrangeErr: errors.New("redis down")}, 10000)

@@ -261,6 +261,19 @@ By default, you'll get colourful output unless you specify `--nocolor`.
 
 Output logs as JSON with `--output json` (which implies `--nocolor`).
 
+Use `--log-level debug` for additional delivery diagnostics. Target failures
+include the provider delivery ID, Redis/SSE stream ID, event type, attempt,
+elapsed time, timeout, target (with credentials and query parameters removed),
+HTTP status, and retry decision. Request payloads and webhook headers are not
+logged.
+
+Transient target failures (timeouts, network errors, 408, 425, 429, and 5xx)
+are retried five times for non-Redis events, with exponential backoff. After
+the retry budget is exhausted, gosmee logs the delivery as lost and continues
+with later events. Configure the budget with `--target-retries` or
+`GOSMEE_TARGET_RETRIES`. Use `--saveDir` when you need a replayable copy of
+events that cannot be delivered.
+
 #### Executing commands on webhook events
 
 You can execute a shell command whenever a webhook event is received using `--exec`:
@@ -333,6 +346,11 @@ With `gosmee server` you can run your own relay server instead of using <https:/
 
 By default, `gosmee server` binds to `localhost` on port `3333`. For practical use, you'll want to expose it to your public IP or behind a proxy using the `--address` and `--port` flags.
 
+The server logs webhook publication and SSE delivery failures with the request
+ID, channel, provider delivery ID, event type, and Redis stream ID. These logs
+distinguish a webhook being accepted by gosmee from the later client-to-target
+forwarding attempt.
+
 For security, you can use Let's Encrypt certificates with the `--tls-cert` and `--tls-key` flags.
 
 There are many flags available - check them with `gosmee server --help`.
@@ -388,7 +406,7 @@ gosmee client \
   http://localhost:8080
 ```
 
-The client only advances this checkpoint after parsing, optional `--saveDir`, target forwarding, and optional `--exec` all succeed. In Redis Streams mode, target HTTP responses `>=300` are treated as failures and retried forever with backoff. Without `--resume-state-file`, reconnect resume works only for the current process; restarts start live.
+The client only advances this checkpoint after parsing, optional `--saveDir`, target forwarding, and optional `--exec` all succeed. In Redis Streams mode, transient target failures are retried forever with backoff; permanent target responses (for example 401 or 422) stop the client without advancing the checkpoint. Without `--resume-state-file`, reconnect resume works only for the current process; restarts start live.
 
 #### Protected client channels
 

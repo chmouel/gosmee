@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -44,6 +45,8 @@ var pmEventRe = regexp.MustCompile(`(\w+|\d+|_|-|:)`)
 
 const (
 	defaultTimeout       = 5
+	defaultTargetRetries = 5
+	maxRetryDelay        = 30 * time.Second
 	smeeChannel          = "messages"
 	defaultLocalDebugURL = "http://localhost:8080"
 	tsFormat             = "2006-01-02T15.04.01.000"
@@ -53,6 +56,7 @@ type goSmee struct {
 	replayDataOpts *replayDataOpts
 	channel        string
 	logger         *slog.Logger
+	retrySleep     func(context.Context, time.Duration) error
 }
 
 type payloadMsg struct {
@@ -62,6 +66,7 @@ type payloadMsg struct {
 	contentType string
 	eventType   string
 	eventID     string
+	streamID    string
 }
 
 type clientSSEEvent struct {
@@ -129,7 +134,7 @@ func (c goSmee) parse(now time.Time, data []byte) (payloadMsg, error) {
 
 	for payloadKey, payloadValue := range payload {
 		switch payloadKey {
-		case "x-github-event", "x-gitlab-event", "x-event-key":
+		case "x-github-event", "x-gitlab-event", "x-gitea-event", "x-forgejo-event", "x-event-key":
 			if pv, ok := payloadValue.(string); ok {
 				pm.headers[title(payloadKey)] = pv
 				replace := strings.NewReplacer(":", "-", " ", "_", "/", "_")
@@ -137,10 +142,12 @@ func (c goSmee) parse(now time.Time, data []byte) (payloadMsg, error) {
 				pv = pmEventRe.FindString(pv)
 				pm.eventType = pv
 			}
-		case "x-github-delivery":
+		case "x-github-delivery", "x-gitea-delivery", "x-forgejo-delivery", "x-gitlab-delivery", "x-event-id":
 			if pv, ok := payloadValue.(string); ok {
 				pm.headers[title(payloadKey)] = pv
-				pm.eventID = pv
+				if pm.eventID == "" {
+					pm.eventID = pv
+				}
 			}
 		case "bodyB":
 			mb := &messageBody{}
@@ -317,6 +324,7 @@ func buildHttpieHeaders(headers map[string]string) string {
 type replayDataOpts struct {
 	insecureTLSVerify           bool
 	targetCnxTimeout            int
+	targetRetries               int
 	sseBufferSize               int
 	decorate, noReplay          bool
 	saveDir, smeeURL, targetURL string
@@ -328,6 +336,131 @@ type replayDataOpts struct {
 	execEnvVars                 []string
 	encryptionKeyFile           string
 	resumeStateFile             string
+	targetHTTPClient            *http.Client
+}
+
+type targetDeliveryError struct {
+	err        error
+	kind       string
+	retryable  bool
+	status     int
+	duration   time.Duration
+	deliveryID string
+	eventType  string
+	retryAfter time.Duration
+}
+
+func (e *targetDeliveryError) Error() string {
+	return e.err.Error()
+}
+
+func (e *targetDeliveryError) Unwrap() error {
+	return e.err
+}
+
+func targetHTTPClient(ropts *replayDataOpts) *http.Client {
+	if ropts.targetHTTPClient != nil {
+		return ropts.targetHTTPClient
+	}
+	//nolint:gosec // InsecureSkipVerify is controlled by user input for testing/self-signed certs
+	transport := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: ropts.insecureTLSVerify}}
+	ropts.targetHTTPClient = &http.Client{Transport: transport}
+	return ropts.targetHTTPClient
+}
+
+func classifyTargetError(err error) (kind string, retryable bool) {
+	if errors.Is(err, context.Canceled) {
+		return "canceled", false
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return "timeout", true
+	}
+	if strings.Contains(strings.ToLower(err.Error()), "x509:") {
+		return "tls", false
+	}
+	var dnsErr *net.DNSError
+	if errors.As(err, &dnsErr) {
+		// A resolvable-but-empty answer (NXDOMAIN) or any non-temporary,
+		// non-timeout DNS failure is permanent; retrying will not help.
+		if dnsErr.IsNotFound || (!dnsErr.IsTemporary && !dnsErr.IsTimeout) {
+			return "dns", false
+		}
+		return "dns", true
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) {
+		return "network", true
+	}
+	return "transport", false
+}
+
+func targetStatusRetryable(status int) bool {
+	switch status {
+	case http.StatusRequestTimeout, http.StatusTooEarly, http.StatusTooManyRequests:
+		return true
+	default:
+		return status >= http.StatusInternalServerError
+	}
+}
+
+func parseRetryAfter(resp *http.Response) time.Duration {
+	value := strings.TrimSpace(resp.Header.Get("Retry-After"))
+	if value == "" {
+		return 0
+	}
+	if seconds, err := strconv.Atoi(value); err == nil && seconds >= 0 {
+		return time.Duration(seconds) * time.Second
+	}
+	when, err := http.ParseTime(value)
+	if err != nil {
+		return 0
+	}
+	delay := time.Until(when)
+	if delay < 0 {
+		return 0
+	}
+	return delay
+}
+
+func redactTargetURL(raw string) string {
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return raw
+	}
+	parsed.User = nil
+	parsed.RawQuery = ""
+	parsed.Fragment = ""
+	return parsed.String()
+}
+
+func deliveryAttrs(ropts *replayDataOpts, pm payloadMsg, streamID string, attempt, maxAttempts int, err *targetDeliveryError) []slog.Attr {
+	deliveryID := pm.eventID
+	if err.deliveryID != "" {
+		deliveryID = err.deliveryID
+	}
+	eventType := pm.eventType
+	if err.eventType != "" {
+		eventType = err.eventType
+	}
+	attrs := []slog.Attr{
+		slog.String("delivery_id", deliveryID),
+		slog.String("stream_id", streamID),
+		slog.String("event_type", eventType),
+		slog.String("target", redactTargetURL(ropts.targetURL)),
+		slog.Int("attempt", attempt),
+		slog.Int("max_attempts", maxAttempts),
+		slog.Int64("duration_ms", err.duration.Milliseconds()),
+		slog.Int("timeout_seconds", ropts.targetCnxTimeout),
+		slog.String("error_kind", err.kind),
+		slog.Bool("retryable", err.retryable),
+	}
+	if err.status != 0 {
+		attrs = append(attrs, slog.Int("http_status", err.status))
+	}
+	if err.retryAfter > 0 {
+		attrs = append(attrs, slog.Duration("retry_after", err.retryAfter))
+	}
+	return attrs
 }
 
 func replayData(ropts *replayDataOpts, logger *slog.Logger, pm payloadMsg) error {
@@ -335,13 +468,12 @@ func replayData(ropts *replayDataOpts, logger *slog.Logger, pm payloadMsg) error
 }
 
 func replayDataWithStatusPolicy(ropts *replayDataOpts, logger *slog.Logger, pm payloadMsg, failOnHTTPError bool) error {
+	started := time.Now()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(ropts.targetCnxTimeout)*time.Second)
 	defer cancel()
-	//nolint:gosec // InsecureSkipVerify is controlled by user input for testing/self-signed certs
-	client := http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: ropts.insecureTLSVerify}}}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, ropts.targetURL, strings.NewReader(string(pm.body)))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, ropts.targetURL, bytes.NewReader(pm.body))
 	if err != nil {
-		return err
+		return &targetDeliveryError{err: err, kind: "request", duration: time.Since(started), deliveryID: pm.eventID, eventType: pm.eventType}
 	}
 	for k, v := range pm.headers {
 		req.Header.Add(k, v)
@@ -349,11 +481,17 @@ func replayDataWithStatusPolicy(ropts *replayDataOpts, logger *slog.Logger, pm p
 	if _, ok := pm.headers["Content-Type"]; !ok {
 		req.Header.Add("Content-Type", pm.contentType)
 	}
-	resp, err := client.Do(req) //nolint:gosec // user-configured URL
+	resp, err := targetHTTPClient(ropts).Do(req) //nolint:gosec // user-configured URL
 	if err != nil {
-		return err
+		kind, retryable := classifyTargetError(err)
+		return &targetDeliveryError{err: err, kind: kind, retryable: retryable, duration: time.Since(started), deliveryID: pm.eventID, eventType: pm.eventType}
 	}
-	defer resp.Body.Close()
+	defer func() {
+		// Drain a bounded amount of the body so the shared transport can
+		// reuse this keep-alive connection for subsequent deliveries.
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
+		resp.Body.Close()
+	}()
 
 	msg := "request"
 	if pm.eventType != "" {
@@ -367,9 +505,32 @@ func replayDataWithStatusPolicy(ropts *replayDataOpts, logger *slog.Logger, pm p
 		msg = fmt.Sprintf("%s, error: %s", msg, resp.Status)
 	}
 	s := fmt.Sprintf("%s%s", emoji("•", "magenta+b", ropts.decorate), msg)
-	logger.InfoContext(context.Background(), s)
+	level := slog.LevelInfo
+	if resp.StatusCode > 299 {
+		level = slog.LevelWarn
+	}
+	logger.LogAttrs(context.Background(), level, s,
+		slog.String("delivery_id", pm.eventID),
+		slog.String("stream_id", pm.streamID),
+		slog.String("event_type", pm.eventType),
+		slog.String("target", redactTargetURL(ropts.targetURL)),
+		slog.Int("http_status", resp.StatusCode),
+		slog.Int("timeout_seconds", ropts.targetCnxTimeout),
+		slog.Int64("duration_ms", time.Since(started).Milliseconds()),
+		slog.String("error_kind", "none"),
+		slog.Bool("retryable", false),
+	)
 	if failOnHTTPError && resp.StatusCode > 299 {
-		return fmt.Errorf("target returned %s", resp.Status)
+		return &targetDeliveryError{
+			err:        fmt.Errorf("target returned %s", resp.Status),
+			kind:       "http_status",
+			retryable:  targetStatusRetryable(resp.StatusCode),
+			status:     resp.StatusCode,
+			duration:   time.Since(started),
+			deliveryID: pm.eventID,
+			eventType:  pm.eventType,
+			retryAfter: parseRetryAfter(resp),
+		}
 	}
 	return nil
 }
@@ -790,8 +951,8 @@ func newRetryBackoff() *retryBackoff {
 func (b *retryBackoff) Next() time.Duration {
 	delay := b.next
 	b.next *= 2
-	if b.next > 30*time.Second {
-		b.next = 30 * time.Second
+	if b.next > maxRetryDelay {
+		b.next = maxRetryDelay
 	}
 	return delay
 }
@@ -813,6 +974,20 @@ func sleepWithContext(ctx context.Context, delay time.Duration) error {
 
 func (c goSmee) shouldIgnoreEvent(eventType string) bool {
 	return eventType != "" && slices.Contains(c.replayDataOpts.ignoreEvents, eventType)
+}
+
+func (c goSmee) sleep(ctx context.Context, delay time.Duration) error {
+	if c.retrySleep != nil {
+		return c.retrySleep(ctx, delay)
+	}
+	return sleepWithContext(ctx, delay)
+}
+
+func (c goSmee) targetRetryLimit() int {
+	if c.replayDataOpts.targetRetries < 0 {
+		return 0
+	}
+	return c.replayDataOpts.targetRetries
 }
 
 func isClientControlEvent(event clientSSEEvent) bool {
@@ -884,17 +1059,17 @@ func (c goSmee) processClientEvent(now time.Time, event clientSSEEvent, privateK
 	if len(pm.headers) == 0 {
 		return false, permanentClientProcessingError("no headers found in message")
 	}
+	pm.streamID = event.ID
 
-	headers := buildHeaders(pm.headers)
 	if c.replayDataOpts.saveDir != "" {
 		if err := saveData(c.replayDataOpts, c.logger, pm); err != nil {
-			return false, fmt.Errorf("saving message with headers %q: %w", headers, err)
+			return false, fmt.Errorf("saving message: %w", err)
 		}
 	}
 
 	if !c.replayDataOpts.noReplay {
-		if err := replayDataWithStatusPolicy(c.replayDataOpts, c.logger, pm, isValidRedisStreamID(event.ID)); err != nil {
-			return false, fmt.Errorf("forwarding message with headers %q: %w", headers, err)
+		if err := replayDataWithStatusPolicy(c.replayDataOpts, c.logger, pm, true); err != nil {
+			return false, fmt.Errorf("forwarding event %q: %w", pm.eventType, err)
 		}
 	}
 
@@ -910,6 +1085,11 @@ func (c goSmee) processClientEvent(now time.Time, event clientSSEEvent, privateK
 func (c goSmee) processClientEventWithRetry(ctx context.Context, event clientSSEEvent, privateKey *[32]byte, state *resumeState) error {
 	durable := isValidRedisStreamID(event.ID)
 	processingBackoff := newRetryBackoff()
+	attempt := 1
+	maxAttempts := 1 + c.targetRetryLimit()
+	if durable {
+		maxAttempts = 0 // Redis stream events retry transient delivery failures indefinitely.
+	}
 	for {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -920,8 +1100,9 @@ func (c goSmee) processClientEventWithRetry(ctx context.Context, event clientSSE
 				for {
 					if err := state.Advance(event.ID); err != nil {
 						delay := processingBackoff.Next()
-						c.logger.ErrorContext(ctx, fmt.Sprintf("%s checkpointing event %s failed: %s; retrying in %s", ansi.Color("ERROR", "red+b"), event.ID, err.Error(), delay))
-						if sleepErr := sleepWithContext(ctx, delay); sleepErr != nil {
+						c.logger.LogAttrs(ctx, slog.LevelError, "checkpointing delivery failed; retrying",
+							slog.String("stream_id", event.ID), slog.String("error", err.Error()), slog.Duration("retry_in", delay))
+						if sleepErr := c.sleep(ctx, delay); sleepErr != nil {
 							return sleepErr
 						}
 						continue
@@ -932,20 +1113,52 @@ func (c goSmee) processClientEventWithRetry(ctx context.Context, event clientSSE
 			return nil
 		}
 
-		if !durable {
-			c.logger.ErrorContext(ctx, fmt.Sprintf("%s processing event failed: %s", ansi.Color("ERROR", "red+b"), err.Error()))
-			return nil
-		}
 		if isPermanentClientProcessingError(err) {
-			c.logger.ErrorContext(ctx, fmt.Sprintf("%s poison event %s failed permanently: %s", ansi.Color("ERROR", "red+b"), event.ID, err.Error()))
+			c.logger.LogAttrs(ctx, slog.LevelError, "event processing failed permanently",
+				slog.String("stream_id", event.ID), slog.String("error", err.Error()))
 			return err
 		}
 
+		var deliveryErr *targetDeliveryError
+		if errors.As(err, &deliveryErr) {
+			if !deliveryErr.retryable {
+				attrs := deliveryAttrs(c.replayDataOpts, payloadMsg{eventID: "", eventType: ""}, event.ID, attempt, maxAttempts, deliveryErr)
+				attrs = append(attrs, slog.String("error", err.Error()))
+				c.logger.LogAttrs(ctx, slog.LevelError, "target delivery failed permanently", attrs...)
+				if durable {
+					return permanentClientProcessingError("target delivery for stream event %s failed permanently: %w", event.ID, err)
+				}
+				return nil
+			}
+			if !durable && attempt >= maxAttempts {
+				attrs := deliveryAttrs(c.replayDataOpts, payloadMsg{}, event.ID, attempt, maxAttempts, deliveryErr)
+				attrs = append(attrs, slog.Bool("retry_exhausted", true), slog.String("error", err.Error()))
+				c.logger.LogAttrs(ctx, slog.LevelError, "target delivery retries exhausted; continuing", attrs...)
+				return nil
+			}
+		}
+		if !durable && deliveryErr == nil {
+			c.logger.LogAttrs(ctx, slog.LevelError, "event processing failed; continuing",
+				slog.String("error", err.Error()))
+			return nil
+		}
+
 		delay := processingBackoff.Next()
-		c.logger.ErrorContext(ctx, fmt.Sprintf("%s processing event %s failed: %s; retrying in %s", ansi.Color("ERROR", "red+b"), event.ID, err.Error(), delay))
-		if sleepErr := sleepWithContext(ctx, delay); sleepErr != nil {
+		if deliveryErr != nil && deliveryErr.retryAfter > delay {
+			delay = deliveryErr.retryAfter
+			if delay > maxRetryDelay {
+				delay = maxRetryDelay
+			}
+		}
+		attrs := []slog.Attr{slog.String("stream_id", event.ID), slog.String("error", err.Error()), slog.Duration("retry_in", delay), slog.Int("attempt", attempt)}
+		if deliveryErr != nil {
+			attrs = append(attrs, deliveryAttrs(c.replayDataOpts, payloadMsg{}, event.ID, attempt, maxAttempts, deliveryErr)...)
+		}
+		c.logger.LogAttrs(ctx, slog.LevelWarn, "event processing failed; retrying", attrs...)
+		if sleepErr := c.sleep(ctx, delay); sleepErr != nil {
 			return sleepErr
 		}
+		attempt++
 	}
 }
 

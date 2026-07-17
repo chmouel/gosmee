@@ -29,15 +29,20 @@ const DefaultPublicHookURL = "https://hook.pipelinesascode.com/new"
 func getLogger(c *cli.Context) (*slog.Logger, bool, error) {
 	nocolor := c.Bool("nocolor")
 	w := os.Stdout
+	var level slog.Level
+	if err := level.UnmarshalText([]byte(c.String("log-level"))); err != nil {
+		return nil, false, fmt.Errorf("invalid log level %q: %w", c.String("log-level"), err)
+	}
 	var logger *slog.Logger
 	switch c.String("output") {
 	case "json":
-		logger = slog.New(slog.NewJSONHandler(os.Stdout, nil))
+		logger = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: level}))
 		nocolor = true
 	case "pretty":
 		logger = slog.New(tint.NewHandler(w, &tint.Options{
 			TimeFormat: time.RFC1123,
 			NoColor:    !isatty.IsTerminal(w.Fd()),
+			Level:      level,
 		}))
 	default:
 		return nil, false, fmt.Errorf("invalid output format %s", c.String("output"))
@@ -245,6 +250,7 @@ non-publicly accessible endpoint, forward those requests to your local service.`
 							decorate:          decorate,
 							ignoreEvents:      c.StringSlice("ignore-event"),
 							targetCnxTimeout:  c.Int("target-connection-timeout"),
+							targetRetries:     c.Int("target-retries"),
 							insecureTLSVerify: c.Bool("insecure-skip-tls-verify"),
 							useHttpie:         c.Bool("httpie"),
 							sseBufferSize:     c.Int("sse-buffer-size"),

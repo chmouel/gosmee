@@ -79,8 +79,9 @@ func TestClientDurableProcessing(t *testing.T) {
 		nonDurableEvent := baseEvent
 		nonDurableEvent.ID = ""
 		processed, err = gs.processClientEvent(time.Now().UTC(), nonDurableEvent, nil)
-		assert.NilError(t, err)
-		assert.Assert(t, processed)
+		assert.Assert(t, err != nil)
+		assert.Assert(t, !processed)
+		assert.ErrorContains(t, err, "target returned 500")
 	})
 
 	t.Run("checkpoint advances after successful processing", func(t *testing.T) {
@@ -235,4 +236,49 @@ func TestClientDurableProcessing(t *testing.T) {
 		_, statErr := os.Stat(path)
 		assert.Assert(t, os.IsNotExist(statErr))
 	})
+}
+
+func TestClientTargetRetries(t *testing.T) {
+	var calls int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls++
+		if calls < 3 {
+			w.WriteHeader(http.StatusBadGateway)
+			return
+		}
+		w.WriteHeader(http.StatusAccepted)
+	}))
+	defer server.Close()
+
+	gs := newTestGoSmeeForProcessing(&replayDataOpts{
+		targetURL:     server.URL,
+		targetRetries: 5,
+		decorate:      false,
+	})
+	gs.retrySleep = func(context.Context, time.Duration) error { return nil }
+
+	event := clientSSEEvent{Data: []byte(simpleJSON)}
+	err := gs.processClientEventWithRetry(context.Background(), event, nil, &resumeState{})
+	assert.NilError(t, err)
+	assert.Equal(t, calls, 3)
+}
+
+func TestClientPermanentTargetErrorDoesNotRetry(t *testing.T) {
+	var calls int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls++
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer server.Close()
+
+	gs := newTestGoSmeeForProcessing(&replayDataOpts{
+		targetURL:     server.URL,
+		targetRetries: 5,
+		decorate:      false,
+	})
+	gs.retrySleep = func(context.Context, time.Duration) error { return nil }
+
+	err := gs.processClientEventWithRetry(context.Background(), clientSSEEvent{Data: []byte(simpleJSON)}, nil, &resumeState{})
+	assert.NilError(t, err)
+	assert.Equal(t, calls, 1)
 }

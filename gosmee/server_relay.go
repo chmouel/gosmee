@@ -2,8 +2,10 @@ package gosmee
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -15,8 +17,34 @@ const (
 )
 
 type relayEvent struct {
-	ID   string
-	Data []byte
+	ID         string
+	Data       []byte
+	DeliveryID string
+	EventType  string
+}
+
+func relayEventMetadata(data []byte) (deliveryID, eventType string) {
+	var payload map[string]any
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return "", ""
+	}
+	for key, value := range payload {
+		value, ok := value.(string)
+		if !ok {
+			continue
+		}
+		switch strings.ToLower(key) {
+		case "x-github-delivery", "x-gitea-delivery", "x-forgejo-delivery", "x-gitlab-delivery", "x-event-id":
+			if deliveryID == "" {
+				deliveryID = value
+			}
+		case "x-github-event", "x-gitlab-event", "x-gitea-event", "x-forgejo-event", "x-event-key":
+			if eventType == "" {
+				eventType = value
+			}
+		}
+	}
+	return deliveryID, eventType
 }
 
 type payloadRelay interface {
@@ -124,7 +152,8 @@ func (r *redisPayloadRelay) Read(ctx context.Context, channel, afterID string, b
 			if err != nil {
 				return nil, fmt.Errorf("redis stream entry %s payload: %w", message.ID, err)
 			}
-			events = append(events, relayEvent{ID: message.ID, Data: data})
+			deliveryID, eventType := relayEventMetadata(data)
+			events = append(events, relayEvent{ID: message.ID, Data: data, DeliveryID: deliveryID, EventType: eventType})
 		}
 	}
 

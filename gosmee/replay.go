@@ -2,6 +2,7 @@ package gosmee
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -96,13 +97,13 @@ func (r *replayOpts) replayHooks(ctx context.Context, hookid int64) error {
 			pm.timestamp = dt.Format(tsFormat)
 
 			if err := replayData(r.replayDataOpts, r.logger, pm); err != nil {
-				s := fmt.Sprintf(
-					"%s forwarding message with headers '%s' - %s\n",
-					ansi.Color("ERROR", "red+b"),
-					pm.headers,
-					err.Error(),
-				)
-				r.logger.ErrorContext(context.Background(), s)
+				attrs := []slog.Attr{slog.String("delivery_id", pm.eventID), slog.String("event_type", pm.eventType), slog.String("error", err.Error())}
+				var deliveryErr *targetDeliveryError
+				if errors.As(err, &deliveryErr) {
+					attrs = deliveryAttrs(r.replayDataOpts, pm, "", 1, 1, deliveryErr)
+					attrs = append(attrs, slog.String("error", err.Error()))
+				}
+				r.logger.LogAttrs(context.Background(), slog.LevelError, "replay target delivery failed", attrs...)
 				continue
 			}
 			if r.replayDataOpts.saveDir != "" {
@@ -245,6 +246,7 @@ func replay(c *cli.Context) error {
 		decorate:          decorate,
 		ignoreEvents:      c.StringSlice("ignore-event"),
 		targetCnxTimeout:  c.Int("target-connection-timeout"),
+		targetRetries:     c.Int("target-retries"),
 		insecureTLSVerify: c.Bool("insecure-skip-tls-verify"),
 		execCommand:       c.String("exec"),
 		execOnEvents:      c.StringSlice("exec-on-events"),

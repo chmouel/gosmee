@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -65,12 +66,18 @@ type Subscriber struct {
 type EventBroker struct {
 	sync.RWMutex
 	subscribers map[string][]*Subscriber
+	logger      *slog.Logger
 }
 
 // NewEventBroker creates a new event broker.
-func NewEventBroker() *EventBroker {
+func NewEventBroker(loggers ...*slog.Logger) *EventBroker {
+	logger := slog.Default()
+	if len(loggers) > 0 && loggers[0] != nil {
+		logger = loggers[0]
+	}
 	return &EventBroker{
 		subscribers: make(map[string][]*Subscriber),
+		logger:      logger,
 	}
 }
 
@@ -119,6 +126,9 @@ func (eb *EventBroker) PublishEvent(channel string, event relayEvent) {
 	eb.RLock()
 	subscribers := append([]*Subscriber(nil), eb.subscribers[channel]...)
 	eb.RUnlock()
+	if event.DeliveryID == "" {
+		event.DeliveryID, event.EventType = relayEventMetadata(event.Data)
+	}
 
 	// Send to each subscriber
 	for _, s := range subscribers {
@@ -135,8 +145,15 @@ func (eb *EventBroker) PublishEvent(channel string, event relayEvent) {
 		// Non-blocking send - if buffer is full, we'll skip this subscriber
 		select {
 		case s.Events <- payload:
+			eb.logger.LogAttrs(context.Background(), slog.LevelDebug, "event queued for subscriber",
+				slog.String("channel", channel), slog.String("delivery_id", payload.DeliveryID),
+				slog.String("stream_id", payload.ID), slog.String("event_type", payload.EventType),
+				slog.Int("queue_depth", len(s.Events)))
 		default:
-			fmt.Fprintf(os.Stdout, "WARNING: event dropped for subscriber on channel %s: buffer full\n", s.Channel) //nolint:gosec // stdout, not web output
+			eb.logger.LogAttrs(context.Background(), slog.LevelWarn, "event dropped for subscriber: buffer full",
+				slog.String("channel", channel), slog.String("delivery_id", payload.DeliveryID),
+				slog.String("stream_id", payload.ID), slog.String("event_type", payload.EventType),
+				slog.Int("queue_depth", len(s.Events)))
 		}
 	}
 }
@@ -309,7 +326,11 @@ func validateWebhookSignature(secrets []string, payload []byte, r *http.Request)
 }
 
 // handleWebhookPost handles POST requests to the webhook endpoint.
-func handleWebhookPost(c *cli.Context, relay payloadRelay, webhookSecrets []string) http.HandlerFunc {
+func handleWebhookPost(c *cli.Context, relay payloadRelay, webhookSecrets []string, loggers ...*slog.Logger) http.HandlerFunc {
+	logger := slog.Default()
+	if len(loggers) > 0 && loggers[0] != nil {
+		logger = loggers[0]
+	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		now := time.Now().UTC()
 		if !strings.Contains(r.Header.Get("Content-Type"), contentType) {
@@ -344,10 +365,8 @@ func handleWebhookPost(c *cli.Context, relay payloadRelay, webhookSecrets []stri
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		var headersBuilder strings.Builder
 		payload := make(map[string]any)
 		for k, v := range r.Header {
-			fmt.Fprintf(&headersBuilder, " %s=%s", k, v[0])
 			payload[strings.ToLower(k)] = v[0]
 		}
 		payload["timestamp"] = fmt.Sprintf("%d", now.UnixMilli())
@@ -378,15 +397,12 @@ func handleWebhookPost(c *cli.Context, relay payloadRelay, webhookSecrets []stri
 			resp["stream_id"] = streamID
 		}
 		_ = json.NewEncoder(w).Encode(resp)
-		logMessage := fmt.Sprintf("%s Published %s%s on channel %s", //nolint:gosec // stdout, not web output
-			now.Format(timeFormat),
-			middleware.GetReqID(r.Context()),
-			headersBuilder.String(),
-			channel)
-		if streamID != "" {
-			logMessage = fmt.Sprintf("%s stream_id=%s", logMessage, streamID)
-		}
-		fmt.Fprintln(os.Stdout, logMessage) //nolint:gosec // stdout, not web output
+		deliveryID, eventType := relayEventMetadata(reencoded)
+		logger.LogAttrs(r.Context(), slog.LevelInfo, "webhook published",
+			slog.String("request_id", middleware.GetReqID(r.Context())),
+			slog.String("channel", channel), slog.String("delivery_id", deliveryID),
+			slog.String("event_type", eventType), slog.String("stream_id", streamID),
+			slog.Int("body_bytes", len(body)))
 	}
 }
 
@@ -749,12 +765,20 @@ func handleEventsGet(eventBroker *EventBroker, protectedChannels *ProtectedChann
 		subscriber := eventBroker.Subscribe(channel, pubKey)
 		defer eventBroker.Unsubscribe(channel, subscriber)
 
+		reqID := middleware.GetReqID(r.Context())
+
 		setupSSEHeaders(w, corsOrigin)
 
 		if err := writeSSEEvent(w, "", "", []byte(`{"message":"connected"}`)); err != nil {
+			eventBroker.logger.LogAttrs(r.Context(), slog.LevelWarn, "SSE initial write failed",
+				slog.String("request_id", reqID), slog.String("channel", channel),
+				slog.String("error", err.Error()))
 			return
 		}
 		if err := writeSSEEvent(w, "", "", []byte(`{"message":"ready"}`)); err != nil {
+			eventBroker.logger.LogAttrs(r.Context(), slog.LevelWarn, "SSE initial write failed",
+				slog.String("request_id", reqID), slog.String("channel", channel),
+				slog.String("error", err.Error()))
 			return
 		}
 
@@ -766,6 +790,8 @@ func handleEventsGet(eventBroker *EventBroker, protectedChannels *ProtectedChann
 		for {
 			select {
 			case <-clientGone:
+				eventBroker.logger.LogAttrs(r.Context(), slog.LevelDebug, "SSE subscriber disconnected",
+					slog.String("request_id", reqID), slog.String("channel", channel))
 				return
 
 			case event, ok := <-subscriber.Events:
@@ -773,11 +799,19 @@ func handleEventsGet(eventBroker *EventBroker, protectedChannels *ProtectedChann
 					return
 				}
 				if err := writeSSEEvent(w, event.ID, "", event.Data); err != nil {
+					eventBroker.logger.LogAttrs(r.Context(), slog.LevelWarn, "SSE event delivery failed",
+						slog.String("request_id", reqID),
+						slog.String("channel", channel), slog.String("delivery_id", event.DeliveryID),
+						slog.String("stream_id", event.ID), slog.String("event_type", event.EventType),
+						slog.String("error", err.Error()))
 					return
 				}
 
 			case <-ticker.C:
 				if err := writeSSEComment(w, "keepalive"); err != nil {
+					eventBroker.logger.LogAttrs(r.Context(), slog.LevelWarn, "SSE keepalive write failed",
+						slog.String("request_id", reqID), slog.String("channel", channel),
+						slog.String("error", err.Error()))
 					return
 				}
 			}
@@ -785,7 +819,11 @@ func handleEventsGet(eventBroker *EventBroker, protectedChannels *ProtectedChann
 	}
 }
 
-func handleRedisEventsGet(redisRelay *redisPayloadRelay, protectedChannels *ProtectedChannels, corsOrigin string) http.HandlerFunc {
+func handleRedisEventsGet(redisRelay *redisPayloadRelay, protectedChannels *ProtectedChannels, corsOrigin string, loggers ...*slog.Logger) http.HandlerFunc {
+	logger := slog.Default()
+	if len(loggers) > 0 && loggers[0] != nil {
+		logger = loggers[0]
+	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		if _, ok := w.(http.Flusher); !ok {
 			http.Error(w, "Streaming unsupported", http.StatusInternalServerError)
@@ -838,15 +876,26 @@ func handleRedisEventsGet(redisRelay *redisPayloadRelay, protectedChannels *Prot
 			}
 		}
 
+		reqID := middleware.GetReqID(r.Context())
+
 		setupSSEHeaders(w, corsOrigin)
 		if err := writeSSEEvent(w, "", "", []byte(`{"message":"connected"}`)); err != nil {
+			logger.LogAttrs(r.Context(), slog.LevelWarn, "Redis SSE initial write failed",
+				slog.String("request_id", reqID), slog.String("channel", channel),
+				slog.String("error", err.Error()))
 			return
 		}
 		if err := writeSSEEvent(w, "", "", []byte(`{"message":"ready"}`)); err != nil {
+			logger.LogAttrs(r.Context(), slog.LevelWarn, "Redis SSE initial write failed",
+				slog.String("request_id", reqID), slog.String("channel", channel),
+				slog.String("error", err.Error()))
 			return
 		}
 		if len(gapEvent) > 0 {
 			if err := writeSSEEvent(w, "", "gosmee-gap", gapEvent); err != nil {
+				logger.LogAttrs(r.Context(), slog.LevelWarn, "Redis SSE gap write failed",
+					slog.String("request_id", reqID), slog.String("channel", channel),
+					slog.String("error", err.Error()))
 				return
 			}
 		}
@@ -855,16 +904,25 @@ func handleRedisEventsGet(redisRelay *redisPayloadRelay, protectedChannels *Prot
 			events, err := redisRelay.Read(r.Context(), channel, readAfterID, 30*time.Second, 100)
 			if err != nil {
 				if r.Context().Err() != nil {
+					logger.LogAttrs(r.Context(), slog.LevelDebug, "Redis SSE subscriber disconnected",
+						slog.String("request_id", reqID), slog.String("channel", channel))
 					return
 				}
-				fmt.Fprintf(os.Stderr, "WARNING: Redis stream read failed for channel %s: %v\n", channel, err) //nolint:gosec // stderr, not web output
+				logger.LogAttrs(r.Context(), slog.LevelWarn, "Redis stream read failed",
+					slog.String("request_id", reqID), slog.String("channel", channel),
+					slog.String("error", err.Error()))
 				return
 			}
 			if len(events) == 0 {
 				if r.Context().Err() != nil {
+					logger.LogAttrs(r.Context(), slog.LevelDebug, "Redis SSE subscriber disconnected",
+						slog.String("request_id", reqID), slog.String("channel", channel))
 					return
 				}
 				if err := writeSSEComment(w, "keepalive"); err != nil {
+					logger.LogAttrs(r.Context(), slog.LevelWarn, "Redis SSE keepalive write failed",
+						slog.String("request_id", reqID), slog.String("channel", channel),
+						slog.String("error", err.Error()))
 					return
 				}
 				continue
@@ -872,10 +930,17 @@ func handleRedisEventsGet(redisRelay *redisPayloadRelay, protectedChannels *Prot
 			for _, event := range events {
 				event, err = encryptRelayEvent(event, pubKey)
 				if err != nil {
-					fmt.Fprintf(os.Stderr, "WARNING: encryption failed for Redis stream subscriber on channel %s: %v\n", channel, err) //nolint:gosec // stderr, not web output
+					logger.LogAttrs(r.Context(), slog.LevelWarn, "Redis SSE encryption failed",
+						slog.String("request_id", reqID), slog.String("channel", channel),
+						slog.String("stream_id", event.ID), slog.String("error", err.Error()))
 					continue
 				}
 				if err := writeSSEEvent(w, event.ID, "", event.Data); err != nil {
+					logger.LogAttrs(r.Context(), slog.LevelWarn, "Redis SSE event delivery failed",
+						slog.String("request_id", reqID),
+						slog.String("channel", channel), slog.String("delivery_id", event.DeliveryID),
+						slog.String("stream_id", event.ID), slog.String("event_type", event.EventType),
+						slog.String("error", err.Error()))
 					return
 				}
 				readAfterID = event.ID
@@ -917,8 +982,16 @@ func serve(c *cli.Context) error {
 		}
 	}
 
+	// Initialize the configured logger so server correlation logs honor
+	// --output and --log-level / GOSMEE_LOG_LEVEL.
+	logger, _, err := getLogger(c)
+	if err != nil {
+		return err
+	}
+	slog.SetDefault(logger)
+
 	// Initialize the in-process event broker used by non-Redis mode.
-	eventBroker := NewEventBroker()
+	eventBroker := NewEventBroker(logger)
 	localRelay := newLocalPayloadRelay(eventBroker)
 	var relay payloadRelay = localRelay
 	var redisRelay *redisPayloadRelay
@@ -970,13 +1043,13 @@ func serve(c *cli.Context) error {
 
 	// SSE endpoint for event streaming
 	if redisRelay != nil {
-		mainRouter.Get(eventsPath, handleRedisEventsGet(redisRelay, protectedChannels, corsOrigin))
+		mainRouter.Get(eventsPath, handleRedisEventsGet(redisRelay, protectedChannels, corsOrigin, logger))
 	} else {
 		mainRouter.Get(eventsPath, handleEventsGet(eventBroker, protectedChannels, corsOrigin))
 	}
 
 	// Register POST routes on the restricted router
-	restrictedRouter.Post(channelPath, handleWebhookPost(c, relay, c.StringSlice("webhook-signature")))
+	restrictedRouter.Post(channelPath, handleWebhookPost(c, relay, c.StringSlice("webhook-signature"), logger))
 	restrictedRouter.Post(replayPath, handleReplayPost(c, relay))
 
 	// Create a final router which will route to the appropriate sub-router
