@@ -140,7 +140,7 @@ func TestRedisStreamsIntegration(t *testing.T) {
 		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/"+channel, strings.NewReader(body))
 		req.Header.Set("Content-Type", contentType)
 		rctx := chi.NewRouteContext()
-		rctx.URLParams.Add("channel", channel)
+		rctx.URLParams.Add("*", channel)
 		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 		w := httptest.NewRecorder()
 		handleWebhookPost(postCtx, relayA, nil)(w, req)

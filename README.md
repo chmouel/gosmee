@@ -357,9 +357,16 @@ There are many flags available - check them with `gosmee server --help`.
 
 To use your server in normal plaintext mode, access it with a URL format like:
 
-<https://myserverurl/RANDOM_ID>
+<https://myserverurl/CHANNEL_ID>
 
-The random ID must be 12 characters long with characters from `a-zA-Z0-9_-`.
+A channel ID is one or more `/`-separated segments built from `a-zA-Z0-9_-`, up
+to 255 characters in total, so it can mirror the path of the webhook it relays:
+
+<https://myserverurl/github/myorg/myrepo/push>
+
+Empty segments (`//`), leading and trailing slashes, and any other character are
+rejected. `/events/` and `/replay/` are reserved prefixes, so a channel ID cannot
+start with either.
 
 Generate a random ID easily with the `/new` endpoint:
 

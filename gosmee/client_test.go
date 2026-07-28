@@ -1503,6 +1503,26 @@ func TestPrepareSubscription(t *testing.T) {
 		assert.Assert(t, strings.HasPrefix(sseURL, "https://example.com/events/protectedchan?pubkey="))
 		assert.DeepEqual(t, loadedPrivateKey, privateKey)
 	})
+
+	t.Run("multi segment channel keeps every path segment", func(t *testing.T) {
+		channel, sseURL, privateKey, err := prepareSubscription("https://example.com/github/myorg/myrepo/push", "")
+		assert.NilError(t, err)
+		assert.Equal(t, channel, "github/myorg/myrepo/push")
+		assert.Equal(t, sseURL, "https://example.com/events/github/myorg/myrepo/push")
+		assert.Assert(t, privateKey == nil)
+	})
+
+	t.Run("trailing slash is trimmed", func(t *testing.T) {
+		channel, sseURL, _, err := prepareSubscription("https://example.com/plainchannel/", "")
+		assert.NilError(t, err)
+		assert.Equal(t, channel, "plainchannel")
+		assert.Equal(t, sseURL, "https://example.com/events/plainchannel")
+	})
+
+	t.Run("url without a channel is rejected", func(t *testing.T) {
+		_, _, _, err := prepareSubscription("https://example.com", "")
+		assert.ErrorContains(t, err, "no channel in smee url")
+	})
 }
 
 func TestIsOlderVersion(t *testing.T) {

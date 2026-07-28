@@ -817,9 +817,6 @@ func isOlderVersion(v1, v2 []int) bool {
 }
 
 func prepareSubscription(smeeURL, encryptionKeyFile string) (channel, sseURL string, privateKey *[32]byte, err error) {
-	channel = filepath.Base(smeeURL)
-	baseURL := strings.TrimSuffix(smeeURL, "/"+channel)
-
 	if strings.HasPrefix(smeeURL, "https://smee.io") {
 		if encryptionKeyFile != "" {
 			return "", "", nil, fmt.Errorf("client key files are only supported with gosmee server URLs, not https://smee.io")
@@ -827,25 +824,32 @@ func prepareSubscription(smeeURL, encryptionKeyFile string) (channel, sseURL str
 		return smeeChannel, smeeURL, nil, nil
 	}
 
-	sseURL = fmt.Sprintf("%s/events/%s", baseURL, channel)
+	// A channel id can span several path segments, and a gosmee server always
+	// serves from the root of its host, so the whole path is the channel.
+	parsedSmeeURL, err := url.Parse(smeeURL)
+	if err != nil {
+		return "", "", nil, fmt.Errorf("parse smee url: %w", err)
+	}
+	channel = strings.Trim(parsedSmeeURL.Path, "/")
+	if channel == "" {
+		return "", "", nil, fmt.Errorf("no channel in smee url %s", smeeURL)
+	}
+
+	parsedSSEURL := *parsedSmeeURL
+	parsedSSEURL.Path = "/events/" + channel
+	parsedSSEURL.RawPath = ""
+	parsedSSEURL.RawQuery = ""
 	if encryptionKeyFile == "" {
-		return channel, sseURL, nil, nil
+		return channel, parsedSSEURL.String(), nil, nil
 	}
 
 	publicKey, loadedPrivateKey, err := LoadKeyPair(encryptionKeyFile)
 	if err != nil {
 		return "", "", nil, fmt.Errorf("load encryption keys: %w", err)
 	}
+	parsedSSEURL.RawQuery = url.Values{"pubkey": {EncodePublicKey(publicKey)}}.Encode()
 
-	parsedURL, err := url.Parse(sseURL)
-	if err != nil {
-		return "", "", nil, fmt.Errorf("parse sse url: %w", err)
-	}
-	query := parsedURL.Query()
-	query.Set("pubkey", EncodePublicKey(publicKey))
-	parsedURL.RawQuery = query.Encode()
-
-	return channel, parsedURL.String(), loadedPrivateKey, nil
+	return channel, parsedSSEURL.String(), loadedPrivateKey, nil
 }
 
 type resumeState struct {

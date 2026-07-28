@@ -34,12 +34,17 @@ const (
 	timeFormat        = "2006-01-02T15.04.01.000"
 	contentType       = "application/json"
 	versionHeaderName = "X-Gosmee-Version"
-	minChannelLength  = 12
-	maxChannelLength  = 64 // Set maximum channel length to prevent DoS attacks
-	channelIDPattern  = "[a-zA-Z0-9_-]{12,64}"
-	channelPath       = "/{channel:" + channelIDPattern + "}"
-	eventsPath        = "/events/{channel:" + channelIDPattern + "}"
-	replayPath        = "/replay/{channel:" + channelIDPattern + "}"
+	minChannelLength  = 12  // Length of the ids handed out by /new
+	maxChannelLength  = 255 // Set maximum channel length to prevent DoS attacks
+	// A channel id is one or more slash separated segments, so it can mirror a
+	// real webhook path such as "github/myorg/myrepo/push".
+	channelIDPattern = "[a-zA-Z0-9_-]+(?:/[a-zA-Z0-9_-]+)*"
+	// Channel ids may contain slashes and chi matches a {param:regexp} only up
+	// to the next slash, so the routes catch everything and the handlers
+	// enforce channelIDPattern themselves via requestChannel.
+	channelPath = "/*"
+	eventsPath  = "/events/*"
+	replayPath  = "/replay/*"
 )
 
 var (
@@ -172,7 +177,18 @@ func nextPlaintextChannel(protectedChannels *ProtectedChannels) string {
 }
 
 func isValidChannelID(channel string) bool {
-	return validChannelID.MatchString(channel)
+	return len(channel) <= maxChannelLength && validChannelID.MatchString(channel)
+}
+
+// requestChannel returns the channel id matched by a catch-all route and
+// whether it is valid.
+func requestChannel(r *http.Request) (string, bool) {
+	channel := chi.URLParam(r, "*")
+	return channel, isValidChannelID(channel)
+}
+
+func rejectInvalidChannelRequest(w http.ResponseWriter) {
+	http.Error(w, "invalid channel name", http.StatusBadRequest)
 }
 
 func effectivePublicURL(publicURL, portAddr string, sslEnabled bool) string {
@@ -199,9 +215,13 @@ func showNewURL(publicURL string, protectedChannels *ProtectedChannels) http.Han
 
 func serveIndex(publicURL, footer string, protectedChannels *ProtectedChannels) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		channel := chi.URLParam(r, "channel")
+		channel, valid := requestChannel(r)
 		if channel == "" {
 			http.Redirect(w, r, fmt.Sprintf("%s/%s", publicURL, nextPlaintextChannel(protectedChannels)), http.StatusFound)
+			return
+		}
+		if !valid {
+			http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
 			return
 		}
 		if protectedChannels.Has(channel) {
@@ -231,6 +251,23 @@ func serveIndex(publicURL, footer string, protectedChannels *ProtectedChannels) 
 			errorIt(w, r, http.StatusInternalServerError, err)
 		}
 	}
+}
+
+// registerMainRoutes registers the unrestricted GET routes. channelPath is a
+// catch-all, so chi only reaches it once every static route above has been
+// ruled out.
+func registerMainRoutes(mainRouter chi.Router, publicURL, footer string, protectedChannels *ProtectedChannels, eventsHandler http.HandlerFunc) {
+	mainRouter.Get("/favicon.ico", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "image/svg+xml")
+		_, _ = w.Write(faviconSVG)
+	})
+	mainRouter.Get("/", serveIndex(publicURL, footer, protectedChannels))
+	mainRouter.Get("/new", showNewURL(publicURL, protectedChannels))
+	mainRouter.Get("/version", retVersion)
+	mainRouter.Get("/health", retVersion)
+	mainRouter.Get("/livez", retVersion)
+	mainRouter.Get(eventsPath, eventsHandler)
+	mainRouter.Get(channelPath, serveIndex(publicURL, footer, protectedChannels))
 }
 
 func errorIt(w http.ResponseWriter, _ *http.Request, status int, err error) {
@@ -337,7 +374,11 @@ func handleWebhookPost(c *cli.Context, relay payloadRelay, webhookSecrets []stri
 			http.Error(w, "content-type must be application/json", http.StatusBadRequest)
 			return
 		}
-		channel := chi.URLParam(r, "channel")
+		channel, valid := requestChannel(r)
+		if !valid {
+			rejectInvalidChannelRequest(w)
+			return
+		}
 		defer r.Body.Close()
 
 		// Limit request body size to prevent memory exhaustion attacks
@@ -430,15 +471,9 @@ func handleReplayPost(c *cli.Context, relay payloadRelay) http.HandlerFunc {
 			}
 		}
 
-		channel := chi.URLParam(r, "channel")
-		if channel == "" {
-			http.Error(w, "Channel name missing in URL", http.StatusBadRequest)
-			return
-		}
-
-		// Validate channel length
-		if len(channel) > maxChannelLength {
-			http.Error(w, "Channel name exceeds maximum length", http.StatusBadRequest)
+		channel, valid := requestChannel(r)
+		if !valid {
+			rejectInvalidChannelRequest(w)
 			return
 		}
 
@@ -626,13 +661,9 @@ func retVersion(w http.ResponseWriter, _ *http.Request) {
 }
 
 func authorizeEventSubscriber(w http.ResponseWriter, r *http.Request, protectedChannels *ProtectedChannels) (string, *[32]byte, bool) {
-	channel := chi.URLParam(r, "channel")
-	if channel == "" {
-		http.Error(w, "Channel name missing in URL", http.StatusBadRequest)
-		return "", nil, false
-	}
-	if len(channel) > maxChannelLength {
-		http.Error(w, "Channel name exceeds maximum length", http.StatusBadRequest)
+	channel, valid := requestChannel(r)
+	if !valid {
+		rejectInvalidChannelRequest(w)
 		return "", nil, false
 	}
 
@@ -1029,24 +1060,14 @@ func serve(c *cli.Context) error {
 	// Apply IP restriction middleware ONLY to restricted router
 	restrictedRouter.Use(ipRestrictMiddleware(allowedRanges, c.Bool("trust-proxy")))
 
-	// Register all GET routes on the main router
-	mainRouter.Get("/favicon.ico", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "image/svg+xml")
-		_, _ = w.Write(faviconSVG)
-	})
-	mainRouter.Get("/", serveIndex(publicURL, footer, protectedChannels))
-	mainRouter.Get("/new", showNewURL(publicURL, protectedChannels))
-	mainRouter.Get(channelPath, serveIndex(publicURL, footer, protectedChannels))
-	mainRouter.Get("/version", retVersion)
-	mainRouter.Get("/health", retVersion)
-	mainRouter.Get("/livez", retVersion)
-
 	// SSE endpoint for event streaming
+	var eventsHandler http.HandlerFunc
 	if redisRelay != nil {
-		mainRouter.Get(eventsPath, handleRedisEventsGet(redisRelay, protectedChannels, corsOrigin, logger))
+		eventsHandler = handleRedisEventsGet(redisRelay, protectedChannels, corsOrigin, logger)
 	} else {
-		mainRouter.Get(eventsPath, handleEventsGet(eventBroker, protectedChannels, corsOrigin))
+		eventsHandler = handleEventsGet(eventBroker, protectedChannels, corsOrigin)
 	}
+	registerMainRoutes(mainRouter, publicURL, footer, protectedChannels, eventsHandler)
 
 	// Register POST routes on the restricted router
 	restrictedRouter.Post(channelPath, handleWebhookPost(c, relay, c.StringSlice("webhook-signature"), logger))

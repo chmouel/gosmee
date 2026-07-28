@@ -29,7 +29,7 @@ internet → [gosmee server] → SSE stream → [gosmee client] → local servic
 | Forged or tampered webhooks from untrusted senders | Signature validation, IP allowlisting |
 | Eavesdropping on the SSE relay stream | End-to-end encryption |
 | Unauthorized replay injection | `--replay-token` |
-| Payload-based resource exhaustion (DoS) | `--max-body-size`, channel name length limit |
+| Payload-based resource exhaustion (DoS) | `--max-body-size`, 255-character channel name limit |
 | Command injection via exec scripts | `--exec` hardening, signature validation, IP allowlisting |
 | Unauthorized access to protected channels | Encrypted channels with public-key authentication |
 
@@ -271,9 +271,13 @@ gosmee client --sse-buffer-size 5242880 <SMEE_URL> <TARGET_URL>  # 5 MB
 
 Raising these limits increases memory consumption proportionally. A server with a very high `--max-body-size` is also a more attractive DoS target. If you run gosmee in Kubernetes, update the memory `requests` and `limits` in your deployment manifests when you change these values, or Pods may be OOMKilled under load.
 
-### Channel Name Length Limit
+### Channel Name Rules
 
-Channel names are capped at 64 characters across all endpoints. This guards against resource exhaustion from pathologically long names — no configuration is needed.
+A channel name is one or more `/`-separated segments of `a-zA-Z0-9_-`, capped at 255 characters across all endpoints. The cap guards against resource exhaustion from pathologically long names — no configuration is needed.
+
+Every endpoint rejects anything else, so a channel name can never contain `.`, `..`, an empty segment, or a percent-encoded byte, and cannot be used to escape the channel namespace in the relay stream or in the Redis key `gosmee:stream:{channel}`.
+
+There is no minimum length. Channel names are the only thing protecting an unprotected channel from being read by anyone who guesses it, so keep using long random names — the `/new` endpoint mints 12-character ones — for anything you have not put behind `--encrypted-channels-file`.
 
 ---
 

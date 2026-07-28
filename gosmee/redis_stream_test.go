@@ -79,7 +79,7 @@ func (f *fakeRedisStreamClient) Close() error {
 
 func redisStreamRouter(relay *redisPayloadRelay, protectedChannels *ProtectedChannels) *chi.Mux {
 	router := chi.NewRouter()
-	router.Get("/events/{channel:[a-zA-Z0-9_-]{12,64}}", handleRedisEventsGet(relay, protectedChannels, "*"))
+	router.Get(eventsPath, handleRedisEventsGet(relay, protectedChannels, "*"))
 	return router
 }
 

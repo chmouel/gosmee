@@ -59,13 +59,13 @@ func TestLoadProtectedChannels(t *testing.T) {
 		assert.Assert(t, err != nil)
 	})
 
-	t.Run("channel id must match server routes", func(t *testing.T) {
+	t.Run("multi segment channel id", func(t *testing.T) {
 		publicKey, _, err := GenerateKeyPair()
 		assert.NilError(t, err)
 
 		cfg := protectedChannelsFile{
 			Channels: map[string]protectedChannelConfig{
-				"abc": {
+				"github/myorg/myrepo/push": {
 					AllowedPublicKeys: []string{EncodePublicKey(publicKey)},
 				},
 			},
@@ -77,7 +77,33 @@ func TestLoadProtectedChannels(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "channels.json")
 		assert.NilError(t, os.WriteFile(path, data, 0o600))
 
-		_, err = LoadProtectedChannels(path)
-		assert.ErrorContains(t, err, `must match`)
+		protectedChannels, err := LoadProtectedChannels(path)
+		assert.NilError(t, err)
+		assert.Assert(t, protectedChannels.Has("github/myorg/myrepo/push"))
+		assert.Assert(t, protectedChannels.IsAllowed("github/myorg/myrepo/push", publicKey))
+	})
+
+	t.Run("channel id must match server routes", func(t *testing.T) {
+		publicKey, _, err := GenerateKeyPair()
+		assert.NilError(t, err)
+
+		for _, channel := range []string{"/leading-slash", "trailing-slash/", "double//slash", "has space", "has.dot"} {
+			cfg := protectedChannelsFile{
+				Channels: map[string]protectedChannelConfig{
+					channel: {
+						AllowedPublicKeys: []string{EncodePublicKey(publicKey)},
+					},
+				},
+			}
+
+			data, err := json.Marshal(cfg)
+			assert.NilError(t, err)
+
+			path := filepath.Join(t.TempDir(), "channels.json")
+			assert.NilError(t, os.WriteFile(path, data, 0o600))
+
+			_, err = LoadProtectedChannels(path)
+			assert.ErrorContains(t, err, `must match`, "channel %q should be rejected", channel)
+		}
 	})
 }

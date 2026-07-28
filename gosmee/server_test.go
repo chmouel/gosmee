@@ -237,7 +237,7 @@ func TestHandleWebhookPost(t *testing.T) {
 	ctx := newTestContext()
 
 	// Set up the webhook endpoint
-	router.Post("/webhook/{channel}", handleWebhookPost(ctx, relay, []string{}))
+	router.Post(channelPath, handleWebhookPost(ctx, relay, []string{}))
 
 	t.Run("Valid Webhook", func(t *testing.T) {
 		// Create a subscriber to verify event was published
@@ -259,7 +259,7 @@ func TestHandleWebhookPost(t *testing.T) {
 		// Route the request
 		// Set up URL parameters since we're not using the full router
 		rctx := chi.NewRouteContext()
-		rctx.URLParams.Add("channel", "test-channel")
+		rctx.URLParams.Add("*", "test-channel")
 		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
 		handler := handleWebhookPost(ctx, relay, []string{})
@@ -303,7 +303,7 @@ func TestHandleWebhookPost(t *testing.T) {
 		w := httptest.NewRecorder()
 
 		rctx := chi.NewRouteContext()
-		rctx.URLParams.Add("channel", "unknown-channel")
+		rctx.URLParams.Add("*", "unknown-channel")
 		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
 		handler := handleWebhookPost(ctx, relay, []string{})
@@ -320,7 +320,7 @@ func TestHandleWebhookPost(t *testing.T) {
 		w := httptest.NewRecorder()
 
 		rctx := chi.NewRouteContext()
-		rctx.URLParams.Add("channel", "test-channel")
+		rctx.URLParams.Add("*", "test-channel")
 		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
 		handler := handleWebhookPost(ctx, relay, []string{})
@@ -340,7 +340,7 @@ func TestHandleWebhookPost(t *testing.T) {
 		w := httptest.NewRecorder()
 
 		rctx := chi.NewRouteContext()
-		rctx.URLParams.Add("channel", "test-channel")
+		rctx.URLParams.Add("*", "test-channel")
 		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
 		handler := handleWebhookPost(ctx, relay, []string{})
@@ -362,7 +362,7 @@ func TestHandleWebhookPost(t *testing.T) {
 		w := httptest.NewRecorder()
 
 		rctx := chi.NewRouteContext()
-		rctx.URLParams.Add("channel", "test-channel")
+		rctx.URLParams.Add("*", "test-channel")
 		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
 		handler := handleWebhookPost(ctx, relay, secrets)
@@ -379,7 +379,7 @@ func TestHandleWebhookPost(t *testing.T) {
 		w = httptest.NewRecorder()
 
 		rctx = chi.NewRouteContext()
-		rctx.URLParams.Add("channel", "test-channel")
+		rctx.URLParams.Add("*", "test-channel")
 		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
 		handler = handleWebhookPost(ctx, relay, secrets)
@@ -411,7 +411,7 @@ func TestHandleWebhookPostRelay(t *testing.T) {
 		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/webhook/test-channel", strings.NewReader(`{"event":"test"}`))
 		req.Header.Set("Content-Type", contentType)
 		rctx := chi.NewRouteContext()
-		rctx.URLParams.Add("channel", "test-channel")
+		rctx.URLParams.Add("*", "test-channel")
 		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
 		w := httptest.NewRecorder()
@@ -435,7 +435,7 @@ func TestHandleWebhookPostRelay(t *testing.T) {
 		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/webhook/test-channel", strings.NewReader(`{"event":"test"}`))
 		req.Header.Set("Content-Type", contentType)
 		rctx := chi.NewRouteContext()
-		rctx.URLParams.Add("channel", "test-channel")
+		rctx.URLParams.Add("*", "test-channel")
 		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
 		w := httptest.NewRecorder()
@@ -468,7 +468,7 @@ func TestHandleReplayPost(t *testing.T) {
 		}
 
 		rctx := chi.NewRouteContext()
-		rctx.URLParams.Add("channel", "test-channel")
+		rctx.URLParams.Add("*", "test-channel")
 		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
 		w := httptest.NewRecorder()
@@ -524,7 +524,7 @@ func TestHandleReplayPost(t *testing.T) {
 		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/replay/test-channel", strings.NewReader(`{"event":"replay"}`))
 		req.Header.Set("Content-Type", contentType)
 		rctx := chi.NewRouteContext()
-		rctx.URLParams.Add("channel", "test-channel")
+		rctx.URLParams.Add("*", "test-channel")
 		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
 		w := httptest.NewRecorder()
@@ -545,7 +545,7 @@ func TestHandleEventsGet(t *testing.T) {
 		"test-channel": {allowedKey},
 	})
 	router := chi.NewRouter()
-	router.Get("/events/{channel:[a-zA-Z0-9_-]{12,64}}", handleEventsGet(eventBroker, protectedChannels, "*"))
+	router.Get(eventsPath, handleEventsGet(eventBroker, protectedChannels, "*"))
 
 	t.Run("Rejects Invalid Public Key", func(t *testing.T) {
 		req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/events/test-channel?pubkey=!!!", nil)
@@ -638,7 +638,7 @@ func TestHandleEventsGet(t *testing.T) {
 			"test-channel": {allowed},
 		})
 		router = chi.NewRouter()
-		router.Get("/events/{channel:[a-zA-Z0-9_-]{12,64}}", handleEventsGet(eventBroker, protectedChannels, "*"))
+		router.Get(eventsPath, handleEventsGet(eventBroker, protectedChannels, "*"))
 
 		req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/events/test-channel?pubkey="+url.QueryEscape(allowed), nil)
 		reqCtx, cancel := context.WithCancel(req.Context())
@@ -711,7 +711,7 @@ func TestHandleEventsGetCORSOrigin(t *testing.T) {
 			protectedChannels, err := LoadProtectedChannels("")
 			assert.NilError(t, err)
 			router := chi.NewRouter()
-			router.Get("/events/{channel:[a-zA-Z0-9_-]{12,64}}", handleEventsGet(eventBroker, protectedChannels, tc.corsOrigin))
+			router.Get(eventsPath, handleEventsGet(eventBroker, protectedChannels, tc.corsOrigin))
 
 			req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/events/plainchannel1", nil)
 			reqCtx, cancel := context.WithCancel(req.Context())
@@ -766,7 +766,7 @@ func TestServeIndexAndNewURL(t *testing.T) {
 		w := httptest.NewRecorder()
 
 		rctx := chi.NewRouteContext()
-		rctx.URLParams.Add("channel", "plainchannel1")
+		rctx.URLParams.Add("*", "plainchannel1")
 		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
 		handler := serveIndex("https://example.com", "footer text", protectedChannels)
@@ -787,7 +787,7 @@ func TestServeIndexAndNewURL(t *testing.T) {
 		w := httptest.NewRecorder()
 
 		rctx := chi.NewRouteContext()
-		rctx.URLParams.Add("channel", "protectedchan")
+		rctx.URLParams.Add("*", "protectedchan")
 		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
 		handler := serveIndex("https://example.com", "", protectedChannels)

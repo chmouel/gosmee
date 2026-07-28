@@ -1120,8 +1120,9 @@
                 });
             }
 
-            // Get channel from URL
-            const channel = window.location.pathname.split('/').pop();
+            // A channel id can span several path segments, so take it from the
+            // server rather than from the last segment of the URL.
+            const channel = '{{ .Channel }}';
             const payload = JSON.parse(rawContent.textContent);
 
             // Helper function to attempt replay
