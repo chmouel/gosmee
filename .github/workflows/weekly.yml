@@ -44,14 +44,6 @@ jobs:
           go get -u ./...
           go mod tidy
 
-      - name: Generate coverage badge
-        run: make coverage
-
-      - name: Update coverage badge
-        uses: tj-actions/coverage-badge-go@v3
-        with:
-          filename: coverage.out
-
       - name: Create pull request
         id: create-pr
         uses: peter-evans/create-pull-request@v8
