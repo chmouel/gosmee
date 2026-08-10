@@ -39,7 +39,7 @@ func getLogger(c *cli.Context) (*slog.Logger, bool, error) {
 		logger = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: level}))
 		nocolor = true
 	case "pretty":
-		logger = slog.New(tint.NewHandler(w, &tint.Options{
+		logger = slog.New(tint.NewTextHandler(w, &tint.Options{
 			TimeFormat: time.RFC1123,
 			NoColor:    !isatty.IsTerminal(w.Fd()),
 			Level:      level,
