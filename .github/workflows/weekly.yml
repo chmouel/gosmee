@@ -43,6 +43,7 @@ jobs:
         run: |
           go get -u ./...
           go mod tidy
+          make vendor
 
       - name: Create pull request
         id: create-pr
