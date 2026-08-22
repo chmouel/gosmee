@@ -1,0 +1,23 @@
+apiVersion: v2
+name: gosmee
+description: gosmee server, a webhook relay for clients sitting behind a firewall
+type: application
+# Placeholder for local installs, releases are packaged with the gosmee version
+# by .github/workflows/releaser.yaml.
+version: 0.1.0
+# Installing from a checkout follows the "main" image. Released charts are
+# packaged with --app-version by .github/workflows/releaser.yaml, so they pin the
+# image tagged with that same release.
+appVersion: "main"
+kubeVersion: ">=1.21.0-0"
+home: https://github.com/chmouel/gosmee
+sources:
+  - https://github.com/chmouel/gosmee
+keywords:
+  - webhook
+  - smee
+  - relay
+  - forwarder
+maintainers:
+  - name: chmouel
+    url: https://github.com/chmouel

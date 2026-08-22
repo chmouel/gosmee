@@ -1,0 +1,80 @@
+name: Helm chart
+
+on:
+  push:
+    paths:
+      - "charts/**"
+      - ".github/workflows/helm.yml"
+  pull_request:
+    paths:
+      - "charts/**"
+      - ".github/workflows/helm.yml"
+
+jobs:
+  lint-and-template:
+    name: Lint and template
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v7.0.1
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+
+      - name: Install kubeconform
+        run: |
+          curl -sSL https://github.com/yannh/kubeconform/releases/download/v0.7.0/kubeconform-linux-amd64.tar.gz \
+            | sudo tar xz -C /usr/local/bin kubeconform
+
+      - name: Lint chart
+        run: helm lint charts/gosmee --strict
+
+      - name: Render and validate every values combination
+        run: |
+          for values in charts/gosmee/ci/*.yaml; do
+            echo "::group::${values}"
+            helm template gosmee charts/gosmee --values "${values}" | \
+              kubeconform -strict -summary -verbose \
+                -kubernetes-version 1.31.0 \
+                -schema-location default \
+                -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+                -
+            echo "::endgroup::"
+          done
+
+      - name: Check the guardrails reject broken values
+        run: |
+          if helm template gosmee charts/gosmee --set replicaCount=3 >/dev/null 2>&1; then
+            echo "::error::replicaCount > 1 without a Redis URL should have failed"
+            exit 1
+          fi
+          if helm template gosmee charts/gosmee --set httpRoute.enabled=true >/dev/null 2>&1; then
+            echo "::error::httpRoute.enabled without parentRefs should have failed"
+            exit 1
+          fi
+
+      - name: Check the ingress and the HTTPRoute stay exclusive
+        run: |
+          kinds() {
+            helm template gosmee charts/gosmee "$@" | grep -E "^kind: " | sort -u
+          }
+          expect() { # kinds, kind, present|absent, description
+            if echo "${1}" | grep -qx "kind: ${2}"; then
+              found=present
+            else
+              found=absent
+            fi
+            if [ "${found}" != "${3}" ]; then
+              echo "::error::${4}: expected ${2} ${3}, it is ${found}"
+              exit 1
+            fi
+          }
+          with_ingress=$(kinds --values charts/gosmee/ci/ingress-values.yaml)
+          with_route=$(kinds --values charts/gosmee/ci/httproute-values.yaml)
+          with_neither=$(kinds)
+          expect "${with_ingress}" Ingress present "ingress.enabled"
+          expect "${with_ingress}" HTTPRoute absent "ingress.enabled"
+          expect "${with_route}" HTTPRoute present "httpRoute.enabled"
+          expect "${with_route}" Ingress absent "httpRoute.enabled"
+          expect "${with_neither}" Ingress absent "defaults"
+          expect "${with_neither}" HTTPRoute absent "defaults"

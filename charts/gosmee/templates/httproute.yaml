@@ -1,0 +1,31 @@
+{{- if .Values.httpRoute.enabled }}
+{{- $apiVersion := "gateway.networking.k8s.io/v1" }}
+{{- if and (.Capabilities.APIVersions.Has "gateway.networking.k8s.io/v1beta1") (not (.Capabilities.APIVersions.Has "gateway.networking.k8s.io/v1")) }}
+{{- $apiVersion = "gateway.networking.k8s.io/v1beta1" }}
+{{- end }}
+apiVersion: {{ $apiVersion }}
+kind: HTTPRoute
+metadata:
+  name: {{ include "gosmee.fullname" . }}
+  labels:
+    {{- include "gosmee.labels" . | nindent 4 }}
+  {{- with .Values.httpRoute.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  parentRefs:
+    {{- toYaml .Values.httpRoute.parentRefs | nindent 4 }}
+  {{- with .Values.httpRoute.hostnames }}
+  hostnames:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    {{- if .Values.httpRoute.rules }}
+    {{- toYaml .Values.httpRoute.rules | nindent 4 }}
+    {{- else }}
+    - backendRefs:
+        - name: {{ include "gosmee.fullname" . }}
+          port: {{ .Values.service.port }}
+    {{- end }}
+{{- end }}

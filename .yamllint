@@ -2,6 +2,7 @@ ignore: |
   /vendor
   .git
   .github/workflows
+  charts/*/templates
 
 rules:
   braces: enable

@@ -1,0 +1,9 @@
+replicaCount: 3
+podDisruptionBudget:
+  enabled: true
+server:
+  publicUrl: https://gosmee.example.com
+  redis:
+    url: redis://redis.default.svc.cluster.local:6379/0
+    streamMaxlen: 5000
+  corsOrigin: https://gosmee.example.com

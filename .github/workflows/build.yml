@@ -8,6 +8,9 @@ on:
       - "go.sum"
       - "Dockerfile"
       - ".github/workflows/build.yml"
+  # Called by the release workflow on a tag, so a release gets an image tagged
+  # with its version instead of only moving :main.
+  workflow_call:
 
 env:
   REGISTRY: ghcr.io
@@ -45,6 +48,10 @@ jobs:
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v7

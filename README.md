@@ -138,6 +138,23 @@ System service example files for macOS and Linux are available in the [misc](./m
 
 You can deploy gosmee on Kubernetes to relay webhooks to your internal services.
 
+#### Helm chart
+
+A chart for the server lives in [charts/gosmee](./charts/gosmee) and is published
+on every release:
+
+```shell
+helm install gosmee oci://ghcr.io/chmouel/charts/gosmee \
+  --set server.publicUrl=https://smee.example.com
+```
+
+It covers an Ingress or a Gateway API HTTPRoute, webhook signature validation,
+protected channels, Redis backed multi replica delivery and a hardened pod
+security context. See the [chart README](./charts/gosmee/README.md) for all the
+values.
+
+#### Plain manifests
+
 Two deployment configurations are available:
 
 - [gosmee-server-deployment.yaml](./misc/gosmee-server-deployment.yaml) - For deploying the public-facing server component

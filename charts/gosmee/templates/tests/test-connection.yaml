@@ -1,0 +1,28 @@
+{{- if .Values.tests.enabled }}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "gosmee.fullname" . }}-test-connection
+  labels:
+    {{- include "gosmee.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  containers:
+    - name: wget
+      image: {{ .Values.tests.image }}
+      command:
+        - wget
+      args:
+        - --spider
+        - -q
+        - http://{{ include "gosmee.fullname" . }}:{{ .Values.service.port }}/health
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop:
+            - ALL
+{{- end }}

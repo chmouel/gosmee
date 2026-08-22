@@ -1,0 +1,198 @@
+# Default values for the gosmee server chart.
+
+image:
+  repository: ghcr.io/chmouel/gosmee
+  # Image tag, defaults to the chart appVersion when empty, which is the gosmee
+  # version the chart was released with.
+  tag: ""
+  # Image digest (sha256:...), takes precedence over the tag when set, for
+  # rollouts that must resolve to the exact same bytes every time.
+  digest: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+nameOverride: ""
+fullnameOverride: ""
+
+# Running more than one replica requires server.redis.url, without it a webhook
+# reaches only the clients connected to the replica that received it.
+replicaCount: 1
+
+server:
+  # Public URL shown on the web interface and in the channel URLs handed to
+  # clients (--public-url). When empty it is derived from the first ingress host
+  # or HTTPRoute hostname below.
+  publicUrl: ""
+  # Port and address gosmee listens on inside the container.
+  port: 3333
+  address: 0.0.0.0
+  # Log level: debug, info, warn or error.
+  logLevel: info
+  # Log format, one of "json" or "pretty".
+  logFormat: json
+  # Maximum accepted webhook body size in bytes.
+  maxBodySize: 26214400
+  # CORS origin for the SSE endpoint. "*" allows any site to connect to the
+  # stream, set a single origin to restrict it, set "" for same-origin only.
+  corsOrigin: "*"
+  # Trust X-Forwarded-For and X-Real-IP for the client IP. Only enable this when
+  # your ingress is the only path to gosmee and overwrites those headers,
+  # otherwise allowedIPs can be bypassed with spoofed headers.
+  trustProxy: false
+  # CIDR ranges or IP addresses allowed to post webhooks, empty allows all.
+  allowedIPs: []
+  # HTML snippet shown in the page footer.
+  footer: ""
+
+  # Secrets are passed as environment variables, never as command line
+  # arguments, so they stay out of the pod spec.
+  secret:
+    # Tokens used to validate incoming webhook signatures (GitHub, GitLab,
+    # Gitea, Bitbucket).
+    webhookSignatures: []
+    # Bearer token required by POST /replay/{channel}. The endpoint is open when
+    # left empty.
+    replayToken: ""
+    # Use a secret you manage instead of the one created by this chart. It is
+    # loaded with envFrom, so its keys must be named GOSMEE_WEBHOOK_SIGNATURE,
+    # GOSMEE_REPLAY_TOKEN and GOSMEE_REDIS_URL. Multiple webhook signatures go
+    # in GOSMEE_WEBHOOK_SIGNATURE as a comma separated list.
+    existingSecret: ""
+
+  redis:
+    # Redis URL enabling stream backed delivery across replicas. Stored in the
+    # chart secret since it usually carries credentials.
+    url: ""
+    # Maximum entries retained per channel stream, 0 disables trimming.
+    streamMaxlen: 10000
+
+  # Channels listed here reject any client that does not hold one of the allowed
+  # private keys, and payloads are encrypted end to end. Channels absent from
+  # this list stay readable by anyone who knows the URL.
+  encryptedChannels:
+    enabled: false
+    # Map of channel id to the client public keys allowed on it, rendered into a
+    # secret and passed as --encrypted-channels-file.
+    #   channels:
+    #     mychannel:
+    #       allowed_public_keys:
+    #         - base64publickey
+    channels: {}
+    # Use a secret you manage instead, holding the JSON document under the key
+    # below.
+    existingSecret: ""
+    key: encrypted-channels.json
+
+# Extra arguments appended to the gosmee server command line, for flags this
+# chart does not map, ie: --auto-cert or --tls-cert.
+extraArgs: []
+# Extra environment variables, either plain values or valueFrom entries.
+extraEnv: []
+# Extra envFrom sources, ie: secretRef or configMapRef entries.
+extraEnvFrom: []
+
+service:
+  type: ClusterIP
+  port: 80
+  annotations: {}
+  # Node port when service.type is NodePort.
+  nodePort: null
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: gosmee.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  #  - secretName: gosmee-tls
+  #    hosts:
+  #      - gosmee.example.com
+
+# Gateway API alternative to the ingress above, both can be enabled but usually
+# you want one or the other.
+httpRoute:
+  enabled: false
+  annotations: {}
+  # Gateways this route attaches to.
+  parentRefs: []
+  #  - name: my-gateway
+  #    namespace: gateway-system
+  #    sectionName: https
+  hostnames: []
+  #  - gosmee.example.com
+  # Rules default to sending every path to the gosmee service, override to add
+  # matches or filters.
+  rules: []
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+  automountServiceAccountToken: false
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+resources:
+  limits:
+    cpu: 200m
+    memory: 1Gi
+  requests:
+    cpu: 100m
+    memory: 512Mi
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 30
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 10
+
+# Webhook deliveries are long lived SSE connections, give them time to drain.
+terminationGracePeriodSeconds: 60
+
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+  maxUnavailable: null
+
+# Extra volumes and mounts, ie: TLS certificates used with extraArgs.
+extraVolumes: []
+extraVolumeMounts: []
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+topologySpreadConstraints: []
+priorityClassName: ""
+
+# Pod run by "helm test", it checks that /health answers through the service.
+tests:
+  enabled: true
+  image: busybox:1.37

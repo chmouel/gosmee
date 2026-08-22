@@ -1,0 +1,22 @@
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: gosmee.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: gosmee-tls
+      hosts:
+        - gosmee.example.com
+server:
+  trustProxy: true
+  allowedIPs:
+    - 192.30.252.0/22
+    - 185.199.108.0/22
+  secret:
+    webhookSignatures:
+      - supersecret1
+      - supersecret2
+    replayToken: replaytoken
