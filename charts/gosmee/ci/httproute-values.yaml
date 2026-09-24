@@ -1,0 +1,10 @@
+httpRoute:
+  enabled: true
+  parentRefs:
+    - name: my-gateway
+      namespace: gateway-system
+      sectionName: https
+  hostnames:
+    - gosmee.example.com
+service:
+  port: 8080

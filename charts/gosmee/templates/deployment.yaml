@@ -1,0 +1,169 @@
+{{- include "gosmee.validateValues" . -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "gosmee.fullname" . }}
+  labels:
+    {{- include "gosmee.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "gosmee.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- $annotations := dict }}
+      {{- if (include "gosmee.createSecret" .) }}
+      {{- $_ := set $annotations "checksum/secret" (include (print $.Template.BasePath "/secret.yaml") . | sha256sum) }}
+      {{- end }}
+      {{- if and .Values.server.encryptedChannels.enabled (not .Values.server.encryptedChannels.existingSecret) }}
+      {{- $_ := set $annotations "checksum/encrypted-channels" (include (print $.Template.BasePath "/secret-encrypted-channels.yaml") . | sha256sum) }}
+      {{- end }}
+      {{- range $key, $value := .Values.podAnnotations }}
+      {{- $_ := set $annotations $key $value }}
+      {{- end }}
+      {{- with $annotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "gosmee.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "gosmee.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: {{ include "gosmee.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - --output
+            - {{ .Values.server.logFormat | quote }}
+            - server
+            - --address
+            - {{ .Values.server.address | quote }}
+            - --port
+            - {{ int .Values.server.port | quote }}
+            {{- with (include "gosmee.publicURL" .) }}
+            - --public-url
+            - {{ . | quote }}
+            {{- end }}
+            - --max-body-size
+            - {{ int64 .Values.server.maxBodySize | quote }}
+            - --cors-origin
+            - {{ .Values.server.corsOrigin | quote }}
+            {{- if .Values.server.trustProxy }}
+            - --trust-proxy
+            {{- end }}
+            {{- range .Values.server.allowedIPs }}
+            - --allowed-ips
+            - {{ . | quote }}
+            {{- end }}
+            {{- with .Values.server.footer }}
+            - --footer
+            - {{ . | quote }}
+            {{- end }}
+            {{- if .Values.server.encryptedChannels.enabled }}
+            - --encrypted-channels-file
+            - {{ include "gosmee.encryptedChannelsMountPath" . | quote }}
+            {{- end }}
+            {{- if or .Values.server.redis.url .Values.server.secret.existingSecret }}
+            - --redis-stream-maxlen
+            - {{ int64 .Values.server.redis.streamMaxlen | quote }}
+            {{- end }}
+            {{- range .Values.extraArgs }}
+            - {{ . | quote }}
+            {{- end }}
+          env:
+            - name: GOSMEE_LOG_LEVEL
+              value: {{ .Values.server.logLevel | quote }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- if or (include "gosmee.useSecret" .) .Values.extraEnvFrom }}
+          envFrom:
+            {{- if (include "gosmee.useSecret" .) }}
+            - secretRef:
+                name: {{ include "gosmee.secretName" . }}
+            {{- end }}
+            {{- with .Values.extraEnvFrom }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.server.port }}
+              protocol: TCP
+          {{- with .Values.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- /* gosmee runs with a read only root filesystem, it still needs a
+          writable /tmp for the auto-cert cache and temporary files. */}}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            {{- if .Values.server.encryptedChannels.enabled }}
+            - name: encrypted-channels
+              mountPath: {{ dir (include "gosmee.encryptedChannelsMountPath" .) }}
+              readOnly: true
+            {{- end }}
+            {{- with .Values.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        {{- if .Values.server.encryptedChannels.enabled }}
+        - name: encrypted-channels
+          secret:
+            secretName: {{ include "gosmee.encryptedChannelsSecretName" . }}
+            items:
+              - key: {{ .Values.server.encryptedChannels.key }}
+                path: {{ .Values.server.encryptedChannels.key }}
+        {{- end }}
+        {{- with .Values.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

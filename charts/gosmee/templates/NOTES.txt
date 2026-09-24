@@ -1,0 +1,36 @@
+gosmee server {{ .Chart.AppVersion }} is starting as {{ include "gosmee.fullname" . }}.
+
+{{- $publicURL := include "gosmee.publicURL" . }}
+{{- if $publicURL }}
+
+Clients connect to a channel under:
+
+    {{ $publicURL }}/CHANNEL_ID
+
+    gosmee client {{ $publicURL }}/CHANNEL_ID http://localhost:8080
+{{- else }}
+
+No public URL is set, so the web interface shows the in-cluster address. Set
+server.publicUrl (or enable the ingress or httpRoute) to the address your
+webhook provider reaches, otherwise the channel URLs handed to clients are
+wrong.
+
+Reach it locally with:
+
+    kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "gosmee.fullname" . }} 3333:{{ .Values.service.port }}
+{{- end }}
+
+{{- if not .Values.server.secret.webhookSignatures }}
+{{- if not .Values.server.secret.existingSecret }}
+
+Webhook signatures are not validated (server.secret.webhookSignatures is empty),
+anyone who learns a channel URL can post payloads to it.
+{{- end }}
+{{- end }}
+
+{{- if and (eq .Values.server.corsOrigin "*") (not .Values.server.encryptedChannels.enabled) }}
+
+server.corsOrigin is "*", any website a browser visits can read the event stream
+of a channel it knows about. Set it to your own origin, or "" for same-origin
+only, unless you need the wide open default.
+{{- end }}

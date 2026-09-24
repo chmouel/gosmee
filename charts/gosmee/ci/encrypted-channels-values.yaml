@@ -1,0 +1,8 @@
+server:
+  publicUrl: https://gosmee.example.com
+  encryptedChannels:
+    enabled: true
+    channels:
+      mychannel:
+        allowed_public_keys:
+          - 8Zx3vJ2rKq1mN5tYw7uPd0aRbC4eF6gH8iJ0kL2mN4o=

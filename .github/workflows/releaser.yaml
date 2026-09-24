@@ -55,3 +55,39 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           ./hack/generate-release-notes.sh
+
+  image:
+    name: Publish the container image
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/build.yml
+
+  helm-chart:
+    name: Publish the Helm chart
+    runs-on: ubuntu-latest
+    needs: [goreleaser, image]
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+
+      - name: Package and push the chart to ghcr.io
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # The chart is versioned with the gosmee release it ships with, and
+          # its appVersion is the image tag published by the image job above, so
+          # `helm install --version` pins both the chart and the binary.
+          version="${GITHUB_REF_NAME#v}"
+          helm package charts/gosmee \
+            --version "${version}" --app-version "${version}" --destination dist
+          echo "${GH_TOKEN}" | helm registry login ghcr.io \
+            --username "${{ github.actor }}" --password-stdin
+          helm push "dist/gosmee-${version}.tgz" \
+            "oci://ghcr.io/${{ github.repository_owner }}/charts"
