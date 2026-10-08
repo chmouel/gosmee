@@ -301,3 +301,163 @@ func TestReplayHooks(t *testing.T) {
 		assert.NilError(t, err)
 	})
 }
+
+type mockGHOpForDeliveryLookup struct {
+	mockGHOpForReplay
+	getDelivery func(context.Context, string, string, int64, int64) (*github.HookDelivery, *github.Response, error)
+}
+
+func (m *mockGHOpForDeliveryLookup) GetHookDelivery(ctx context.Context, org, repo string, hookID, deliveryID int64) (*github.HookDelivery, *github.Response, error) {
+	return m.getDelivery(ctx, org, repo, hookID, deliveryID)
+}
+
+func TestGetHookDelivery(t *testing.T) {
+	delivery := &github.HookDelivery{ID: github.Int64(123)}
+	okResponse := &github.Response{Response: &http.Response{StatusCode: http.StatusOK}}
+	notFoundResponse := &github.Response{Response: &http.Response{StatusCode: http.StatusNotFound}}
+	serverErrorResponse := &github.Response{Response: &http.Response{StatusCode: http.StatusServiceUnavailable}}
+	notFoundErr := errors.New("delivery not found")
+	lastNotFoundErr := errors.New("delivery still not found")
+	transportErr := errors.New("connection failed")
+	serverErr := errors.New("service unavailable")
+	type lookupResult struct {
+		delivery *github.HookDelivery
+		response *github.Response
+		err      error
+	}
+	success := lookupResult{delivery: delivery, response: okResponse}
+	notFound := lookupResult{response: notFoundResponse, err: notFoundErr}
+	tests := []struct {
+		name    string
+		results []lookupResult
+		wantErr error
+	}{
+		{
+			name:    "success",
+			results: []lookupResult{success},
+		},
+		{
+			name:    "success without response",
+			results: []lookupResult{{delivery: delivery}},
+		},
+		{
+			name:    "success after one 404",
+			results: []lookupResult{notFound, success},
+		},
+		{
+			name:    "success after two 404s",
+			results: []lookupResult{notFound, notFound, success},
+		},
+		{
+			name:    "exhausted 404 retries",
+			results: []lookupResult{notFound, notFound, {response: notFoundResponse, err: lastNotFoundErr}},
+			wantErr: lastNotFoundErr,
+		},
+		{
+			name:    "transport error without response",
+			results: []lookupResult{{err: transportErr}},
+			wantErr: transportErr,
+		},
+		{
+			name:    "non404 error",
+			results: []lookupResult{{response: serverErrorResponse, err: serverErr}},
+			wantErr: serverErr,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			calls := 0
+			mockGh := &mockGHOpForDeliveryLookup{
+				getDelivery: func(gotCtx context.Context, org, repo string, hookID, deliveryID int64) (*github.HookDelivery, *github.Response, error) {
+					assert.Equal(t, gotCtx, ctx)
+					assert.Equal(t, org, "test-org")
+					assert.Equal(t, repo, "test-repo")
+					assert.Equal(t, hookID, int64(456))
+					assert.Equal(t, deliveryID, int64(123))
+					if calls >= len(tt.results) {
+						t.Fatalf("unexpected delivery lookup %d", calls+1)
+					}
+					result := tt.results[calls]
+					calls++
+					return result.delivery, result.response, result.err
+				},
+			}
+			opts := &replayOpts{org: "test-org", repo: "test-repo", ghop: mockGh}
+
+			got, err := opts.getHookDelivery(ctx, 456, 123)
+
+			assert.Equal(t, calls, len(tt.results))
+			if tt.wantErr != nil {
+				assert.Assert(t, errors.Is(err, tt.wantErr))
+				assert.ErrorContains(t, err, "cannot get delivery")
+				assert.Assert(t, got == nil)
+				return
+			}
+			assert.NilError(t, err)
+			assert.Equal(t, got, delivery)
+		})
+	}
+}
+
+func TestGetHookDeliveryCanceledWait(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	firstLookup := make(chan struct{})
+	calls := 0
+	mockGh := &mockGHOpForDeliveryLookup{
+		getDelivery: func(context.Context, string, string, int64, int64) (*github.HookDelivery, *github.Response, error) {
+			calls++
+			if calls == 1 {
+				close(firstLookup)
+			}
+			return nil, &github.Response{Response: &http.Response{StatusCode: http.StatusNotFound}}, errors.New("delivery not found")
+		},
+	}
+	opts := &replayOpts{ghop: mockGh}
+	type lookupResult struct {
+		delivery *github.HookDelivery
+		err      error
+	}
+	result := make(chan lookupResult, 1)
+	go func() {
+		delivery, err := opts.getHookDelivery(ctx, 456, 123)
+		result <- lookupResult{delivery: delivery, err: err}
+	}()
+	<-firstLookup
+	cancel()
+
+	select {
+	case got := <-result:
+		assert.Assert(t, errors.Is(got.err, context.Canceled))
+		assert.ErrorContains(t, got.err, "cannot get delivery")
+		assert.Assert(t, got.delivery == nil)
+		assert.Equal(t, calls, 1)
+	case <-time.After(5 * time.Second):
+		t.Fatal("delivery lookup did not stop after cancellation")
+	}
+}
+
+func TestReplayHooksLookupFailure(t *testing.T) {
+	lookupErr := errors.New("connection failed")
+	calls := 0
+	mockGh := &mockGHOpForDeliveryLookup{
+		mockGHOpForReplay: mockGHOpForReplay{
+			deliveries: []*github.HookDelivery{{
+				ID:          github.Int64(123),
+				DeliveredAt: &github.Timestamp{Time: time.Now()},
+			}},
+		},
+		getDelivery: func(context.Context, string, string, int64, int64) (*github.HookDelivery, *github.Response, error) {
+			calls++
+			return nil, nil, lookupErr
+		},
+	}
+	opts := &replayOpts{ghop: mockGh}
+
+	err := opts.replayHooks(context.Background(), 456)
+
+	assert.Assert(t, errors.Is(err, lookupErr))
+	assert.ErrorContains(t, err, "cannot get delivery")
+	assert.Equal(t, calls, 1)
+}
