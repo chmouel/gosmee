@@ -59,20 +59,9 @@ func (r *replayOpts) replayHooks(ctx context.Context, hookid int64) error {
 		// reverse deliveries to replay from oldest to newest
 		deliveries = r.chooseDeliveries(deliveries)
 		for _, hd := range deliveries {
-			var delivery *github.HookDelivery
-			// There can be a race between the time listhookdeliveries show the
-			// id and Gethookdelivery is created on the API, so wait for it for a bit
-			for range []int{1, 2, 3} {
-				var resp *github.Response
-				var err error
-				delivery, resp, err = r.ghop.GetHookDelivery(ctx, r.org, r.repo, hookid, hd.GetID())
-				if resp.StatusCode == http.StatusNotFound {
-					time.Sleep(1 * time.Second)
-					continue
-				}
-				if err != nil {
-					return fmt.Errorf("cannot get delivery: %w", err)
-				}
+			delivery, err := r.getHookDelivery(ctx, hookid, hd.GetID())
+			if err != nil {
+				return err
 			}
 			pm := payloadMsg{}
 			var ok bool
@@ -132,6 +121,27 @@ func (r *replayOpts) replayHooks(ctx context.Context, hookid int64) error {
 			r.sinceTime = deliveries[len(deliveries)-1].DeliveredAt.GetTime().Add(1 * time.Second)
 		}
 		time.Sleep(5 * time.Second)
+	}
+}
+
+func (r *replayOpts) getHookDelivery(ctx context.Context, hookID, deliveryID int64) (*github.HookDelivery, error) {
+	for attempt := 0; ; attempt++ {
+		delivery, resp, err := r.ghop.GetHookDelivery(ctx, r.org, r.repo, hookID, deliveryID)
+		// GitHub can list a delivery before its detail endpoint is ready.
+		if resp != nil && resp.StatusCode == http.StatusNotFound && attempt < 2 {
+			timer := time.NewTimer(time.Second)
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				return nil, fmt.Errorf("cannot get delivery: %w", ctx.Err())
+			case <-timer.C:
+			}
+			continue
+		}
+		if err != nil {
+			return nil, fmt.Errorf("cannot get delivery: %w", err)
+		}
+		return delivery, nil
 	}
 }
 
