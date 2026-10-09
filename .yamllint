@@ -1,7 +1,7 @@
 ignore: |
   /vendor
   .git
-  .github/workflows
+  .github/
 
 rules:
   braces: enable
