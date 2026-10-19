@@ -4,7 +4,7 @@ github.com/cespare/xxhash/v2
 # github.com/cpuguy83/go-md2man/v2 v2.0.7
 ## explicit; go 1.12
 github.com/cpuguy83/go-md2man/v2/md2man
-# github.com/go-chi/chi/v5 v5.4.0
+# github.com/go-chi/chi/v5 v5.5.0
 ## explicit; go 1.24
 github.com/go-chi/chi/v5
 github.com/go-chi/chi/v5/middleware
@@ -62,7 +62,7 @@ github.com/russross/blackfriday/v2
 # github.com/urfave/cli/v2 v2.27.7
 ## explicit; go 1.18
 github.com/urfave/cli/v2
-# github.com/xrash/smetrics v0.0.0-20250705151800-55b8f293f342
+# github.com/xrash/smetrics v0.0.0-20261013231157-39c47d93efba
 ## explicit; go 1.15
 github.com/xrash/smetrics
 # go.uber.org/atomic v1.12.0
