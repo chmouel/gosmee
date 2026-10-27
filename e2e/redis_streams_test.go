@@ -65,9 +65,10 @@ type gosmeeProcess struct {
 
 func (p *gosmeeProcess) stop() {
 	p.cancel()
-	done := make(chan error, 1)
+	done := make(chan struct{})
 	go func() {
-		done <- p.cmd.Wait()
+		_ = p.cmd.Wait()
+		close(done)
 	}()
 	select {
 	case <-done:
