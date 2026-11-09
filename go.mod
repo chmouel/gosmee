@@ -28,6 +28,6 @@ require (
 	github.com/xrash/smetrics v0.0.0-20261013231157-39c47d93efba // indirect
 	go.uber.org/atomic v1.12.0 // indirect
 	golang.org/x/net v0.62.0 // indirect
-	golang.org/x/sys v0.49.0 // indirect
+	golang.org/x/sys v0.50.0 // indirect
 	gopkg.in/cenkalti/backoff.v1 v1.1.0 // indirect
 )
