@@ -68,7 +68,7 @@ github.com/xrash/smetrics
 # go.uber.org/atomic v1.12.0
 ## explicit; go 1.18
 go.uber.org/atomic
-# golang.org/x/crypto v0.58.0
+# golang.org/x/crypto v0.59.0
 ## explicit; go 1.26.0
 golang.org/x/crypto/acme
 golang.org/x/crypto/acme/autocert
@@ -88,7 +88,7 @@ golang.org/x/net/idna
 golang.org/x/sys/cpu
 golang.org/x/sys/unix
 golang.org/x/sys/windows
-# golang.org/x/text v0.43.0
+# golang.org/x/text v0.44.0
 ## explicit; go 1.26.0
 golang.org/x/text/cases
 golang.org/x/text/internal
