@@ -12,8 +12,8 @@ require (
 	github.com/r3labs/sse/v2 v2.10.0
 	github.com/redis/go-redis/v9 v9.23.0
 	github.com/urfave/cli/v2 v2.27.7
-	golang.org/x/crypto v0.58.0
-	golang.org/x/text v0.43.0
+	golang.org/x/crypto v0.59.0
+	golang.org/x/text v0.44.0
 	gopkg.in/yaml.v3 v3.0.1
 	gotest.tools/v3 v3.5.2
 )
